@@ -5,7 +5,7 @@
 error_reporting (E_ERROR | E_WARNING | E_PARSE | E_NOTICE);
 
 // TODO: Lazy loading.
-include_once( '../Torpor.class' );
+include_once( '../Torpor.php' );
 
 // TODO: Need a way to instantiate this object, not as ColumnAsClass, but
 // as an actual column instead.  This should be used in the custom column type
