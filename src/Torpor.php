@@ -288,7 +288,7 @@ class Torpor {
 		foreach( array_keys( $grids ) as $gridName ){
 			if( isset( $references{ $gridName } ) && count( $references{ $gridName } ) > 0 ){
 				foreach( $references{ $gridName } as $targetGrid => $columnPairs ){
-					if( !$grids{ $targetGrid } ){
+					if( !isset( $grids{ $targetGrid } ) ){
 						throw( new Exception( 'Unknown grid "'.$targetGrid.'" in key references from grid '.$gridName ) );
 					}
 					$filled_keys = array();
@@ -720,7 +720,7 @@ class Torpor {
 
 	public static function xmlObjKeyName( SimpleXMLElement $xmlObj ){
 		$name = self::makeKeyName( (string)$xmlObj->attributes()->name );
-		if( !$name ){ $name = $this->makeKeyName( (string)$xmlObj->attributes()->dataName ); }
+		if( !$name ){ $name = self::makeKeyName( (string)$xmlObj->attributes()->dataName ); }
 		return( $name );
 	}
 }

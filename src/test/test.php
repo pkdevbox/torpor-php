@@ -47,9 +47,10 @@ class User extends Grid
 // TODO: Default values for columns (and perhaps have the default value maintain an addressing
 // scheme such as 'userDefined:ApplicationName' which indicates where to get that default value.
 // TODO: Data fetch specifications making use of stored procedures/functions instead of tables.
+// TODO: Be able to mark grids as read-only
 $xmlConfig = <<<XML
 <?xml version='1.0'?>
-<trpr:TorporConfig version="0.1" xmlns:trpr="http://www.tricornersoftware.com/Products/Torpor/Config/1.0">
+<trpr:TorporConfig version="0.1" xmlns:trpr="http://www.tricornersoftware.com/Products/Torpor/Config/0.1">
 	<Database/>
 	<Options/>
 	<Grids>
@@ -97,7 +98,6 @@ $xmlConfig = <<<XML
 	</Grids>
 </trpr:TorporConfig>
 XML;
-
 
 // A number of different ways of accessing the Torpor singleton instance exist.
 // Either through a number of statically declared methods, an instance of the
