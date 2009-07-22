@@ -2,10 +2,10 @@
 // $Rev$
 // This should be redundant with lazy loading, but redunance
 // in some cases is better than broken in others.
-require_once( 'PersistableContainer.class' );
-require_once( 'Grid.class' );
-require_once( 'Column.class' );
-require_once( 'Criteria.class' );
+require_once( 'PersistableContainer.php' );
+require_once( 'Grid.php' );
+require_once( 'Column.php' );
+require_once( 'Criteria.php' );
 
 // TODO: phpdoc
 // TODO: Review all singleton vs. object context interfaces and make
