@@ -5,8 +5,9 @@
 class Grid extends PersistableContainer
 {
 	const OPERATION_GET = 'get';
+	const OPERATION_IS  = 'is';
+	const OPERATION_NEW = 'new';
 	const OPERATION_SET = 'set';
-	const OPERATION_IS = 'is';
 
 	private $_columns = array();
 
@@ -17,10 +18,12 @@ class Grid extends PersistableContainer
 		if( $columnName instanceof Column ){
 			$columnName = $columnName->_getObjName();
 		}
-		return( in_array( strtoupper( $columnName ), $this->_getColumnNames() ) );
+		return( in_array( $this->Torpor()->makeKeyName( $columnName ), $this->_getColumnNames() ) );
 	}
 
+	public function Column( $columName ){ return( $this->_getColumn( $columnName ) ); }
 	public function _getColumn( $columnName ){
+		$columnName = $this->Torpor()->makeKeyName( $columnName );
 		if( !$this->hasColumn( $columnName ) ){
 			throw( new Exception( $columnName.' is not a valid column on '.$this->_getObjName() ) );
 		}
@@ -155,8 +158,9 @@ class Grid extends PersistableContainer
 	// Abstract all getter & setter methods.
 	public function __call( $func, $args ){
 		$return = null;
+		// TODO: Decide on a common scheme of strto(upper|lower)
 		$func = strtolower( $this->Torpor()->makeKeyName( $func ) );
-		$operation = strtolower( substr( $func, 0, 3 ) );
+		$operation = ( stripos( $func, self::OPERATION_IS ) === 0 ? self::OPERATION_IS : strtolower( substr( $func, 0, 3 ) ) );
 		// TODO: Evalutate operations first?
 
 		// TODO: make use of the 'is' prefix when testing bools, and the convention of setBoolColumn()
@@ -165,9 +169,20 @@ class Grid extends PersistableContainer
 		// TODO: How to handle factory methods based on identified foreign key
 		// criteria?  Should always be fetching a collection (which may have a single member,
 		// which will need to have convenience methods for as well)
-		$target = strtoupper( substr( $func, 3 ) );
-		if( !$this->hasColumn( $target ) ){
-			throw( new Exception( $target.' does not exist as a member of this class' ) );
+		$funcRemainder = strtoupper( substr( $func, strlen( $operation ) ) );
+		if( !$this->hasColumn( $funcRemainder ) ){
+			// Not attempting a column operation, see if this is something we're looking for
+			// larger factory operations.
+			// get<Target>
+			// get<Target>Set
+			// new<Target>
+			// new<Target>Set ?
+			$torporCall = $func.Torpor::OPERATION_MOD_FROM.$this->_getObjName();
+			if( $this->Torpor()->can( $torporCall ) ){
+				return( $this->Torpor()->$torporCall( $this ) );
+			} else {
+				throw( new Exception( $funcRemainder.' does not exist as a member or method of this class' ) );
+			}
 		}
 		// TODO: What to do about longer operation names, and especially the treatment
 		// of collections? (for add/remove operations)  And collections in general, with their
@@ -186,20 +201,32 @@ class Grid extends PersistableContainer
 		// own, making sure that any time one of the sub members is deleted or published that
 		// the appropriate changes also take place inside that map.  This still needs to be
 		// accessible to the user without jumping through too many hoops.
-		$column = $this->_getColumn( $target );
+		$column = $this->_getColumn( $funcRemainder );
 		if( !( $column instanceof Column ) ){
-			throw( new Exception( $target.' is not a valid Column object' ) );
+			throw( new Exception( $funcRemainder.' is not a valid Column object' ) );
 		}
 		switch( $operation ){
-			case self::OPERATION_SET:
-				$return = $column->setData( array_shift( $args ) );
-				$this->_setDirty( $this->isDirty() || $column->isDirty() );
+			case self::OPERATION_IS:
+				if( $column->getType() == Column::TYPE_BOOL ){
+					$return = $column->getData();
+				} else {
+					trigger_error( $funcRemainder.' is not of type '.Column::TYPE_BOOL, E_USER_ERROR );
+				}
 				break;
 			case self::OPERATION_GET:
 				if( !$column->isLoaded() && $this->isLoaded() ){
-					throw( new Exception( 'Unloaded Column '.$target.' in loaded Grid '.$this->_getObjName() ) );
+					throw( new Exception( 'Unloaded Column '.$funcRemainder.' in loaded Grid '.$this->_getObjName() ) );
 				}
 				$return = $column->getData(); // Will automatically load the grid as necessary.
+				break;
+			case self::OPERATION_SET:
+				// alias set<Column>() == set<Column>( true ); for BOOL types
+				if( count( $args ) == 0 && $column->getType() == Column::TYPE_BOOL ){
+					$return = $column->setData( true );
+				} else {
+					$return = $column->setData( array_shift( $args ) );
+				}
+				$this->_setDirty( $this->isDirty() || $column->isDirty() );
 				break;
 			default:
 				throw( new Exception( 'Unrecognized operation '.$operation ) );

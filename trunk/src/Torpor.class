@@ -16,12 +16,15 @@ class Torpor {
 	const VERSION = 0.1;
 
 	// Options
-	const OPTION_OVERWRITE_ON_LOAD = 'OverwriteOnLoad';
+	const OPTION_OVERWRITE_ON_LOAD  = 'OverwriteOnLoad';
 	const DEFAULT_OVERWRITE_ON_LOAD = false;
-	const OPTION_GRID_CLASS = 'DefaultGridClass';
+
+	const OPTION_GRID_CLASS  = 'DefaultGridClass';
 	const DEFAULT_GRID_CLASS = 'Grid';
-	const OPTION_COLUMN_CLASS = 'DefaultColumnClass';
+
+	const OPTION_COLUMN_CLASS  = 'DefaultColumnClass';
 	const DEFAULT_COLUMN_CLASS = 'Column';
+
 	const VALUE_NONE = 'none';
 
 	// Utility
@@ -39,6 +42,7 @@ class Torpor {
 
 	const OPERATION_NEW = 'new';
 	const OPERATION_GET = 'get';
+	const OPERATION_CAN = 'can';
 	const OPERATION_GET_SET = 'set';
 	const OPERATION_MOD_FROM = 'from';
 	const OPERATION_GET_CRITERIA = 'criteria';
@@ -49,12 +53,8 @@ class Torpor {
 	private $_xmlConfig = null;
 	private $_config = array();
 	private $_isInitialized = false;
-	private $_containsKeywordSubstring = false;
 
 	private $_cachedCalls = array();
-
-	// TODO: Need to keep this?
-	private $_prototypeCache = array();
 
 	private $_warnings = array();
 	private $_errors = array();
@@ -95,9 +95,6 @@ class Torpor {
 	}
 
 	public static function Version(){ return( self::VERSION ); }
-
-	protected function containsKeywordSubstring(){ return( $this->_containsKeywordSubstring ); }
-	protected function setContainsKeywordSubstring( $bool = true ){ return( $this->_containsKeywordSubstring = ( $bool ? true : false ) ); }
 
 	public function initialize( $config ){
 		$instance = null;
@@ -154,6 +151,11 @@ class Torpor {
 			if( isset( $grids{ $gridName } ) ){
 				throw( new Exception( 'Duplicate grid name '.$gridName ) );
 			}
+			$grids{ $gridName } = (string)$xmlGrid->attributes()->dataName;
+			$columns{ $gridName } = array();
+			$keys{ $gridName } = array();
+			$uniqueKeys{ $gridName } = array();
+			$references{ $gridName } = array();
 			if( $className = (string)$xmlGrid->attributes()->class ){
 				if( $className == self::VALUE_NONE ){
 					$className = self::DEFAULT_GRID_CLASS;
@@ -174,13 +176,6 @@ class Torpor {
 				}
 				$gridClasses{ $gridName } = $className;
 			}
-
-			$this->_containsKeywordSubstring = ( $this->_containsKeywordSubstring || $this->stringContainsKeywordSubstring( $gridName ) );
-			$grids{ $gridName } = (string)$xmlGrid->attributes()->dataName;
-			$columns{ $gridName } = array();
-			$keys{ $gridName } = array();
-			$uniqueKeys{ $gridName } = array();
-			$references{ $gridName } = array();
 
 			foreach( $xmlGrid->Columns->Column as $xmlColumn ){
 				$columnName = $this->xmlObjKeyName( $xmlColumn );
@@ -250,6 +245,12 @@ class Torpor {
 					}
 				}
 			}
+			if(
+				count( $keys{ $gridName } ) == 0
+				&& count( $uniqueKeys{ $gridName } ) == 0
+			){
+				trigger_error( 'No primary or unique keys defined for grid '.$gridName.', object update will be impossible', E_USER_WARNING );
+			}
 
 			if( $xmlGrid->Keys->Foreign ){
 				foreach( $xmlGrid->Keys->Foreign->Key as $xmlKey ){
@@ -274,10 +275,87 @@ class Torpor {
 					if( !$columnName || !$columns{ $gridName }{ $columnName } ){
 						throw( new Exception( 'Invalid column referenceColumn '.(string)$xmlKey->attributes()->referenceColumn.' in foreign key under grid '.$gridName ) );
 					}
+					// TODO: It is possible for a grid to have multiple references to the same
+					// target grid, even to have multiple references to the same key (transactional
+					// data referencing multiple Entity records, for example).  While this model
+					// supports that, it may lead to ambiguity in the selection process that needs
+					// to be addressed.
 					$references{ $gridName }{ $targetGrid }{ $columnName } = $targetColumnName;
 				}
 			}
+		}
 
+		foreach( array_keys( $grids ) as $gridName ){
+			if( isset( $references{ $gridName } ) && count( $references{ $gridName } ) > 0 ){
+				foreach( $references{ $gridName } as $targetGrid => $columnPairs ){
+					if( !$grids{ $targetGrid } ){
+						throw( new Exception( 'Unknown grid "'.$targetGrid.'" in key references from grid '.$gridName ) );
+					}
+					$filled_keys = array();
+					foreach(
+						array(
+							$keys{ $targetGrid },
+							$uniqueKeys{ $targetGrid }
+						) as $temp_keys
+					){
+						if( is_array( $temp_keys ) ){
+							foreach( $temp_keys as $key ){
+								$filled_keys[] = (
+									is_array( $key )
+									? array_combine( $key, array_fill( 0, count( $key ), false ) )
+									: array( $key => false )
+								);
+							}
+						} else {
+							$filled_keys[] = array( $temp_keys => false );
+						}
+					}
+					foreach( $columnPairs as $columnName => $targetColumnName ){
+						if( !$columns{ $targetGrid }{ $targetColumnName } ){
+							throw( new Exception( 'Unknown reference column "'.$targetColumnName.'" in key reference from '.$gridName.' on column '.$columnName ) );
+						}
+						foreach( $filled_keys as $index => $key ){
+							if( isset( $filled_keys[ $index ]{ $targetColumnName } ) ){
+								$filled_keys[ $index ]{ $targetColumnName } = true;
+							}
+						}
+					}
+					$cleanReference = false;
+					foreach( $filled_keys as $temp_keys ){
+						$pass = true;
+						foreach( $temp_keys as $match ){
+							if( !$match ){
+								$pass = false;
+							}
+						}
+						if( $pass ){
+							$cleanReference = true;
+							break;
+						}
+					}
+					if( !$cleanReference ){
+						trigger_error( 'No complete reference key / unique key combination from '.$gridName.' to '.$targetGrid, E_USER_WARNING );
+					} else {
+						$this->cacheCall(
+							self::OPERATION_GET.$targetGrid.self::OPERATION_MOD_FROM.$gridName,
+							'_getGridFromRecord', // TODO: Const?
+							$targetGrid
+						);
+						$this->cacheCall(
+							self::OPERATION_GET.$gridName.self::OPERATION_GET_SET
+							.self::OPERATION_MOD_FROM.$targetGrid,
+							'_getGridSetFromRecord',
+							$gridName
+						);
+						$this->cacheCall(
+							self::OPERATION_NEW.$gridName.self::OPERATION_MOD_FROM.$targetGrid,
+							'_newGridFromRecord',
+							$gridName
+						);
+					}
+				}
+			}
+			$this->cacheCall( 'new'.$gridName, '_newGrid', $gridName );
 		}
 		// TODO: Now that we have all tables scanned, make sure that all foreign references
 		// correspond to known table types.
@@ -309,7 +387,13 @@ class Torpor {
 			if( $gridName instanceof Grid ){
 				$gridName = $gridName->_getObjName();
 			}
-			return( $this->_config{ $x }{ $gridName } );
+			return(
+				(
+					isset( $this->_config{ $x }{ $gridName } )
+					? $this->_config{ $x }{ $gridName }
+					: null
+				)
+			);
 		}
 		return( $this->_config{ $x } );
 	}
@@ -352,7 +436,7 @@ class Torpor {
 		}
 		return(
 			(
-				$this->_getGridClasses( $gridName )
+				!is_null( $this->_getGridClasses( $gridName ) )
 				? $this->_getGridClasses( $gridName )
 				: $this->options( self::OPTION_GRID_CLASS )
 			)
@@ -467,15 +551,17 @@ class Torpor {
 		// configuration setting (global to the Torpor instance) and *possibly*
 		// support local override.  Otherwise, since we're already talking to the
 		// database, we might as well slurp the whole bunch, yeah?
+		var_dump( 'getting single grid of type '.$gridName.' from type '.$record->_getObjName() );
 	}
 
 	public function _getGridFromCriteria( $gridName, Criteria $criteria ){
 	}
 
-	public function _getSetFromRecord( $gridName, Grid $record ){
+	public function _getGridSetFromRecord( $gridName, Grid $record ){
+		var_dump( 'getting grid set of type '.$gridName.' from type '.$record->_getObjName() );
 	}
 
-	public function _getSetFromCriteria( $gridName, Grid $record ){
+	public function _getGridSetFromCriteria( $gridName, Grid $record ){
 	}
 
 	public function _newGrid( $gridName ){
@@ -524,40 +610,30 @@ class Torpor {
 		$funcRemainder = substr( $func, 3 );
 		$return = null;
 		switch( $operation ){
+			case self::OPERATION_CAN:
+				$return = $this->can( $funcRemainder );
+				break;
 			case self::OPERATION_NEW:
 				$targetGridType = null;
-				if( $this->containsKeywordSubstring() ){
-					// TODO: Fancy Dance
-				} else {
-					if( $this->supportedGrid( $funcRemainder ) ){
-						// WARNING: Magic string '_newGrid' rather than constant or verified
-						// contents.  TODO: Fix this.
-						$this->cacheCall( $func, '_newGrid', $funcRemainder );
-						$return = $this->_newGrid( $funcRemainder );
-					}
+				if( $this->supportedGrid( $funcRemainder ) ){
+					// WARNING: Magic string '_newGrid' rather than constant or verified
+					// contents.  TODO: Fix this.
+					$this->cacheCall( $func, '_newGrid', $funcRemainder );
+					$return = $this->_newGrid( $funcRemainder );
 				}
+				break;
 			case self::OPERATION_GET:
 				// Get a Grid instance from...
 				$targetGridType = null;
 				$sourceGridType = null;
-				if( $this->containsKeywordSubstring() ){
-					// Tricky Footwork: if a keyword appears multiple
-					// times, we need to figure out which of those corresponds
-					// to the target grid, source identifier, and/or modifier.
-					// TODO: Find out which one we have multiple times, and whether
-					// this is a candidate for any of those.
-					if( stripos( $funcRemainder, self::OPERATION_MOD_FROM ) ){
-					}
-				} else {
-					if( $this->supportedGrid( $funcRemainder ) ){
-						// Assume we're getting it from either an ID or a unique constraint
-					}
-					if( stripos( $funcRemainder, self::OPERATION_MOD_FROM ) ){
-						list( $source, $target ) = explode( self::OPERATION_MOD_FROM, $funcRemainder );
-						// TODO: Leavning off here...
-						print_r( $source );
-						print_r( $target );
-					}
+				if( $this->supportedGrid( $funcRemainder ) ){
+					// Assume we're getting it from either an ID or a unique constraint
+				}
+				if( stripos( $funcRemainder, self::OPERATION_MOD_FROM ) ){
+					list( $source, $target ) = explode( self::OPERATION_MOD_FROM, $funcRemainder );
+					// TODO: Leavning off here...
+					print_r( $source );
+					print_r( $target );
 				}
 				// A record of unknown type
 				// Another Record of known type
@@ -573,17 +649,21 @@ class Torpor {
 	// Cache functions
 	// TODO: Grid instance cache, mechanisms to flush or override
 
+	public function can( $callName ){
+		return( $this->cachedCall( $callName ) );
+	}
 	protected function cachedCall( $callName ){
-		return( in_array( $callName, array_keys( $this->_cachedCalls ) ) );
+		return( in_array( $this->makeKeyName( $callName ), array_keys( $this->_cachedCalls ) ) );
 	}
 	protected function cacheCall( $callName, $mappedCall ){
 		// WARNING: Expeditious use of magic number corresponding
 		// to the number of known arguments in caching this call
-		$this->_cachedCalls{ $callName } = array(
+		$this->_cachedCalls{ $this->makeKeyName( $callName ) } = array(
 			$mappedCall => array_splice( func_get_args(), 2 )
 		);
 	}
 	protected function callCachedCall( $callName, $newArgs ){
+		$callName = $this->makeKeyName( $callName );
 		if( !$this->cachedCall( $callName ) ){
 			throw( new Exception( 'Unknown cached call "'.$callName.'"' ) );
 		}
