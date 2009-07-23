@@ -26,6 +26,7 @@ class Torpor {
 	const DEFAULT_COLUMN_CLASS = 'Column';
 
 	const VALUE_NONE = 'none';
+	const VALUE_SEPARATOR = '|';
 
 	// Utility
 	// These are all the characters which will be stripped.
@@ -265,6 +266,10 @@ class Torpor {
 						$references{ $gridName }{ $targetGrid } = array();
 					}
 					$columnName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
+					if( $xmlKey->attributes()->referenceGridAlias ){
+						$alias = $this->makeKeyName( (string)$xmlKey->attributes()->referenceGridAlias );
+						$targetGrid.= self::VALUE_SEPARATOR.$alias;
+					}
 					if( !$columnName || !isset( $columns{ $gridName }{ $columnName } ) ){
 						throw( new Exception( 'Invalid column reference '.(string)$xmlKey->attributes()->column.' in foreign key under grid '.$gridName ) );
 					}
@@ -285,9 +290,17 @@ class Torpor {
 			}
 		}
 
+		// Review all specified keys and confirm target grid and columns exist, and determine
+		// of these keys which ones provide discrete mappings (complete overlap with one or more
+		// of the unique constraints [primary or otherwise] on the target table, such that definitive
+		// identification is assured)
 		foreach( array_keys( $grids ) as $gridName ){
 			if( isset( $references{ $gridName } ) && count( $references{ $gridName } ) > 0 ){
 				foreach( $references{ $gridName } as $targetGrid => $columnPairs ){
+					$alias = false;
+					if( stripos( $targetGrid, self::VALUE_SEPARATOR ) ){
+						list( $targetGrid, $alias ) = explode( self::VALUE_SEPARATOR, $targetGrid );
+					}
 					if( !isset( $grids{ $targetGrid } ) ){
 						throw( new Exception( 'Unknown grid "'.$targetGrid.'" in key references from grid '.$gridName ) );
 					}
@@ -336,22 +349,45 @@ class Torpor {
 					if( !$cleanReference ){
 						trigger_error( 'No complete reference key / unique key combination from '.$gridName.' to '.$targetGrid, E_USER_WARNING );
 					} else {
-						$this->cacheCall(
-							self::OPERATION_GET.$targetGrid.self::OPERATION_MOD_FROM.$gridName,
-							'_getGridFromRecord', // TODO: Const?
-							$targetGrid
-						);
-						$this->cacheCall(
-							self::OPERATION_GET.$gridName.self::OPERATION_GET_SET
-							.self::OPERATION_MOD_FROM.$targetGrid,
-							'_getGridSetFromRecord',
-							$gridName
-						);
-						$this->cacheCall(
-							self::OPERATION_NEW.$gridName.self::OPERATION_MOD_FROM.$targetGrid,
-							'_newGridFromRecord',
-							$gridName
-						);
+						if( $alias ){
+							// Put'em back together.
+							$targetGrid = $targetGrid.self::VALUE_SEPARATOR.$alias;
+							$this->cacheCall(
+								self::OPERATION_GET.$alias.self::OPERATION_MOD_FROM.$gridName,
+								'_getGridFromRecord', // TODO: Const?
+								$targetGrid
+							);
+							$this->cacheCall(
+								self::OPERATION_GET.$gridName.self::OPERATION_GET_SET
+								.self::OPERATION_MOD_FROM.$alias,
+								'_getGridSetFromAliasRecord',
+								$gridName,
+								$alias
+							);
+							$this->cacheCall(
+								self::OPERATION_NEW.$gridName.self::OPERATION_MOD_FROM.$alias,
+								'_newGridFromAliasRecord',
+								$gridName,
+								$alias
+							);
+						} else {
+							$this->cacheCall(
+								self::OPERATION_GET.$targetGrid.self::OPERATION_MOD_FROM.$gridName,
+								'_getGridFromRecord', // TODO: Const?
+								$targetGrid
+							);
+							$this->cacheCall(
+								self::OPERATION_GET.$gridName.self::OPERATION_GET_SET
+								.self::OPERATION_MOD_FROM.$targetGrid,
+								'_getGridSetFromRecord',
+								$gridName
+							);
+							$this->cacheCall(
+								self::OPERATION_NEW.$gridName.self::OPERATION_MOD_FROM.$targetGrid,
+								'_newGridFromRecord',
+								$gridName
+							);
+						}
 					}
 				}
 			}
@@ -561,6 +597,10 @@ class Torpor {
 		var_dump( 'getting grid set of type '.$gridName.' from type '.$record->_getObjName() );
 	}
 
+	public function _getGridSetFromAliasRecord( $gridName, $alias, Grid $record ){
+		var_dump( 'getting grid set of type '.$gridName.' from type '.$record->_getObjName().' as '.$alias );
+	}
+
 	public function _getGridSetFromCriteria( $gridName, Grid $record ){
 	}
 
@@ -590,7 +630,12 @@ class Torpor {
 	// exist between the foreign key references and either the primary or other unique key(s)
 	// of the target table, and instantiates a grid of the target type pre-populated with the
 	// identified key data.
-	public function _newGridFromRecord( $gridName, $record ){
+	public function _newGridFromRecord( $gridName, Grid $record ){
+		var_dump( 'creating new '.$gridName.' from '.$record->_getObjName() );
+	}
+
+	public function _newGridFromAliasRecord( $gridName, $alias, Grid $record ){
+		var_dump( 'creating new '.$gridName.' from '.$record->_getObjName().' as '.$alias );
 	}
 
 	public function _newGridFromCriteria( $gridName, Criteria $criteria ){
