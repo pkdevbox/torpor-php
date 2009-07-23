@@ -185,6 +185,14 @@ class Grid extends PersistableContainer
 					return( $this->Torpor()->$torporCall( $this ) );
 				}
 			}
+			// TODO: set<Target> where <Target> is a grid (or grid alias), e.g.,
+			// $order->setUser( $user ) or $order->setCustomer( $user ).  Especially
+			// necessary for this to be handled internally (rather than individual object
+			// extension by the end-user) since we will need to keep track of the unsaved
+			// object dependency tree, in the event that $user (from the above example)
+			// has not yet been published, but should be in the event that $order is (and
+			// in fact would need to be saved first, in order to propagate the relaionship
+			// defining keeys up to $order prior to its being published)
 			throw( new Exception( $funcRemainder.' does not exist as a member or method of this class' ) );
 		}
 		// TODO: What to do about longer operation names, and especially the treatment
