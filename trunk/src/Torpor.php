@@ -693,6 +693,9 @@ class Torpor {
 
 	// Cache functions
 	// TODO: Grid instance cache, mechanisms to flush or override
+	// TODO: Unsaved object cache and dependency tree for related
+	// but unpublished grids that need to cascade, with recursion
+	// checking on the cascading publish routines.
 
 	public function can( $callName ){
 		return( $this->cachedCall( $callName ) );
