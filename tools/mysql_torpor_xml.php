@@ -21,19 +21,24 @@ $connection = mysql_connect( $args['host'], $args['user'], $args['password'] ) o
 mysql_select_db( 'information_schema', $connection ) or die( mysql_error() );
 
 $dataTypeMap = array(
+	'char' => 'char',
 	'varchar' => 'varchar',
-	'bigint' => 'int',
+	'tinyint' => 'integer',
+	'smallint' => 'integer',
+	'mediumint' => 'integer',
+	'bigint' => 'integer',
 	'longtext' => 'text',
 	'decimal' => 'float',
+	'date' => 'date'
 	'datetime' => 'datetime',
-	'int' => 'int',
+	'int' => 'integer',
 	'timestamp' => 'datetime',
 	'text' => 'text',
 	'enum' => 'varchar', // TODO!!
 	'double' => 'double',
 	'tinytext' => 'varchar',
 	'mediumint' => 'int',
-	'float nsigned' => 'float',
+	'float unsigned' => 'float',
 	'mediumtext' => 'text',
 	'set' => 'varchar', // TODO!!
 	'time' => 'time',

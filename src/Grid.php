@@ -177,12 +177,15 @@ class Grid extends PersistableContainer
 			// get<Target>Set
 			// new<Target>
 			// new<Target>Set ?
-			$torporCall = $func.Torpor::OPERATION_MOD_FROM.$this->_getObjName();
-			if( $this->Torpor()->can( $torporCall ) ){
-				return( $this->Torpor()->$torporCall( $this ) );
+			if( stripos( $func, Torpor::OPERATION_MOD_FROM ) && $this->Torpor()->can( $func ) ){
+				return( $this->Torpor()->$func( $this ) );
 			} else {
-				throw( new Exception( $funcRemainder.' does not exist as a member or method of this class' ) );
+				$torporCall = $func.Torpor::OPERATION_MOD_FROM.$this->_getObjName();
+				if( $this->Torpor()->can( $torporCall ) ){
+					return( $this->Torpor()->$torporCall( $this ) );
+				}
 			}
+			throw( new Exception( $funcRemainder.' does not exist as a member or method of this class' ) );
 		}
 		// TODO: What to do about longer operation names, and especially the treatment
 		// of collections? (for add/remove operations)  And collections in general, with their
