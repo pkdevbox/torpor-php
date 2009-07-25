@@ -26,6 +26,7 @@ class Torpor {
 	const OPTION_COLUMN_CLASS  = 'DefaultColumnClass';
 	const DEFAULT_COLUMN_CLASS = 'Column';
 
+	const VALUE_TRUE = 'true';
 	const VALUE_NONE = 'none';
 	const VALUE_SEPARATOR = '|';
 
@@ -66,6 +67,7 @@ class Torpor {
 	private $_isInitialized = false;
 
 	private $_cachedCalls = array();
+	private $_prePublishedIdentifierCache = array();
 
 	private $_warnings = array();
 	private $_errors = array();
@@ -291,32 +293,24 @@ class Torpor {
 					if( !$targetGrid ){
 						$this->throwException( 'Invalid referenceGrid '.(string)$xmlKey->attributes()->referenceGrid.' in foreign key under grid '.$gridName );
 					}
+					if( $xmlKey->attributes()->referenceGridAlias ){
+						$alias = $this->makeKeyName( (string)$xmlKey->attributes()->referenceGridAlias );
+						$targetGrid.= self::VALUE_SEPARATOR.$alias;
+					}
+					$columnName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
+					if( !$columnName || !isset( $columns{ $gridName }{ $columnName } ) ){
+						$this->throwException( 'Invalid column reference '.(string)$xmlKey->attributes()->column.' in foreign key under grid '.$gridName );
+					}
 					if(
 						!isset( $references{ $gridName }{ $targetGrid } )
 						|| !is_array( $references{ $gridName }{ $targetGrid } )
 					){
 						$references{ $gridName }{ $targetGrid } = array();
 					}
-					$columnName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
-					if( $xmlKey->attributes()->referenceGridAlias ){
-						$alias = $this->makeKeyName( (string)$xmlKey->attributes()->referenceGridAlias );
-						$targetGrid.= self::VALUE_SEPARATOR.$alias;
-					}
-					if( !$columnName || !isset( $columns{ $gridName }{ $columnName } ) ){
-						$this->throwException( 'Invalid column reference '.(string)$xmlKey->attributes()->column.' in foreign key under grid '.$gridName );
-					}
 					if( isset( $references{ $gridName }{ $targetGrid }{ $columnName } ) ){
 						$this->throwException( 'Duplicate column reference '.$columnName.' in foreign key under grid '.$gridName );
 					}
 					$targetColumnName = $this->makeKeyName( (string)$xmlKey->attributes()->referenceColumn );
-					if( !$columnName || !$columns{ $gridName }{ $columnName } ){
-						$this->throwException( 'Invalid column referenceColumn '.(string)$xmlKey->attributes()->referenceColumn.' in foreign key under grid '.$gridName );
-					}
-					// TODO: It is possible for a grid to have multiple references to the same
-					// target grid, even to have multiple references to the same key (transactional
-					// data referencing multiple Entity records, for example).  While this model
-					// supports that, it may lead to ambiguity in the selection process that needs
-					// to be addressed.
 					$references{ $gridName }{ $targetGrid }{ $columnName } = $targetColumnName;
 				}
 			}
@@ -370,48 +364,15 @@ class Torpor {
 					if( is_null( $this->_getGrids( $targetGrid ) ) ){
 						$this->throwException( 'Unknown grid "'.$targetGrid.'" in key references from grid '.$gridName );
 					}
-					foreach( $this->_getAllGridKeys( $targetGrid ) as $keys ){
-						if( is_array( $keys ) ){
-							// Not using array_fill_keys due to target compatibility of PHP 5.1.x
-							foreach( $keys as $key ){
-								$filled_keys[] = (
-									is_array( $key )
-									? array_combine( $key, array_fill( 0, count( $key ), false ) )
-									: array( $key => false )
-								);
-							}
-						} else {
-							$filled_keys[] = array( $keys => false );
-						}
-					}
-					
+					// TODO: Keep the exceptions, because the intialize routines are the place to check for them.
+					// Otherwise, complete replace this with the canReference routines.
 					foreach( $columnPairs as $columnName => $targetColumnName ){
 						$columns = $this->_getColumns( $targetGrid );
 						if( !is_array( $columns ) || !isset( $columns{ $targetColumnName } ) ){
 							$this->throwException( 'Unknown reference column "'.$targetColumnName.'" in key reference from '.$gridName.' on column '.$columnName );
 						}
-						foreach( $filled_keys as $index => $key ){
-							if( isset( $filled_keys[ $index ]{ $targetColumnName } ) ){
-								$filled_keys[ $index ]{ $targetColumnName } = true;
-							}
-						}
 					}
-					$cleanReference = false;
-					foreach( $filled_keys as $temp_keys ){
-						$pass = true;
-						foreach( $temp_keys as $match ){
-							if( !$match ){
-								$pass = false;
-							}
-						}
-						if( $pass ){
-							$cleanReference = true;
-							break;
-						}
-					}
-					if( !$cleanReference ){
-						trigger_error( 'No complete reference key / unique key combination from '.$gridName.' to '.$targetGrid, E_USER_WARNING );
-					} else {
+					if( $this->canReference( $gridName, $targetGrid, ( $alias ? $alias : self::VALUE_NONE ) ) ){
 						if( $alias ){
 							// Put'em back together.
 							$targetGrid = $targetGrid.self::VALUE_SEPARATOR.$alias;
@@ -451,6 +412,8 @@ class Torpor {
 								$gridName
 							);
 						}
+					} else {
+						trigger_error( 'No complete reference key / unique key combination from '.$gridName.' to '.$targetGrid, E_USER_WARNING );
 					}
 				}
 			}
@@ -500,21 +463,75 @@ class Torpor {
 		return( $this->_config{ self::ARKEY_OPTIONS }{ $optionName } = $setting );
 	}
 
-	public function canReference( $sourceGridName, $targetGridName ){
-		// TODO: First, see if we already have a cache function that indicates we've
-		// already matched all of this up.
-		// TODO: Figure out a good naming scheme and approach for getting alias reference
-		// keys (would need to return a collection like:
-		// array(
-		// 	'alias' => array(
-		//		'sourceColumn' => 'targetColumn'[, ...]
-		//	)
-		// )
-		// From any known Source and Target grid combination.
-	}
+	public function canReference( $sourceGridName, $targetGridName, $specificAlias = false ){
+		$sourceGridName = $this->gridKeyName( $sourceGridName );
+		$targetGridName = $this->gridKeyName( $targetGridName );
+		if( !$specificAlias && $specificAlias != self::VALUE_NONE ){
+			$specificAlias = $this->gridKeyName( $specificAlias );
+		}
+		$return = false;
+		if( $this->can(
+			self::OPERATION_GET.(
+				$specificAlias && $specificAlias != self::VALUE_NONE
+				? $specificAlias
+				: $targetGridName
+			).self::OPERATION_MOD_FROM.$sourceGridName )
+		){
+			$return = true;
+		} else {
+			// Set up a temporary key array containing all known keys of the target grid
+			// as $filled_keys[ key_set ][ $keyName ] = false.
+			$filled_keys = array();
+			foreach( $this->_getAllGridKeys( $targetGridName ) as $keys ){
+				if( is_array( $keys ) ){
+					// Not using array_fill_keys due to target compatibility of PHP 5.1.x
+					foreach( $keys as $key ){
+						$filled_keys[] = (
+							is_array( $key )
+							? array_combine( $key, array_fill( 0, count( $key ), false ) )
+							: array( $key => false )
+						);
+					}
+				} else {
+					$filled_keys[] = array( $keys => false );
+				}
+			}
+			// Retrieve all reference keys between source and target
+			$referenceKeys = $this->referenceKeysBetween( $sourceGridName, $targetGridName );
+			foreach( $referenceKeys as $sourceColumnName => $targetColumnName ){
+				if(
+					is_array( $targetColumnName )
+				){
+					// $sourceColumnName is actual an Alias name, look deeper into the relationship
+					if( !$specificAlias || $specificAlias == $sourceColumnName ){
+						foreach( $targetColumnName as $aliasedSourceColumnName => $aliasedTargetColumnName ){
+							foreach( $filled_keys as $index => $keySet ){
+								if( isset( $keySet{ $aliasedTargetColumnName } ) ){
+									$filled_keys[ $index ]{ $aliasedTargetColumnName } = true;
+								}
+							}
+						}
+					}
+				} else if( !$specificAlias || $specificAlias == self::VALUE_NONE ){
+					foreach( $filled_keys as $index => $keyset ){
+						if( isset( $filled_keys[ $index ]{ $targetColumnName } ) ){
+							$filled_keys[ $index ]{ $targetColumnName } = true;
+						}
+					}
+				}
+			}
 
-	public function canBeReferencedBy( $targetGridName, $sourceGridName ){
-		return( $this->canReference( $sourceGridName, $targetGridName ) );
+			foreach( $filled_keys as $keyset ){
+				if( !in_array( false, $keyset, true ) ){
+					$return = true;
+					break;
+				}
+			}
+		}
+		return( $return );
+	}
+	public function canBeReferencedBy( $targetGridName, $sourceGridName, $specificAlias = false ){
+		return( $this->canReference( $sourceGridName, $targetGridName, $specificAlias ) );
 	}
 
 	// TODO: Should we return all non-alias references, all references
@@ -547,7 +564,6 @@ class Torpor {
 						foreach( $sourceGridReferenceKeys{ $referenceGridKey } as $sourceColumnName => $targetColumnName ){
 							if( $keyTypes == self::ALL_KEYS_FLAT ){
 								if( in_array( $targetColumnName, array_values( $returnKeys ) ) ){
-									var_dump( $targetColumnName );
 									trigger_error( 'Multiple source keys reference identical target columns between '.$sourceGridName.' and '.$targetGridName, E_USER_WARNING );
 								}
 								$returnKeys{ $sourceColumnName } = $targetColumnName;
@@ -568,8 +584,16 @@ class Torpor {
 		}
 		return( ( count( $returnKeys ) > 0 ? $returnKeys : false ) );
 	}
-	public function aliasReferenceKeysBetween( $sourceGridName, $targetGridName ){
-		return( $this->referenceKeysBetween( $sourceGridName, $targetGridName, self::ALIAS_KEYS_ONLY ) );
+	public function aliasReferenceKeysBetween( $sourceGridName, $targetGridName, $specificAlias = false ){
+		$referenceKeys = $this->referenceKeysBetween( $sourceGridName, $targetGridName, self::ALIAS_KEYS_ONLY );
+		if( $specificAlias ){
+			$specificAlias = $this->gridKeyName( $specificAlias );
+			if( !isset( $referenceKeys{ $specificAlias } ) ){
+				$this->throwException( 'Unsupported or unrecognized alias "'.$specificAlias.'" reference requested between '.$this->gridKeyName( $sourceGridName ).' and '.$this->gridKeyName( $targetGridName ) );
+			}
+			$referenceKeys = $referenceKeys{ $specificAlias };
+		}
+		return( $referenceKeys );
 	}
 	public function aliasReferenceNames( $sourceGridName, $targetGridName ){
 		$references = $this->aliasReferenceKeysBetween( $sourceGridName, $targetGridName );
@@ -864,6 +888,16 @@ class Torpor {
 		}
 		return( $this->_prototypeCache{ $grid->_getObjName() } = $grid );
 	}
+	public function generatePrePublishIdentifier( $obj ){
+		$identifier = null;
+		if( in_array( $obj, $this->_prePublishedIdentifierCache, true ) ){
+			$identifier = array_search( $obj, $this->_prePublishedIdentifierCache, true );
+		} else {
+			$identifier = count( $this->_prePublishedIdentifierCache ) + 1;
+			$this->_prePublishedIdentifierCache{ $identifier } = $obj;
+		}
+		return( $identifier );
+	}
 
 	// TODO: Figure out the actual error handling mechanisms.
 	public function addWarningString( $warning ){ array_push( $this->_warnings, $warning ); }
@@ -877,7 +911,6 @@ class Torpor {
 	public static function throwException( $msg = 'An unkown error has occurred' ){
 		throw( new TorporException( $msg ) );
 	}
-
 
 	public static function stringContainsKeywordSubstring( $name ){
 		$return = false;
