@@ -62,7 +62,7 @@ class Column extends PersistableContainer
 		}
 		$type = Torpor::makeKeyName( (string)$xmlDef->attributes()->type );
 		if( !in_array( $type, $this->getValidTypes() ) ){
-			throw( new Exception( 'Unrecognized type "'.$type.'"' ) );
+			$this->Torpor()->throwException( 'Unrecognized type "'.$type.'"' );
 		}
 		$this->setType( $type );
 		switch( $type ){
@@ -109,7 +109,7 @@ class Column extends PersistableContainer
 		if( $this->Torpor()->makeKeyName( $func ) == $this->getGrid()->_getObjName() ){
 			return( $this->getGrid() );
 		} else {
-			throw( new Exception( 'Unrecognized method "'.$func.'" on Column '.$this->_getObjName().' in Grid '.$this->getGrid()->_getObjName() ) );
+			$this->Torpor()->throwException( 'Unrecognized method "'.$func.'" on Column '.$this->_getObjName().' in Grid '.$this->getGrid()->_getObjName() );
 		}
 	}
 	// Should only be used in the context of Grid::addColumn( $this ), in order
@@ -137,7 +137,7 @@ class Column extends PersistableContainer
 	public function getType(){ return( $this->_type ); }
 	public function setType( $type ){
 		if( !in_array( $type, $this->getValidTypes() ) ){
-			throw( new Exception( $type.' is not a valid type' ) );
+			$this->Torpor()->throwException( $type.' is not a valid type' );
 		}
 		// TODO: Need to validate existing contents during conversion, throw
 		// conversion warnings as necessary.
@@ -153,7 +153,7 @@ class Column extends PersistableContainer
 	public function getMaxLength(){ return( $this->_length ); }
 	public function setMaxLength( $length ){
 		if( !( (int)$length ) ){
-			throw( new Exception( 'Length must be a non-zero integer' ) );
+			$this->Torpor()->throwException( 'Length must be a non-zero integer' );
 		}
 		$this->_length = (int)$length;
 	}
@@ -225,13 +225,13 @@ class Column extends PersistableContainer
 		// a new object and have nothing to actually fetch.
 		// TODO: Loaded primary keys should be read only
 		if( $this->isReadOnly() ){
-			throw( new Exception( $this->_getObjName().' is Read Only' ) );
+			$this->Torpor()->throwException( $this->_getObjName().' is Read Only' );
 		}
 		$return = false;
 			// Do all necessary validation, warnings, and conversion.
 		if( is_null( $data ) ){
 			if( !$this->isNullable() ){
-				throw( new Exception( $this->getDBName().' is not nullable' ) );
+				$this->Torpor()->throwException( $this->getDBName().' is not nullable' );
 			}
 		} else {
 			switch( $this->getType() ){
@@ -245,21 +245,21 @@ class Column extends PersistableContainer
 				case self::TYPE_CLASS: break; // No checking on class data.
 				case self::TYPE_DATE:
 					if( !preg_match( $data, '/^'.self::REGEX_DATE.'$/' ) ){
-						throw( new Exception( 'Invalid date specified "'.$data.'"' ) );
+						$this->Torpor()->throwException( 'Invalid date specified "'.$data.'"' );
 					}
 					break;
 				case self::TYPE_DATETIME:
 					if( !preg_match( $data, '/^'.self::REGEX_DATE.'\s?'.self::REGEX_TIME.'$/' ) ){
-						throw( new Exception( 'Invalid datetime specified "'.$data.'"' ) );
+						$this->Torpor()->throwException( 'Invalid datetime specified "'.$data.'"' );
 					}
 					break;
 				case self::TYPE_TIME:
 					if( !preg_match( $data, '/^'.self::REGEX_TIME.'$/' ) ){
-						throw( new Exception( 'Invalid time specified "'.$data.'"' ) );
+						$this->Torpor()->throwException( 'Invalid time specified "'.$data.'"' );
 					}
 					break;
 				case self::TYPE_FLOAT:
-					if( !is_numeric( $data ) ){ throw( new Exception( 'Non-numeric data passed to float' ) ); }
+					if( !is_numeric( $data ) ){ $this->Torpor()->throwException( 'Non-numeric data passed to float' ); }
 					$newData = (float)round( $data, $this->getPrecision() );
 					if( ( $newData - (float)$data ) != 0 ){
 						trigger_error( 'Truncating float data to precision '.$this->getPrecision(), E_USER_WARNING );
@@ -268,10 +268,10 @@ class Column extends PersistableContainer
 					break;
 				case self::TYPE_UNSIGNED:
 					if( (int)$data < 0 ){
-						throw( new Exception( 'Unsigned integer must be greater than or equal to zero' ) );
+						$this->Torpor()->throwException( 'Unsigned integer must be greater than or equal to zero' );
 					}
 				case self::TYPE_INT:
-					if( !is_numeric( $data ) ){ throw( new Exception( 'Non-numeric data passed to integer' ) ); }
+					if( !is_numeric( $data ) ){ $this->Torpor()->throwException( 'Non-numeric data passed to integer' ); }
 					$newData = (int)round( $data, $this->getPrecision() );
 					if( ( $newData - (int)$data ) != 0 ){
 						trigger_error( 'Truncating int data to precision '.$this->getPrecision() );

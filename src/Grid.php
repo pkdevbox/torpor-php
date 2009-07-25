@@ -25,7 +25,7 @@ class Grid extends PersistableContainer
 	public function _getColumn( $columnName ){
 		$columnName = $this->Torpor()->makeKeyName( $columnName );
 		if( !$this->hasColumn( $columnName ) ){
-			throw( new Exception( $columnName.' is not a valid column on '.$this->_getObjName() ) );
+			$this->Torpor()->throwException( $columnName.' is not a valid column on '.$this->_getObjName() );
 		}
 		$columns = $this->_getColumns();
 		$column = $columns{ $columnName };
@@ -34,7 +34,7 @@ class Grid extends PersistableContainer
 
 	public function addColumn( Column $column ){
 		if( $this->hasColumn( $column ) ){
-			throw( new Exception( 'Duplicate Column '.$column->_getObjName().' on Grid '.$this->_getObjName() ) );
+			$this->Torpor()->throwException( 'Duplicate Column '.$column->_getObjName().' on Grid '.$this->_getObjName() );
 		}
 		$column->setGrid( $this );
 		$this->_columns{ strtoupper( $column->_getObjName() ) } = $column;
@@ -144,6 +144,7 @@ class Grid extends PersistableContainer
 		return( $return );
 	}
 
+	public function Publish( $force = false ){ return( $this->Persist( $force ) ); }
 	public function Persist( $force = false ){
 		if( $this->isDirty() || $force ){
 			$this->_setDirty( false );
@@ -193,7 +194,7 @@ class Grid extends PersistableContainer
 			// has not yet been published, but should be in the event that $order is (and
 			// in fact would need to be saved first, in order to propagate the relaionship
 			// defining keeys up to $order prior to its being published)
-			throw( new Exception( $funcRemainder.' does not exist as a member or method of this class' ) );
+			$this->Torpor()->throwException( $funcRemainder.' does not exist as a member or method of this class' );
 		}
 		// TODO: What to do about longer operation names, and especially the treatment
 		// of collections? (for add/remove operations)  And collections in general, with their
@@ -214,7 +215,7 @@ class Grid extends PersistableContainer
 		// accessible to the user without jumping through too many hoops.
 		$column = $this->_getColumn( $funcRemainder );
 		if( !( $column instanceof Column ) ){
-			throw( new Exception( $funcRemainder.' is not a valid Column object' ) );
+			$this->Torpor()->throwException( $funcRemainder.' is not a valid Column object' );
 		}
 		switch( $operation ){
 			case self::OPERATION_IS:
@@ -226,7 +227,7 @@ class Grid extends PersistableContainer
 				break;
 			case self::OPERATION_GET:
 				if( !$column->isLoaded() && $this->isLoaded() ){
-					throw( new Exception( 'Unloaded Column '.$funcRemainder.' in loaded Grid '.$this->_getObjName() ) );
+					$this->Torpor()->throwException( 'Unloaded Column '.$funcRemainder.' in loaded Grid '.$this->_getObjName() );
 				}
 				$return = $column->getData(); // Will automatically load the grid as necessary.
 				break;
@@ -240,7 +241,7 @@ class Grid extends PersistableContainer
 				$this->_setDirty( $this->isDirty() || $column->isDirty() );
 				break;
 			default:
-				throw( new Exception( 'Unrecognized operation '.$operation ) );
+				$this->Torpor()->throwException( 'Unrecognized operation '.$operation );
 				break;
 		}
 		return( $return );
