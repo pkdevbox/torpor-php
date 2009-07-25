@@ -21,11 +21,11 @@ class Grid extends PersistableContainer
 		return( in_array( $this->Torpor()->makeKeyName( $columnName ), $this->_getColumnNames() ) );
 	}
 
-	public function Column( $columName ){ return( $this->_getColumn( $columnName ) ); }
+	public function Column( $columnName ){ return( $this->_getColumn( $columnName ) ); }
 	public function _getColumn( $columnName ){
 		$columnName = $this->Torpor()->makeKeyName( $columnName );
 		if( !$this->hasColumn( $columnName ) ){
-			$this->Torpor()->throwException( $columnName.' is not a valid column on '.$this->_getObjName() );
+			$this->throwException( $columnName.' is not a valid column on '.$this->_getObjName() );
 		}
 		$columns = $this->_getColumns();
 		$column = $columns{ $columnName };
@@ -34,7 +34,7 @@ class Grid extends PersistableContainer
 
 	public function addColumn( Column $column ){
 		if( $this->hasColumn( $column ) ){
-			$this->Torpor()->throwException( 'Duplicate Column '.$column->_getObjName().' on Grid '.$this->_getObjName() );
+			$this->throwException( 'Duplicate Column '.$column->_getObjName().' on Grid '.$this->_getObjName() );
 		}
 		$column->setGrid( $this );
 		$this->_columns{ strtoupper( $column->_getObjName() ) } = $column;
@@ -178,7 +178,33 @@ class Grid extends PersistableContainer
 			// get<Target>Set
 			// new<Target>
 			// new<Target>Set ?
-			if( stripos( $func, Torpor::OPERATION_MOD_FROM ) && $this->Torpor()->can( $func ) ){
+			if(
+				$operation == self::OPERATION_SET
+				&& $args[0] instanceof Grid
+				&& $this->Torpor()->canReference( $this, $args[0], $funcRemainder )
+			){
+				$incomingGrid = $args[0];
+				$references = array();
+				if( $incomingGrid->_getObjName() == $funcRemainder ){ // Direct relationship
+					$references = $this->Torpor()->referenceKeysBetween( $this, $incomingGrid, Torpor::NON_ALIAS_KEYS );
+				} else { // Aliased relationship
+					$references = $this->Torpor()->aliasReferenceKeysBetween( $this, $incomingGrid, $funcRemainder );
+				}
+				foreach( $references as $sourceColumnName => $targetColumnName ){
+					// TODO: Need to introspect 
+					$targetColumn = $incomingGrid->Column( $targetColumnName );
+					if( is_null( $targetColumn->getData() ) && !$targetColumn->hasData() ){
+						if( !$targetColumn->isGeneratedOnPublish() ){
+							$this->throwException( 'Insufficient reference data: no values in '.$targetColumnName.' when trying to set '.$this->_getObjName().'->'.$sourceColumnName.' from '.$incomingGrid->_getObjName() );
+						}
+						// TODO: Map the $targetColumn->getPrepublishedIdentifier() to the $sourceColumn->referenceDataSource (pseudo-name,
+						// needs to be defined.
+					} else {
+						$this->$sourceColumnName = $incomingGrid->$targetColumnName;
+					}
+				}
+				return( true );
+			} else if( stripos( $func, Torpor::OPERATION_MOD_FROM ) && $this->Torpor()->can( $func ) ){
 				return( $this->Torpor()->$func( $this ) );
 			} else {
 				$torporCall = $func.Torpor::OPERATION_MOD_FROM.$this->_getObjName();
@@ -194,7 +220,7 @@ class Grid extends PersistableContainer
 			// has not yet been published, but should be in the event that $order is (and
 			// in fact would need to be saved first, in order to propagate the relaionship
 			// defining keeys up to $order prior to its being published)
-			$this->Torpor()->throwException( $funcRemainder.' does not exist as a member or method of this class' );
+			$this->throwException( $funcRemainder.' does not exist as a member or method of this class' );
 		}
 		// TODO: What to do about longer operation names, and especially the treatment
 		// of collections? (for add/remove operations)  And collections in general, with their
@@ -215,7 +241,7 @@ class Grid extends PersistableContainer
 		// accessible to the user without jumping through too many hoops.
 		$column = $this->_getColumn( $funcRemainder );
 		if( !( $column instanceof Column ) ){
-			$this->Torpor()->throwException( $funcRemainder.' is not a valid Column object' );
+			$this->throwException( $funcRemainder.' is not a valid Column object' );
 		}
 		switch( $operation ){
 			case self::OPERATION_IS:
@@ -227,7 +253,7 @@ class Grid extends PersistableContainer
 				break;
 			case self::OPERATION_GET:
 				if( !$column->isLoaded() && $this->isLoaded() ){
-					$this->Torpor()->throwException( 'Unloaded Column '.$funcRemainder.' in loaded Grid '.$this->_getObjName() );
+					$this->throwException( 'Unloaded Column '.$funcRemainder.' in loaded Grid '.$this->_getObjName() );
 				}
 				$return = $column->getData(); // Will automatically load the grid as necessary.
 				break;
@@ -241,7 +267,7 @@ class Grid extends PersistableContainer
 				$this->_setDirty( $this->isDirty() || $column->isDirty() );
 				break;
 			default:
-				$this->Torpor()->throwException( 'Unrecognized operation '.$operation );
+				$this->throwException( 'Unrecognized operation '.$operation );
 				break;
 		}
 		return( $return );

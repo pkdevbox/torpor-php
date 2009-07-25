@@ -28,5 +28,7 @@ class PersistableContainer
 	public function Torpor(){ return( $this->_getTorpor() ); }
 	public function _getTorpor(){ return( $this->_torpor ); }
 	public function _setTorpor( Torpor $torpor ){ return( $this->_torpor = $torpor ); }
+
+	public function throwException( $msg ){ return( $this->Torpor()->throwException( $msg ) ); }
 }
 ?>

@@ -32,6 +32,8 @@ class Column extends PersistableContainer
 	const REGEX_DATE = '\d{4}([,\.\-\/]?\d{2}){2}';
 	const REGEX_TIME = '[01][0-9]([,:\-][0-5][0-9]){2}';
 
+	const ATTRIBUTE_GENERATED_ON_PUBLISH = 'generatedOnPublish';
+
 	private $_grid; // Grid object to which this belongs.
 
 	private $_type = self::TYPE_VARCHAR;
@@ -40,6 +42,8 @@ class Column extends PersistableContainer
 	private $_precision = 0;
 	private $_isNullable = true;
 	private $_isReadOnly = false;
+	private $_generatedOnPublish = false;
+	private $_prePublishedIdentifier = null;
 	private $_attributes = array();
 
 	private $_originalData = null;
@@ -57,12 +61,9 @@ class Column extends PersistableContainer
 		// TODO: Build a local attributes interface in order to keep settings conveniently
 		// accessible to inheriting classes.
 		$this->_attributes = array();
-		foreach( $xmlDef->attributes() as $key => $val ){
-			$this->_attributes[ $key ] = (string)$val;
-		}
 		$type = Torpor::makeKeyName( (string)$xmlDef->attributes()->type );
 		if( !in_array( $type, $this->getValidTypes() ) ){
-			$this->Torpor()->throwException( 'Unrecognized type "'.$type.'"' );
+			$this->throwException( 'Unrecognized type "'.$type.'"' );
 		}
 		$this->setType( $type );
 		switch( $type ){
@@ -100,6 +101,20 @@ class Column extends PersistableContainer
 				}
 				break;
 		}
+
+		if( (string)$xmlDef->attributes()->generatedOnPublish == Torpor::VALUE_TRUE ){
+			$this->setGeneratedOnPublish();
+			$this->_prePublishedIdentifier = $this->Torpor()->generatePrePublishIdentifier( $this );
+		}
+		// TODO: options for navigating attributes
+		foreach( $xmlDef->attributes() as $key => $val ){
+			$this->_attributes[ $key ] = (string)$val;
+		}
+	}
+
+	public function isGeneratedOnPublish(){ return( $this->_generatedOnPublish ); }
+	public function setGeneratedOnPublish( $bool = true ){
+		return( $this->_generatedOnPublish = ( $bool ? true : false ) );
 	}
 
 	public function Grid(){ return( $this->getGrid() ); }
@@ -109,7 +124,7 @@ class Column extends PersistableContainer
 		if( $this->Torpor()->makeKeyName( $func ) == $this->getGrid()->_getObjName() ){
 			return( $this->getGrid() );
 		} else {
-			$this->Torpor()->throwException( 'Unrecognized method "'.$func.'" on Column '.$this->_getObjName().' in Grid '.$this->getGrid()->_getObjName() );
+			$this->throwException( 'Unrecognized method "'.$func.'" on Column '.$this->_getObjName().' in Grid '.$this->getGrid()->_getObjName() );
 		}
 	}
 	// Should only be used in the context of Grid::addColumn( $this ), in order
@@ -137,7 +152,7 @@ class Column extends PersistableContainer
 	public function getType(){ return( $this->_type ); }
 	public function setType( $type ){
 		if( !in_array( $type, $this->getValidTypes() ) ){
-			$this->Torpor()->throwException( $type.' is not a valid type' );
+			$this->throwException( $type.' is not a valid type' );
 		}
 		// TODO: Need to validate existing contents during conversion, throw
 		// conversion warnings as necessary.
@@ -153,7 +168,7 @@ class Column extends PersistableContainer
 	public function getMaxLength(){ return( $this->_length ); }
 	public function setMaxLength( $length ){
 		if( !( (int)$length ) ){
-			$this->Torpor()->throwException( 'Length must be a non-zero integer' );
+			$this->throwException( 'Length must be a non-zero integer' );
 		}
 		$this->_length = (int)$length;
 	}
@@ -225,13 +240,13 @@ class Column extends PersistableContainer
 		// a new object and have nothing to actually fetch.
 		// TODO: Loaded primary keys should be read only
 		if( $this->isReadOnly() ){
-			$this->Torpor()->throwException( $this->_getObjName().' is Read Only' );
+			$this->throwException( $this->_getObjName().' is Read Only' );
 		}
 		$return = false;
 			// Do all necessary validation, warnings, and conversion.
 		if( is_null( $data ) ){
 			if( !$this->isNullable() ){
-				$this->Torpor()->throwException( $this->getDBName().' is not nullable' );
+				$this->throwException( $this->getDBName().' is not nullable' );
 			}
 		} else {
 			switch( $this->getType() ){
@@ -245,21 +260,21 @@ class Column extends PersistableContainer
 				case self::TYPE_CLASS: break; // No checking on class data.
 				case self::TYPE_DATE:
 					if( !preg_match( $data, '/^'.self::REGEX_DATE.'$/' ) ){
-						$this->Torpor()->throwException( 'Invalid date specified "'.$data.'"' );
+						$this->throwException( 'Invalid date specified "'.$data.'"' );
 					}
 					break;
 				case self::TYPE_DATETIME:
 					if( !preg_match( $data, '/^'.self::REGEX_DATE.'\s?'.self::REGEX_TIME.'$/' ) ){
-						$this->Torpor()->throwException( 'Invalid datetime specified "'.$data.'"' );
+						$this->throwException( 'Invalid datetime specified "'.$data.'"' );
 					}
 					break;
 				case self::TYPE_TIME:
 					if( !preg_match( $data, '/^'.self::REGEX_TIME.'$/' ) ){
-						$this->Torpor()->throwException( 'Invalid time specified "'.$data.'"' );
+						$this->throwException( 'Invalid time specified "'.$data.'"' );
 					}
 					break;
 				case self::TYPE_FLOAT:
-					if( !is_numeric( $data ) ){ $this->Torpor()->throwException( 'Non-numeric data passed to float' ); }
+					if( !is_numeric( $data ) ){ $this->throwException( 'Non-numeric data passed to float' ); }
 					$newData = (float)round( $data, $this->getPrecision() );
 					if( ( $newData - (float)$data ) != 0 ){
 						trigger_error( 'Truncating float data to precision '.$this->getPrecision(), E_USER_WARNING );
@@ -268,10 +283,10 @@ class Column extends PersistableContainer
 					break;
 				case self::TYPE_UNSIGNED:
 					if( (int)$data < 0 ){
-						$this->Torpor()->throwException( 'Unsigned integer must be greater than or equal to zero' );
+						$this->throwException( 'Unsigned integer must be greater than or equal to zero' );
 					}
 				case self::TYPE_INT:
-					if( !is_numeric( $data ) ){ $this->Torpor()->throwException( 'Non-numeric data passed to integer' ); }
+					if( !is_numeric( $data ) ){ $this->throwException( 'Non-numeric data passed to integer' ); }
 					$newData = (int)round( $data, $this->getPrecision() );
 					if( ( $newData - (int)$data ) != 0 ){
 						trigger_error( 'Truncating int data to precision '.$this->getPrecision() );

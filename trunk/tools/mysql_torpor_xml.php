@@ -64,6 +64,7 @@ while( $table_obj = mysql_fetch_object( $table_result ) ){
 				.( $column_obj->CHARACTER_SET_NAME ? ' encoding="'.$column_obj->CHARACTER_SET_NAME.'"' : '' )
 				.( $column_obj->NUMERIC_PRECISION ? ' precision="'.$column_obj->NUMERIC_PRECISION.'"' : '' )
 				.( $column_obj->COLUMN_DEFAULT && $column_obj->COLUMN_DEFAULT != 'CURRENT_TIMESTAMP' ? ' default="'.htmlentities( $column_obj->COLUMN_DEFAULT ).'"' : '' )
+				.( $column_obj->EXTRA == 'auto_increment' || $column_obj->COLUMN_DEFAULT == 'CURRENT_TIMESTAMP' ? ' generatedOnPublish="true"' : '' )
 				."/>\n";
 		}
 		print "\t\t\t</Columns>\n";
