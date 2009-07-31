@@ -6,13 +6,13 @@ class PersistableContainer
 	protected $_name;
 	protected $_isLoaded = false;
 	protected $_isDirty = false;
-	protected $_torpor;
+	protected $_torpor = null;
 
 	public function PersistableContainer(
-		Torpor $torpor,
+		Torpor $torpor = null,
 		$name = null
 	){
-		$this->_setTorpor( $torpor );
+		if( $torpor instanceof Torpor ){ $this->_setTorpor( $torpor ); }
 		if( !is_null( $name ) ){ $this->_setObjName( $name ); }
 	}
 
@@ -26,7 +26,12 @@ class PersistableContainer
 	protected function _setDirty( $bool = true ){ return( $this->_isDirty = ( $bool ? true : false ) ); }
 
 	public function Torpor(){ return( $this->_getTorpor() ); }
-	public function _getTorpor(){ return( $this->_torpor ); }
+	public function _getTorpor(){
+		if( is_null( $this->_torpor ) ){
+			$this->_setTorpor( Torpor::getInstance() );
+		}
+		return( $this->_torpor );
+	}
 	public function _setTorpor( Torpor $torpor ){ return( $this->_torpor = $torpor ); }
 
 	public function throwException( $msg ){ return( $this->Torpor()->throwException( $msg ) ); }
