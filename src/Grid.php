@@ -74,27 +74,31 @@ class Grid extends PersistableContainer
 
 	public function canLoad(){
 		$pass = true;
-		$primaryKeys = $this->primaryKey();
-		if( is_array( $primaryKeys ) ){
-			foreach( $primaryKeys as $keyColumn ){
-				if( !$keyColumn->hasData() ){
-					$pass = false;
-					break;
+		$allKeys = $this->Torpor()->allKeysForGrid( $this );
+		foreach( $allKeys as $key ){
+			$pass = false;
+			if( is_array( $key ) ){
+				$pass = true;
+				foreach( $key as $keyColumn ){
+					if( !$keyColumn->hasData() ){
+						$pass = false;
+						break;
+					}
 				}
+			} else {
+				$pass = $this->Column( $key )->hasData();
 			}
-		} else {
-			$pass = $primaryKeys->hasData();
-		}
-		if( !$pass ){
-			// TODO: fall back to known unique keys
+			if( $pass ){
+				break;
+			}
 		}
 		return( $pass );
 	}
 
-	public function Load( $reset = false ){
+	public function Load( $refresh = false ){
 		if(
 			$this->canLoad()
-			&& ( !$this->isLoaded() || $reset )
+			&& ( !$this->isLoaded() || $refresh )
 		){
 			if( false ){
 			// TODO: Actually get the data
@@ -191,14 +195,19 @@ class Grid extends PersistableContainer
 					$references = $this->Torpor()->aliasReferenceKeysBetween( $this, $incomingGrid, $funcRemainder );
 				}
 				foreach( $references as $sourceColumnName => $targetColumnName ){
-					// TODO: Need to introspect 
 					$targetColumn = $incomingGrid->Column( $targetColumnName );
-					if( is_null( $targetColumn->getData() ) && !$targetColumn->hasData() ){
-						if( !$targetColumn->isGeneratedOnPublish() ){
+					// Get data of data can be got.
+					if( !$targetColumn->hasData() ){ $targetColumn->Load(); }
+					// If the target column still doesn't have any data, look to see if we can
+					// do dynamic linking.
+					if( !$targetColumn->hasData() ){
+						// TODO: Look at Torpor settings to determine if all linked relationship
+						// should be established, and whether they should persist.
+						if( $targetColumn->isGeneratedOnPublish() ){
+							$this->Column( $sourceColumnName )->linkToColumn( $targetColumn );
+						} else {
 							$this->throwException( 'Insufficient reference data: no values in '.$targetColumnName.' when trying to set '.$this->_getObjName().'->'.$sourceColumnName.' from '.$incomingGrid->_getObjName() );
 						}
-						// TODO: Map the $targetColumn->getPrepublishedIdentifier() to the $sourceColumn->referenceDataSource (pseudo-name,
-						// needs to be defined.
 					} else {
 						$this->$sourceColumnName = $incomingGrid->$targetColumnName;
 					}
