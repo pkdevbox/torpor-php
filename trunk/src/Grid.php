@@ -2,13 +2,8 @@
 // $Rev$
 // TODO: phpdoc
 // TODO: Callbacks?
-class Grid extends PersistableContainer
+class Grid extends PersistableContainer implements Iterator
 {
-	const OPERATION_GET = 'get';
-	const OPERATION_IS  = 'is';
-	const OPERATION_NEW = 'new';
-	const OPERATION_SET = 'set';
-
 	private $_columns = array();
 
 	protected function _getColumns(){ return( $this->_columns ); }
@@ -109,7 +104,7 @@ class Grid extends PersistableContainer
 			// How does the selection with criteria work?  That should
 			// probably be part of the Torpor factory classes using get(Grid)From(X)
 			// instead of the new (Grid) approach, as the blank slate.
-			// if( $dataMembers = $torpor->_getDataForGrid() ){
+			// if( $dataMembers = $torpor->_getDataForGrid() ){}
 				$this->_setLoaded();
 				// TODO: Walk through the columns and look for data, or walk through the
 				// data and look for columns?
@@ -165,7 +160,12 @@ class Grid extends PersistableContainer
 		$return = null;
 		// TODO: Decide on a common scheme of strto(upper|lower)
 		$func = strtolower( $this->Torpor()->makeKeyName( $func ) );
-		$operation = ( stripos( $func, self::OPERATION_IS ) === 0 ? self::OPERATION_IS : strtolower( substr( $func, 0, 3 ) ) );
+		// TODO: Abstract this into a "detectOperation" call?
+		$operation = (
+			stripos( $func, Torpor::OPERATION_IS ) === 0
+			? Torpor::OPERATION_IS
+			: strtolower( substr( $func, 0, Torpor::COMMON_OPERATION_LENGTH ) )
+		);
 		// TODO: Evalutate operations first?
 
 		// TODO: make use of the 'is' prefix when testing bools, and the convention of setBoolColumn()
@@ -183,7 +183,7 @@ class Grid extends PersistableContainer
 			// new<Target>
 			// new<Target>Set ?
 			if(
-				$operation == self::OPERATION_SET
+				$operation == Torpor::OPERATION_SET
 				&& $args[0] instanceof Grid
 				&& $this->Torpor()->canReference( $this, $args[0], $funcRemainder )
 			){
@@ -231,42 +231,25 @@ class Grid extends PersistableContainer
 			// defining keeys up to $order prior to its being published)
 			$this->throwException( $funcRemainder.' does not exist as a member or method of this class' );
 		}
-		// TODO: What to do about longer operation names, and especially the treatment
-		// of collections? (for add/remove operations)  And collections in general, with their
-		// mapping grids?
-		// Collections should be stored as a reference to a result set which corresponds to this
-		// criteria - which means that we now need concepts of 2 kinds of relationships:
-		// -- Backreference ID (remote record contains a reference to this item's ID)
-		// -- Mapping table (an intermediate table contains a reference to both this item, and
-		//    the remote object's ID)
-		// When belonging to either of these types of collections, the addition of any new
-		// element or setting of any interior data needs to verify that the key relationships
-		// stay intact (adding an object to the collection automatically sets the key ID)
-		// and throw nice big warnings/errors otherwise.  This is going to be the deep
-		// magic of Torpor that really sells it; if I can say User::getOrders().
-		// TODO: The main Torpor instance should own and maintain the mapping table on its
-		// own, making sure that any time one of the sub members is deleted or published that
-		// the appropriate changes also take place inside that map.  This still needs to be
-		// accessible to the user without jumping through too many hoops.
 		$column = $this->_getColumn( $funcRemainder );
 		if( !( $column instanceof Column ) ){
 			$this->throwException( $funcRemainder.' is not a valid Column object' );
 		}
 		switch( $operation ){
-			case self::OPERATION_IS:
+			case Torpor::OPERATION_IS:
 				if( $column->getType() == Column::TYPE_BOOL ){
 					$return = $column->getData();
 				} else {
 					trigger_error( $funcRemainder.' is not of type '.Column::TYPE_BOOL, E_USER_ERROR );
 				}
 				break;
-			case self::OPERATION_GET:
+			case Torpor::OPERATION_GET:
 				if( !$column->isLoaded() && $this->isLoaded() ){
 					$this->throwException( 'Unloaded Column '.$funcRemainder.' in loaded Grid '.$this->_getObjName() );
 				}
 				$return = $column->getData(); // Will automatically load the grid as necessary.
 				break;
-			case self::OPERATION_SET:
+			case Torpor::OPERATION_SET:
 				// alias set<Column>() == set<Column>( true ); for BOOL types
 				if( count( $args ) == 0 && $column->getType() == Column::TYPE_BOOL ){
 					$return = $column->setData( true );
@@ -291,5 +274,12 @@ class Grid extends PersistableContainer
 		$func = 'set'.$name;
 		return( $this->$func( $value ) );
 	}
+
+	// Iterator interface implementation for accessing columns
+	public function rewind(){ reset( $this->_columns ); }
+	public function current(){ return( current( $this->_columns ) ); }
+	public function key(){ return( key( $this->_columns ) ); }
+	public function next(){ return( next( $this->_columns ) ); }
+	public function valid(){ return( $this->current() !== false ); }
 }
 ?>

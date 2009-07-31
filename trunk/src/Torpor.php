@@ -6,6 +6,7 @@ require_once( 'PersistableContainer.php' );
 require_once( 'Grid.php' );
 require_once( 'Column.php' );
 require_once( 'Criteria.php' );
+require_once( 'GridSet.php' );
 
 // TODO: phpdoc
 // TODO: Review all singleton vs. object context interfaces and make
@@ -43,8 +44,11 @@ class Torpor {
 	const ARKEY_REFERENCES   = 'references';
 	const ARKEY_OPTIONS      = 'options';
 
+	const COMMON_OPERATION_LENGTH = 3;
+	const OPERATION_ADD = 'add';
 	const OPERATION_CAN = 'can';
 	const OPERATION_GET = 'get';
+	const OPERATION_IS  = 'is';
 	const OPERATION_NEW = 'new';
 	const OPERATION_SET = 'set';
 	const OPERATION_GET_SET = 'set';
