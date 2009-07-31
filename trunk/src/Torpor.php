@@ -43,9 +43,10 @@ class Torpor {
 	const ARKEY_REFERENCES   = 'references';
 	const ARKEY_OPTIONS      = 'options';
 
-	const OPERATION_NEW = 'new';
-	const OPERATION_GET = 'get';
 	const OPERATION_CAN = 'can';
+	const OPERATION_GET = 'get';
+	const OPERATION_NEW = 'new';
+	const OPERATION_SET = 'set';
 	const OPERATION_GET_SET = 'set';
 	const OPERATION_MOD_FROM = 'from';
 	const OPERATION_GET_CRITERIA = 'criteria';
@@ -67,7 +68,6 @@ class Torpor {
 	private $_isInitialized = false;
 
 	private $_cachedCalls = array();
-	private $_prePublishedIdentifierCache = array();
 
 	private $_warnings = array();
 	private $_errors = array();
@@ -219,28 +219,6 @@ class Torpor {
 				$columns{ $gridName }{ $columnName } = $xmlColumn; // We want this one to hang around.
 			}
 
-			// TODO: Default for single-column primary keys should be availableBeforeInsert=False, which needs
-			// to be overridden by the XML configuration.  This can be done either on the <Primary/> tag or at
-			// the //Primary/Key[availableBeforeInsert] attribute.  The dependency map between related tables
-			// will need to be set using special methods which A) associate the 2 objects in whatever role or
-			// alias is applicable, and B) supply a false, cache-able key with a special indicator that it is
-			// thus.
-			// If all availableBeforeInsert=false columns are assigned an incremental key value in the order
-			// of their instantiation, and that value is thus identified in a cache map, then as each of those
-			// columns is published and finally becomes available then it can fire an onPublish() (or similar)
-			// event that causes it's value to propagate to those items which rely on it.
-			// Example:
-			// $product = Torpor()->getProductFromId( 12345 );
-			// $order     = Torpor()->newOrder();     // Order.Id->prePublishedId = Torpor()->nextPrePublishedKey()  // -1 / 1 /GUID etc.
-			// $orderItem = $order->newOrderItem();   // OrderItem.OrderId->prePublishedDependency = true / -1
-			// $orderItem->setProduct( $product );    // OrderItem.ProductId = 12345
-			// $orderItem->publish() CAUSES $order->publish() IN Order to retrieve the necessary OrderId and
-			// fulfill it's own publish.
-			// This also means that the publish() call needs to take an optional argument to flush all
-			// dependencies to the database as well (otherwise $order->publish() won't necessarily cause
-			// $orderItem->publish(), even though the reverse is true).
-			// Also: Torpor()->publishAll() needs to be an option to flush all outstanding isDirty() changes,
-			// complete with $force = false override.
 			if( $xmlGrid->Keys->Primary ){
 				$keyArray = array();
 				foreach( $xmlGrid->Keys->Primary->Key as $xmlKey ){
@@ -452,13 +430,14 @@ class Torpor {
 			$key_sets[] = $temp_keys;
 		}
 		if( $temp_keys = $this->_getUniqueKeys( $gridName ) ){
-			$key_sets[] = $temp_keys;
+			$key_sets = array_merge( $key_sets, $temp_keys );
 		}
 		return( ( count( $key_sets ) > 0 ? $key_sets : false ) );
 	}
 
 	// Aliases
 	public function primaryKeyForGrid( $gridName ){ return( $this->_getKeys( $gridName ) ); }
+	public function allKeysForGrid( $gridName ){ return( $this->_getAllGridKeys( $gridName ) ); }
 	protected function _setOption( $optionName, $setting ){
 		return( $this->_config{ self::ARKEY_OPTIONS }{ $optionName } = $setting );
 	}
@@ -466,7 +445,7 @@ class Torpor {
 	public function canReference( $sourceGridName, $targetGridName, $specificAlias = false ){
 		$sourceGridName = $this->gridKeyName( $sourceGridName );
 		$targetGridName = $this->gridKeyName( $targetGridName );
-		if( !$specificAlias && $specificAlias != self::VALUE_NONE ){
+		if( $specificAlias && $specificAlias != self::VALUE_NONE ){
 			$specificAlias = $this->gridKeyName( $specificAlias );
 		}
 		$return = false;
@@ -684,7 +663,8 @@ class Torpor {
 		// TODO: any _getGridFromX pattern needs to return bool(false) if
 		// the item cannot be loaded?
 		// Variable arguments for the ID based on variable numuber of key fields
-		// TODO: Look in the internal cache first
+		// TODO: Look in the internal cache first... or is the internal cache only
+		// for use during Load() operations?
 	}
 
 	public function _getGridFromUnique( $gridName ){
@@ -692,27 +672,6 @@ class Torpor {
 	}
 
 	public function _getGridFromRecord( $gridName, Grid $record ){
-		// TODO: Examine the source record and look for key overlap with either the
-		// primary key, or a distinct set of unique keys on the target.  When either
-		// of these conditions are met, return $this->_getGridFromId() or
-		// $this->_getGridFromUnique()
-		// Perhaps the easiest route: create a new grid and populate everything
-		// on it that is indicated in the feference keys, then just look at
-		// $targetGrid->canLoad().  This will only be done, however, if
-		// count( $this->_getReferences( $record->_getObjName() ){ $gridName } ) >= 1
-		// in order to make sure we're not wasting any time.  That logic should
-		// probably be wrapped in a canGetGridFromRecord() call, to allow
-		// introspection of supported relationships.
-
-		// NOTE: returning a grid vs. returning a Set:
-		// If the target grid is referenced by PK / Unique from the source grid, the
-		// return will always be 0 or 1 results (TODO: config option on whether to
-		// warn or throw an exception when a PK referenced value between grids fails
-		// to identify the target record).
-		// If the target grid is not directly referenced by the source grid, but rather
-		// the source grid is suppoted and identified by the target (e.g., the target
-		// has an ID field corresponding to the source table's PK/UK) the result will
-		// be >= 0 and (and this is the important part) always be returned as a GridSet.
 		// TODO: create the GridSet object which allows for the following:
 		// 1. Stores a series of Grids which can be iterated over.
 		// 2. Allows access by PK (variable argument list corresponding to the number
@@ -741,13 +700,42 @@ class Torpor {
 		// configuration setting (global to the Torpor instance) and *possibly*
 		// support local override.  Otherwise, since we're already talking to the
 		// database, we might as well slurp the whole bunch, yeah?
-		var_dump( 'getting single grid of type '.$gridName.' from type '.$record->_getObjName() );
+
+		$alias = false;
+		if( !( $gridName instanceof Grid ) && strpos( $gridName, self::VALUE_SEPARATOR ) ){
+			list( $gridName, $alias ) = explode( self::VALUE_SEPARATOR, $gridName );
+			$alias = $this->makeKeyName( $alias );
+		}
+		$gridName = $this->gridKeyName( $gridName );
+		if( !$this->canReference( $record, $gridName, $alias ) ){
+			$this->throwException( $record->_getObjName().' can not reference '.$gridName.( $alias ? ' as '.$alias : '' ) );
+		}
+		$targetGrid = $this->_newGrid( $gridName );
+		$references = (
+			$alias !== false
+			? $this->aliasReferenceKeysBetween( $record, $gridName, $alias )
+			: $this->referenceKeysBetween( $record, $gridName, self::NON_ALIAS_KEYS )
+		);
+		if( !$record->isLoaded() ){
+			$record->Load();
+		}
+		foreach( $references as $sourceColumnName => $targetColumnName ){
+			if( $record->Column( $sourceColumnName )->hasData() ){
+				$targetGrid->$targetColumnName = $record->$sourceColumnName;
+			}
+		}
+		if( !$targetGrid->canLoad() ){
+			$targetGrid = false;
+		}
+		return( $targetGrid );
 	}
 
 	public function _getGridFromCriteria( $gridName, Criteria $criteria ){
 	}
 
-	public function _getGridSetFromRecord( $gridName, Grid $record ){
+	public function _getGridSetFromRecord( $gridName, Grid $record, Criteria $criteria = null ){
+		// TODO: Ensure $criteria is properly passed through from the Grid->get<Grid>Set( $criteria )
+		// calls in order to AND them together when retrieving corresponding grid records.
 		var_dump( 'getting grid set of type '.$gridName.' from type '.$record->_getObjName() );
 	}
 
@@ -784,12 +772,23 @@ class Torpor {
 	// exist between the foreign key references and either the primary or other unique key(s)
 	// of the target table, and instantiates a grid of the target type pre-populated with the
 	// identified key data.
-	public function _newGridFromRecord( $gridName, Grid $record ){
-		var_dump( 'creating new '.$gridName.' from '.$record->_getObjName() );
+	public function _newGridFromRecord( $gridName, Grid $record, $alias = false ){
+		if( !$this->canReference( $gridName, $record, $alias ) ){
+			$this->throwException( $record->_getObjName().' can not reference '.$gridName.( $alias ? ' as '.$alias : '' ) );
+		}
+		$targetGrid = $this->_newGrid( $this->gridKeyName( $gridName ) );
+		$setCommand = self::OPERATION_SET.( $alias ? $alias : $record->_getObjName() );
+		$targetGrid->$setCommand( $record );
+		return( $targetGrid );
 	}
 
+	// The argument order is such as it is on this method in order to allow for cached calls
+	// to be established containing fixed strings for the firts two arguments, which is
+	// imperitive for the nature of the invocation.  Seeing as how all the other factory
+	// components exis in the generic mechanisms, it also makes sense to gently extend that
+	// behavior rather than re-implement here.
 	public function _newGridFromAliasRecord( $gridName, $alias, Grid $record ){
-		var_dump( 'creating new '.$gridName.' from '.$record->_getObjName().' as '.$alias );
+		return( $this->_newGridFromRecord( $gridName, $record, $alias ) );
 	}
 
 	public function _newGridFromCriteria( $gridName, Criteria $criteria ){
@@ -887,16 +886,6 @@ class Torpor {
 			trigger_error( 'Overwriting existing prototype cache for grid '.$grid->_getObjName(), E_USER_WARNING );
 		}
 		return( $this->_prototypeCache{ $grid->_getObjName() } = $grid );
-	}
-	public function generatePrePublishIdentifier( $obj ){
-		$identifier = null;
-		if( in_array( $obj, $this->_prePublishedIdentifierCache, true ) ){
-			$identifier = array_search( $obj, $this->_prePublishedIdentifierCache, true );
-		} else {
-			$identifier = count( $this->_prePublishedIdentifierCache ) + 1;
-			$this->_prePublishedIdentifierCache{ $identifier } = $obj;
-		}
-		return( $identifier );
 	}
 
 	// TODO: Figure out the actual error handling mechanisms.

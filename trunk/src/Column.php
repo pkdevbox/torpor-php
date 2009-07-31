@@ -43,8 +43,10 @@ class Column extends PersistableContainer
 	private $_isNullable = true;
 	private $_isReadOnly = false;
 	private $_generatedOnPublish = false;
-	private $_prePublishedIdentifier = null;
 	private $_attributes = array();
+
+	private $_linkedColumn = null;
+	private $_linkedColumnContinual = true;
 
 	private $_originalData = null;
 	private $_data = null;
@@ -104,7 +106,6 @@ class Column extends PersistableContainer
 
 		if( (string)$xmlDef->attributes()->generatedOnPublish == Torpor::VALUE_TRUE ){
 			$this->setGeneratedOnPublish();
-			$this->_prePublishedIdentifier = $this->Torpor()->generatePrePublishIdentifier( $this );
 		}
 		// TODO: options for navigating attributes
 		foreach( $xmlDef->attributes() as $key => $val ){
@@ -196,30 +197,56 @@ class Column extends PersistableContainer
 	public function isReadOnly(){ return( $this->_isReadOnly ); }
 	public function setReadOnly( $bool = true ){ return( $this->_isReadOnly = ( $bool ? true : false ) ); }
 
-	public function hasData(){
-		return( $this->isLoaded() || $this->isDirty() );
+	// TODO: Need protection from recursion, and possibly a setting to govern
+	// behavior - either return false as soon as the recursion is detected, or
+	// throw an exception.
+	public function hasData( $localOnly = false ){
+		$return = false;
+		if( $this->isLinked() && !$localOnly ){
+			$return = $this->getLinkedColumn()->hasData();
+		} else {
+			$return = ( $this->isLoaded() || $this->isDirty() );
+		}
+		return( $return );
 	}
 
 	public function getOriginalData(){ return( $this->_originalData ); }
 	protected function setOriginalData( $data ){ return( $this->_originalData = $data ); }
 
 	public function __toString(){ return( $this->getData() ); }
-	public function getData(){
-		// TODO: WARNING: What to do in the case that Grid is already
-		// loaded?  Should we care?  This answer determines whether or
-		// not we throw an exception (if grid is loaded and we're not),
-		// and/or whether we call Load() with refresh set to true.
-		// Only load in the event that we don't already contain data?
-		if(
-			!$this->isLoaded()
-			&& !$this->isDirty()
-			&& $this->getGrid() instanceof Grid
-		){
-			$this->getGrid()->Load();
+	public function getData( $localOnly = false ){
+		if( $this->isLinked() && !$localOnly ){
+			// TODO: What to do if the linked column no longer exists?
+			if( $this->getLinkedColumn()->hasData() ){
+				$this->setData( $this->getLinkedColumn()->getData() );
+				if( !$this->isLinked( true ) ){
+					$this->destroyLink();
+				}
+			}
+		} else {
+			// TODO: WARNING: What to do in the case that Grid is already
+			// loaded?  Should we care?  This answer determines whether or
+			// not we throw an exception (if grid is loaded and we're not),
+			// and/or whether we call Load() with refresh set to true.
+			// Only load in the event that we don't already contain data?
+			if(
+				!$this->isLoaded()
+				&& !$this->isDirty()
+				&& $this->getGrid() instanceof Grid
+			){
+				$this->getGrid()->Load();
+			}
 		}
 		return( $this->_data );
 	}
 
+	public function Load( $refresh = false ){
+		$return = false;
+		if( !$this->isLoaded() || $refresh ){
+			$return = $this->getGrid()->Load( $refresh );
+		}
+		return( $return );
+	}
 	// This should ONLY EVER be used by Grids loading data.  If PHP had
 	// support for Friend classes, this would be marked as protected.  As it
 	// is here, this is volatile since it sets stateful data and bypasses
@@ -233,6 +260,44 @@ class Column extends PersistableContainer
 			$this->setClassData( $data );
 		}
 	}
+
+	// If $continual is set to false, as soon as valid data has been
+	// retrieved from the linked column the link is severed.
+	public function linkToColumn( Column $column, $continual = true ){
+		$this->_linkedColumnContinual = $continual;
+		return( $this->_linkedColumn = $column );
+	}
+
+	public function severLink(){ return( $this->destroyLink() ); }
+	public function destroyLink(){
+		$return = false;
+		if( $this->isLinked() ){
+			$this->_linkedColumn = null;
+			$return = true;
+		}
+		return( $return );
+	}
+
+	public function isLinked( $continualCheck = false ){
+		$return = false;
+		if( $continualCheck ){
+			if( $this->isLinked() && $this->_linkedColumnContinual ){
+				$return = true;
+			}
+		} else {
+			$return = ( !is_null( $this->_linkedColumn ) && $this->_linkedColumn instanceof Column ? true : false );
+		}
+		return( $return );
+	}
+
+	public function getLinkedColumn(){
+		$return = false;
+		if( $this->isLinked() ){
+			$return = $this->_linkedColumn;
+		}
+		return( $return );
+	}
+
 	// Returns bool to indicate whether data has changed.
 	public function setData( $data ){
 		// TODO: Need a way to set data on an unloaded object without
@@ -319,7 +384,7 @@ class Column extends PersistableContainer
 			$this->setOriginalData( $this->_data );
 		}
 
-		if( $data == $this->getData() ){
+		if( $data == $this->getData( true ) ){
 			// If we're setting a null value, even though it's identical to what's
 			// already there it's now because of our intent rather than our convenience
 			// that the data is as it is.  Thus it is only appropriate to indicate that
