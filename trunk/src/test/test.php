@@ -2,7 +2,7 @@
 // TODO: Make sure that everything passes this check.  This is the equivalent
 // of 'use strict' in PHP - although it can only produce warnings, they're still
 // useful in directing attention to probable typos etc.
-error_reporting (E_ERROR | E_WARNING | E_PARSE | E_NOTICE);
+error_reporting ( E_ALL );
 
 // TODO: Lazy loading.
 include_once( '../Torpor.php' );
@@ -78,6 +78,7 @@ $xmlConfig = <<<XML
 			<Columns>
 				<Column name="Id" dataName="ORDER_ID" type="unsigned"/>
 				<Column name="UserId" dataName="USER_ID" type="unsigned"/>
+				<Column name="SellerId" dataName="SELLER_ID" type="unsigned"/>
 				<Column name="Date" dataName="ORDER_DATE" type="datetime"/>
 				<Column name="ShippingAddressId" dataName="SHIPPING_ADDRESS" type="unsigned"/>
 				<Column name="ShippingTypeId" dataName="SHIPPING_TYPE" type="unsigned"/>
@@ -92,6 +93,7 @@ $xmlConfig = <<<XML
 				</Unique>
 				<Foreign>
 					<Key column="UserId" referenceGrid="User" referenceColumn="Id"/>
+					<Key column="SellerId" referenceGrid="User" referenceGridAlias="Seller" referenceColumn="Id"/>
 				</Foreign>
 			</Keys>
 		</Grid>
@@ -144,17 +146,21 @@ foreach( $userToo as $columnName => $column ){
 // One-to-many fetch
 $orderSet = $userToo->getOrderSet();
 
-$orderSet = new GridSet();
+$orderSet = Torpor()->newOrderSet();
 $orderSet->addOrder( Torpor()->newOrder() );
 $orderSet->addOrder( Torpor()->newOrder() );
 $orderSet->addOrder( Torpor()->newOrder() );
+
+$orderSet->setUser( $user );
+$orderSet->mapSeller( $userToo );
 
 $orderSet->getFirstOrder()->ID = 1;
 $orderSet->getNextOrder()->setId( 2 );
 $orderSet->getNextOrder()->setId( 5 );
 
 foreach( $orderSet as $order ){
-	var_dump( $order->ID );
+	var_dump( $order->UserID );
+	var_dump( $order->SellerID );
 }
 
 $order = Torpor()->newOrder();

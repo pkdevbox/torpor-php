@@ -33,6 +33,7 @@ class Torpor {
 	const OPTION_PERPETUATE_AUTO_LINKS = 'PerpetuateAutoLinks';
 	const DEFAULT_PERPETUATE_AUTO_LINKS = false;
 
+	// Value constants
 	const VALUE_TRUE = 'true';
 	const VALUE_NONE = 'none';
 	const VALUE_SEPARATOR = '|';
@@ -55,6 +56,7 @@ class Torpor {
 	const OPERATION_CAN = 'can';
 	const OPERATION_GET = 'get';
 	const OPERATION_IS  = 'is';
+	const OPERATION_MAP = 'map';
 	const OPERATION_NEW = 'new';
 	const OPERATION_SET = 'set';
 	const OPERATION_GET_SET = 'set';
@@ -69,7 +71,6 @@ class Torpor {
 	const ALL_KEYS_DEEP   = 1;
 	const NON_ALIAS_KEYS  = 2;
 	const ALIAS_KEYS_ONLY = 3;
-
 
 	private static $instance;
 	private $_dataEngine;
@@ -812,18 +813,22 @@ class Torpor {
 	public function _newGridFromCriteria( $gridName, Criteria $criteria ){
 	}
 
+	public function _newGridSet( $gridName = null, $sourceContent = null, $alias = false ){
+		return( new GridSet( $this, $gridName, $sourceContent, $alias ) );
+	}
+
 	// Guts
 	// TODO: in PHP 5.3.0 there's a __callStatic() method we'll take advantage of (when that
 	// becomes the standard version available) that will help flesh out the singleton
 	// pattern by calling getInstance() and returning the resulting __call map.
-	public function __call( $func, $args ){
+	public function __call( $function, $arguments ){
 		$this->checkInitialized();
-		$func = strtolower( $this->makeKeyName( $func ) );
-		if( $this->cachedCall( $func ) ){
-			return( $this->callCachedCall( $func, $args ) );
+		$function = strtolower( $this->makeKeyName( $function ) );
+		if( $this->cachedCall( $function ) ){
+			return( $this->callCachedCall( $function, $arguments ) );
 		}
-		$operation = substr( $func, 0, 3 );
-		$funcRemainder = substr( $func, 3 );
+		$operation = $this->detectOperation( $function );
+		$funcRemainder = strtolower( substr( $function, strlen( $operation ) ) );
 		$return = null;
 		switch( $operation ){
 			case self::OPERATION_CAN:
@@ -834,8 +839,29 @@ class Torpor {
 				if( $this->supportedGrid( $funcRemainder ) ){
 					// WARNING: Magic string '_newGrid' rather than constant or verified
 					// contents.  TODO: Fix this.
-					$this->cacheCall( $func, '_newGrid', $funcRemainder );
+					$this->cacheCall( $function, '_newGrid', $funcRemainder );
 					$return = $this->_newGrid( $funcRemainder );
+				} else if(
+					substr(
+						$funcRemainder,
+						( -1 * strlen( self::OPERATION_GET_SET ) )
+					) == self::OPERATION_GET_SET
+				){
+					$targetGridType = substr( $funcRemainder, 0, ( -1 * strlen( self::OPERATION_GET_SET ) ) );
+					var_dump( $targetGridType );
+					if( $this->supportedGrid( $targetGridType ) ){
+						$return = $this->_newGridSet(
+							$targetGridType,
+							array_shift( $arguments ),
+							array_shift( $arguments )
+						);
+					} else {
+						$this->throwException( 'Unrecognized or unsupported grid type "'.$targetGridType.'" requested' );
+					}
+				// TODO: support "new<Grid>Set<From><X>" ?  The pattern is implicitly supported
+				// in the generics, but would require extra parsing here.
+				} else {
+					$this->throwException( 'Unrecognized or unsupported method/grid "'.$function.'"' );
 				}
 				break;
 			case self::OPERATION_GET:
@@ -847,7 +873,7 @@ class Torpor {
 				}
 				if( stripos( $funcRemainder, self::OPERATION_MOD_FROM ) ){
 					list( $source, $target ) = explode( self::OPERATION_MOD_FROM, $funcRemainder );
-					// TODO: Leavning off here...
+					// TODO: Leaving off here...
 					print_r( $source );
 					print_r( $target );
 				}
@@ -857,7 +883,7 @@ class Torpor {
 				// Unique Key
 				break;
 			default:
-				$this->throwException( 'Unrecognized function "'.$func.'" requested on '.get_class( $this ) );
+				$this->throwException( 'Unrecognized function "'.$function.'" requested on '.get_class( $this ) );
 				break;
 		}
 		return( $return );
@@ -971,6 +997,7 @@ class Torpor {
 						self::OPERATION_ADD,
 						self::OPERATION_CAN,
 						self::OPERATION_GET,
+						self::OPERATION_MAP,
 						self::OPERATION_NEW,
 						self::OPERATION_SET
 					)
