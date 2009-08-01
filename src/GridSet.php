@@ -4,6 +4,7 @@ class GridSet extends PersistableContainer implements Iterator {
 	const ADJECTIVE_FIRST = 'first';
 	const ADJECTIVE_NEXT  = 'next';
 
+	private $_type = null;
 	private $_grids = array();
 	private $_sourceGrid = null;
 	private $_sourceCriteria = null;
@@ -31,7 +32,7 @@ class GridSet extends PersistableContainer implements Iterator {
 	// caching engine).
 	public function add( Grid $grid, $setGridCriteria = true ){
 		if( !is_null( $this->gridType() ) && !$this->checkNoun( $grid->_getObjName() ) ){
-			$this->Torpor()->throwException( 'Grid type mismatch, "'.$grid->_getObjName().'" cannot be added to collection of type '.$this->gridType() );
+			$this->throwException( 'Grid type mismatch, "'.$grid->_getObjName().'" cannot be added to collection of type '.$this->gridType() );
 		}
 		$return = false;
 		if( !in_array( $grid, $this->_grids, true ) ){
@@ -48,13 +49,23 @@ class GridSet extends PersistableContainer implements Iterator {
 		return( $return );
 	}
 
+	public function type(){ return( $this->gridType() ); }
 	public function recordType(){ return( $this->gridType() ); }
 	public function gridType(){
-		$return = null;
-		if( $this->gridCount() > 0 ){
-			$return = $this->_grids[0]->_getObjType();
+		if( is_null( $this->_type ) && $this->gridCount() > 0 ){
+			// First one in determines what we can hold.
+			$this->setType( $this->_grids[0]->_getObjName() );
 		}
-		return( $return );
+		return( $this->_type );
+	}
+	protected function setType( $gridType ){
+		$gridType = $this->Torpor()->gridKeyName( $gridType );
+		if( empty( $gridType ) || !is_string( $gridType ) ){
+			$this->throwException( 'Invalid grid type (empty or not a string)' );
+		} else if( !$this->Torpor()->supportedGrid( $gridType ) ){
+			$this->throwExcetion( 'Unkown or unsupported grid "'.$gridType.'"' );
+		}
+		$this->_type = $gridType;
 	}
 
 	protected function checkNoun( $noun ){
@@ -89,28 +100,27 @@ class GridSet extends PersistableContainer implements Iterator {
 	public function gridCount(){ return( count( $this->_grids ) ); } 
 
 	// Used so we can have descriptive names, such as add<Grid>, etc.
-	public function __call( $func, $args ){
+	public function __call( $function, $arguments ){
 		$return = null;
 		// add<Grid>
 		// getFirst<Grid>
 		// getNext<Grid>
-		$func = strtolower( $this->Torpor()->makeKeyName( $func ) );
-		$operation = substr( $func, 0, Torpor::COMMON_OPERATION_LENGTH );
-		$funcRemainder = substr( $func, strlen( $operation ) );
+		$operation = $this->Torpor()->detectOperation( $function );
+		$funcRemainder = strtolower( substr( $function, strlen( $operation ) ) );
 		switch( $operation ){
 			case Torpor::OPERATION_ADD:
 				if( !is_null( $this->gridType() ) && !$this->checkNoun( $funcRemainder ) ){
-					$this->Torpor()->throwExcetion( 'Unrecognized operation or incorrect grid type "'.$funcRemainder.'"' );
+					$this->throwException( 'Unrecognized operation or incorrect grid type "'.$funcRemainder.'"' );
 				}
-				if( count( $args ) > 1 ){
+				if( count( $arguments ) > 1 ){
 					$return = 0;
-					foreach( $args as $grid ){
+					foreach( $arguments as $grid ){
 						if( $this->add( $grid ) ){
 							$return++;
 						}
 					}
 				} else {
-					$return = $this->add( array_shift( $args ) );
+					$return = $this->add( array_shift( $arguments ) );
 				}
 				break;
 			case Torpor::OPERATION_GET:
@@ -118,14 +128,14 @@ class GridSet extends PersistableContainer implements Iterator {
 				$adjective = false;
 				if( strpos( $funcRemainder, self::ADJECTIVE_FIRST ) === 0 ){
 					$adjective = self::ADJECTIVE_FIRST;
-				} else if( strpos( $funcRemainder, self::ADJECTIVE_NEXT ) == 0 ){
+				} else if( strpos( $funcRemainder, self::ADJECTIVE_NEXT ) === 0 ){
 					$adjective = self::ADJECTIVE_NEXT;
 				}
 				if( $adjective !== false ){
 					$funcRemainder = substr( $funcRemainder, strlen( $adjective ) );
 				}
 				if( !$this->checkNoun( $funcRemainder ) ){
-					$this->Torpor()->throwExcetion( 'Unrecognized operation or incorrect grid type "'.$funcRemainder.'"' );
+					$this->throwException( 'Unrecognized operation or incorrect grid type "'.$funcRemainder.'"' );
 				}
 				switch( $adjective ){
 					case self::ADJECTIVE_FIRST:
@@ -139,7 +149,11 @@ class GridSet extends PersistableContainer implements Iterator {
 						break;
 				}
 				break;
+			default:
+				$this->throwException( 'Unrecognized function "'.$func.'" requested on '.get_class( $this ) );
+				break;
 		}
+		return( $return );
 	}
 
 	// Iterator interface implementation for accessing columns
