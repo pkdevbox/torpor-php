@@ -137,8 +137,25 @@ $userToo->UserName = 'harry';
 foreach( $userToo->columnNames() as $column ){
 	var_dump( $userToo->$column );
 }
+foreach( $userToo as $columnName => $column ){
+	var_dump( $columnName.' = '.var_export( $column->getData(), true ) );
+}
+
 // One-to-many fetch
 $orderSet = $userToo->getOrderSet();
+
+$orderSet = new GridSet();
+$orderSet->addOrder( Torpor()->newOrder() );
+$orderSet->addOrder( Torpor()->newOrder() );
+$orderSet->addOrder( Torpor()->newOrder() );
+
+$orderSet->getFirstOrder()->ID = 1;
+$orderSet->getNextOrder()->setId( 2 );
+$orderSet->getNextOrder()->setId( 5 );
+
+foreach( $orderSet as $order ){
+	var_dump( $order->ID );
+}
 
 $order = Torpor()->newOrder();
 // One-to-one fetch

@@ -75,7 +75,7 @@ class Grid extends PersistableContainer implements Iterator
 			if( is_array( $key ) ){
 				$pass = true;
 				foreach( $key as $keyColumn ){
-					if( !$keyColumn->hasData() ){
+					if( !$this->Column( $keyColumn )->hasData() ){
 						$pass = false;
 						break;
 					}
@@ -151,31 +151,21 @@ class Grid extends PersistableContainer implements Iterator
 		return( $this->isDirty() );
 	}
 
-	// TODO: Need a way to abstract the building of a WHERE condition based on the keys.
-	// There will need to be a literal DataAccessObject responsible for translating between
-	// this and wherever it's being saved, and will be a member of Torpor.
-
 	// Abstract all getter & setter methods.
-	public function __call( $func, $args ){
+	public function __call( $function, $arguments ){
 		$return = null;
-		// TODO: Decide on a common scheme of strto(upper|lower)
-		$func = strtolower( $this->Torpor()->makeKeyName( $func ) );
-		// TODO: Abstract this into a "detectOperation" call?
-		$operation = (
-			stripos( $func, Torpor::OPERATION_IS ) === 0
-			? Torpor::OPERATION_IS
-			: strtolower( substr( $func, 0, Torpor::COMMON_OPERATION_LENGTH ) )
-		);
-		// TODO: Evalutate operations first?
 
-		// TODO: make use of the 'is' prefix when testing bools, and the convention of setBoolColumn()
-		// with no arguments defaulting the value to true.
+		// Abort early if column name is being used in function context.
+		if( $this->hasColumn( $function ) ){
+			return( $this->Column( $function ) );
+		}
 
-		// TODO: How to handle factory methods based on identified foreign key
-		// criteria?  Should always be fetching a collection (which may have a single member,
-		// which will need to have convenience methods for as well)
-		$funcRemainder = strtoupper( substr( $func, strlen( $operation ) ) );
-		if( !$this->hasColumn( $funcRemainder ) ){
+		$operation = $this->Torpor()->detectOperation( $function );
+		if( $operation === false ){
+			$this->throwException( 'Unkown or unsupported method "'.$function.'" requested' );
+		}
+		$noun = $this->Torpor()->makeKeyName( substr( $function, strlen( $operation ) ) );
+		if( !$this->hasColumn( $noun ) ){
 			// Not attempting a column operation, see if this is something we're looking for
 			// larger factory operations.
 			// get<Target>
@@ -184,27 +174,35 @@ class Grid extends PersistableContainer implements Iterator
 			// new<Target>Set ?
 			if(
 				$operation == Torpor::OPERATION_SET
-				&& $args[0] instanceof Grid
-				&& $this->Torpor()->canReference( $this, $args[0], $funcRemainder )
+				&& $arguments[0] instanceof Grid
+				&& $this->Torpor()->canReference( $this, $arguments[0], $noun )
 			){
-				$incomingGrid = $args[0];
+				$incomingGrid = $arguments[0];
 				$references = array();
-				if( $incomingGrid->_getObjName() == $funcRemainder ){ // Direct relationship
+				if( $incomingGrid->_getObjName() == $noun ){ // Direct relationship
 					$references = $this->Torpor()->referenceKeysBetween( $this, $incomingGrid, Torpor::NON_ALIAS_KEYS );
 				} else { // Aliased relationship
-					$references = $this->Torpor()->aliasReferenceKeysBetween( $this, $incomingGrid, $funcRemainder );
+					$references = $this->Torpor()->aliasReferenceKeysBetween( $this, $incomingGrid, $noun );
 				}
 				foreach( $references as $sourceColumnName => $targetColumnName ){
 					$targetColumn = $incomingGrid->Column( $targetColumnName );
+
 					// Get data of data can be got.
-					if( !$targetColumn->hasData() ){ $targetColumn->Load(); }
+					if( !$targetColumn->hasData() ){
+						$targetColumn->Load();
+					}
+
 					// If the target column still doesn't have any data, look to see if we can
 					// do dynamic linking.
 					if( !$targetColumn->hasData() ){
-						// TODO: Look at Torpor settings to determine if all linked relationship
-						// should be established, and whether they should persist.
-						if( $targetColumn->isGeneratedOnPublish() ){
-							$this->Column( $sourceColumnName )->linkToColumn( $targetColumn );
+						if(
+							$targetColumn->isGeneratedOnPublish()
+							&& $this->Torpor()->linkUnpublishedReferenceColumns()
+						){
+							$this->Column( $sourceColumnName )->linkToColumn(
+								$targetColumn,
+								$this->Torpor()->perpetuateAutoLinks()
+							);
 						} else {
 							$this->throwException( 'Insufficient reference data: no values in '.$targetColumnName.' when trying to set '.$this->_getObjName().'->'.$sourceColumnName.' from '.$incomingGrid->_getObjName() );
 						}
@@ -213,48 +211,42 @@ class Grid extends PersistableContainer implements Iterator
 					}
 				}
 				return( true );
-			} else if( stripos( $func, Torpor::OPERATION_MOD_FROM ) && $this->Torpor()->can( $func ) ){
-				return( $this->Torpor()->$func( $this ) );
+			} else if( stripos( $function, Torpor::OPERATION_MOD_FROM ) && $this->Torpor()->can( $function ) ){
+				return( $this->Torpor()->$function( $this ) );
 			} else {
-				$torporCall = $func.Torpor::OPERATION_MOD_FROM.$this->_getObjName();
+				$torporCall = $function.Torpor::OPERATION_MOD_FROM.$this->_getObjName();
 				if( $this->Torpor()->can( $torporCall ) ){
 					return( $this->Torpor()->$torporCall( $this ) );
 				}
 			}
-			// TODO: set<Target> where <Target> is a grid (or grid alias), e.g.,
-			// $order->setUser( $user ) or $order->setCustomer( $user ).  Especially
-			// necessary for this to be handled internally (rather than individual object
-			// extension by the end-user) since we will need to keep track of the unsaved
-			// object dependency tree, in the event that $user (from the above example)
-			// has not yet been published, but should be in the event that $order is (and
-			// in fact would need to be saved first, in order to propagate the relaionship
-			// defining keeys up to $order prior to its being published)
-			$this->throwException( $funcRemainder.' does not exist as a member or method of this class' );
+			$this->throwException( $noun.' does not exist as a member or method of this class' );
 		}
-		$column = $this->_getColumn( $funcRemainder );
+
+		$column = $this->_getColumn( $noun );
 		if( !( $column instanceof Column ) ){
-			$this->throwException( $funcRemainder.' is not a valid Column object' );
+			$this->throwException( $noun.' is not a valid Column object' );
 		}
 		switch( $operation ){
 			case Torpor::OPERATION_IS:
 				if( $column->getType() == Column::TYPE_BOOL ){
 					$return = $column->getData();
 				} else {
-					trigger_error( $funcRemainder.' is not of type '.Column::TYPE_BOOL, E_USER_ERROR );
+					trigger_error( $noun.' is not of type '.Column::TYPE_BOOL, E_USER_ERROR );
 				}
 				break;
 			case Torpor::OPERATION_GET:
 				if( !$column->isLoaded() && $this->isLoaded() ){
-					$this->throwException( 'Unloaded Column '.$funcRemainder.' in loaded Grid '.$this->_getObjName() );
+					$this->throwException( 'Unloaded Column '.$noun.' in loaded Grid '.$this->_getObjName() );
 				}
 				$return = $column->getData(); // Will automatically load the grid as necessary.
 				break;
 			case Torpor::OPERATION_SET:
 				// alias set<Column>() == set<Column>( true ); for BOOL types
-				if( count( $args ) == 0 && $column->getType() == Column::TYPE_BOOL ){
+				if( count( $arguments ) == 0 && $column->getType() == Column::TYPE_BOOL ){
 					$return = $column->setData( true );
 				} else {
-					$return = $column->setData( array_shift( $args ) );
+					// TODO: Turn the 'setData' string into a constant?
+					$return = call_user_func_array( array( $column, 'setData' ), $arguments );
 				}
 				$this->_setDirty( $this->isDirty() || $column->isDirty() );
 				break;
@@ -266,13 +258,13 @@ class Grid extends PersistableContainer implements Iterator
 	}
 
 	public function __get( $name ){
-		$func = 'get'.$name;
-		return( $this->$func() );
+		$function = 'get'.$name;
+		return( $this->$function() );
 	}
 
 	public function __set( $name, $value ){
-		$func = 'set'.$name;
-		return( $this->$func( $value ) );
+		$function = 'set'.$name;
+		return( $this->$function( $value ) );
 	}
 
 	// Iterator interface implementation for accessing columns

@@ -27,6 +27,12 @@ class Torpor {
 	const OPTION_COLUMN_CLASS  = 'DefaultColumnClass';
 	const DEFAULT_COLUMN_CLASS = 'Column';
 
+	const OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS = 'LinkUnpublishedReferenceColumns';
+	const DEFAULT_LINK_UNPUBLISHED_REFERENCE_COLUMNS = true;
+
+	const OPTION_PERPETUATE_AUTO_LINKS = 'PerpetuateAutoLinks';
+	const DEFAULT_PERPETUATE_AUTO_LINKS = false;
+
 	const VALUE_TRUE = 'true';
 	const VALUE_NONE = 'none';
 	const VALUE_SEPARATOR = '|';
@@ -134,8 +140,10 @@ class Torpor {
 		return(
 			array(
 				self::OPTION_OVERWRITE_ON_LOAD => self::DEFAULT_OVERWRITE_ON_LOAD,
-				self::OPTION_GRID_CLASS        => self::DEFAULT_GRID_CLASS,
-				self::OPTION_COLUMN_CLASS      => self::DEFAULT_COLUMN_CLASS
+				self::OPTION_GRID_CLASS => self::DEFAULT_GRID_CLASS,
+				self::OPTION_COLUMN_CLASS => self::DEFAULT_COLUMN_CLASS,
+				self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS => self::DEFAULT_LINK_UNPUBLISHED_REFERENCE_COLUMNS,
+				self::OPTION_PERPETUATE_AUTO_LINKS => self::DEFAULT_PERPETUATE_AUTO_LINKS
 			)
 		);
 	}
@@ -602,6 +610,12 @@ class Torpor {
 		return( $options );
 	}
 	public function overwriteOnLoad(){ return( $this->options( self::OPTION_OVERWRITE_ON_LOAD ) ); }
+	public function linkUnpublishedReferenceColumns(){
+		return( $this->options( self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS ) );
+	}
+	public function perpetuateAutoLinks(){
+		return( $this->options( self::OPTION_PERPETUATE_AUTO_LINKS ) );
+	}
 
 	public function gridClass( $gridName ){
 		if( is_object( $gridName ) ){
@@ -941,6 +955,31 @@ class Torpor {
 		$name = self::makeKeyName( (string)$xmlObj->attributes()->name );
 		if( !$name ){ $name = self::makeKeyName( (string)$xmlObj->attributes()->dataName ); }
 		return( $name );
+	}
+
+	public static function detectOperation( $functionName, $compound = false ){
+		$functionName = strtolower( self::makeKeyName( $functionName ) );
+		$operation = false;
+		if( strpos( $functionName, self::OPERATION_IS ) === 0 ){
+			$operation = self::OPERATION_IS;
+		} else {
+			$operationPrefix = substr( $functionName, 0, self::COMMON_OPERATION_LENGTH );
+			if(
+				in_array(
+					$operationPrefix,
+					array(
+						self::OPERATION_ADD,
+						self::OPERATION_CAN,
+						self::OPERATION_GET,
+						self::OPERATION_NEW,
+						self::OPERATION_SET
+					)
+				)
+			){
+				$operation = $operationPrefix;
+			}
+		}
+		return( $operation );
 	}
 }
 
