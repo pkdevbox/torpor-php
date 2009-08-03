@@ -46,10 +46,12 @@ More information on this can be found on the [ExtendingBaseClasses Extending Bas
 == Of Torpor ==
 Singleton invocation
 Compound method names:
+{{{
 <verb>[<adjective>]<noun>[<qualifier>]
 new<Grid>
 new<Grid>From<Grid>
 new<Grid>Set
+}}}
 etc.
 
 
