@@ -8,7 +8,7 @@ These source files should be placed so as to be accessible to the PHP include pa
 It is recommended to run the provided `test.php` (again, located in either `Torpor` or `Torpor/src/test/` depending on the package) in your target environment to confirm successful installation, dependencies, and operation.  Be advised that command line and web server invocations _frequently differ_ in the available environments and settings and may produce different or unexpected results such as failure to include proper files are locate dependent packages.  The successful execution should be confirmed in the same conditions you expect to use the package.
 
 = Configuration =
-All configuration is performed via XML, including optional settings, data engine access, and descriptions of the data objects themselves.  This XML must be prepared according to the specifications outlined in the [Reference#Configuration_XML] section of this documentation and will be validated against a schema file prior to loading (included as `TorporConfig.xsd` in all packages).  It is recommended to test this validation manually while making changes as well in order to ensure successful loading (which will separate syntax errors from logic errors, making debugging easier).  The included `validateXML.php` script is provided for this purpose.
+All configuration is performed via XML, including optional settings, data engine access, and descriptions of the data objects themselves.  This XML must be prepared according to the specifications outlined in the *[Reference#Configuration_XML Configuration XML]* section of this documentation and will be validated against a schema file prior to loading (included as `TorporConfig.xsd` in all packages).  It is recommended to test this validation manually while making changes as well in order to ensure successful loading (which will separate syntax errors from logic errors, making debugging easier).  The included `validateXML.php` script is provided for this purpose.
 
 Torpor will look in the PHP include path for the file `TorporConfig.xml` by default, which can be overridden by passing configuration details as an argument to the `Torpor::initialize()` method (more on that below).
 
@@ -22,12 +22,14 @@ Every data object (be it `Grid` or `Column`) may have 2 names configured - one b
 
 {{{
 $userObject = $torpor->newUser();
+$userSet    = $torpor->newUserSet();
 // as opposed to
 $userObject = $torpor->newUsers()
+$userSet    = $torpor->newUsersSet();
 // etc.
 }}}
 
-Any alias name may be used and need not be related to the original, and this is the name by which it will be known throughout the Torpor instance (including as related objects, within sets, etc.).  More information on names and aliases (including multiple references between identical grids in different contexts) can be found in the *Names and Aliases* section of the [Reference#Configuration_XML Reference - Configuration XML] page.
+Any alias name may be used and need not be related to the original, and this is the name by which it will be known throughout the Torpor instance (including as related objects, within sets, etc.).  More information on names and aliases (including multiple references between identical grids in different contexts) can be found in the *Names and Aliases* section of the *[Reference#Configuration_XML Reference - Configuration XML]* page.
 
 A word about security: Torpor supports encryption for repository access credentials in order to make the files safe for distribution without exposing pertinent details, and all extraction scripts output these encrypted by default.  However, since Torpor is also open source, it is possible to extract the routines required for maintaining the encryption and gain access to the contents.  The values are stored encrypted in memory insofar as it's possible to do so, but there are points during which those values must be decrypted for communication to the data engine drivers, and may be acquired either from the resulting resource objects themselves or by dumping memory contents. The most secure installation practices should include different credentials between development/staging/production environments, read access constraints on configuration files, or remote access controls (retrieving either the entire configuration or specific values via URI - while keeping performance in mind, of course) to limit distribution of sensitive data.
 
@@ -38,7 +40,7 @@ For Columns this is slightly more complex, as overrides exist at several points.
 
 The special keyword `"none"` may be used at any point in the class override hierarchy to opt out of the inheritance (though not entirely - only up to the global `<GridClass/>` or `<ColumnClass/>` designation; if these are provided, `"none"` will result in the corresponding global option rather than the Torpor default of `Grid` and `Column` respectively).  This opt-out is all or nothing, rather than simply moving it up one in the inheritance tree.  `"none"` may also be used as the definition in the hierarchy, opting its descendants out by default (which they may then again override, but only by specifying the class name directly - XPath methods of inheritance which could opt them back in to to the hierarchy at a specific level are not currently supported).
 
-More information on this can be found on the [ExtendingBaseClasses Extending Base Classes] page.
+More information on this can be found on the *[ExtendingBaseClasses Extending Base Classes]* page.
 
 = Conventions =
 (Coming soon)
@@ -56,4 +58,5 @@ etc.
 
 
 Previous: [Overview]
+
 Next: [IllustratedFeatures Illustrated Features]
