@@ -4,6 +4,7 @@
 // TODO: Callbacks?
 class Grid extends PersistableContainer implements Iterator
 {
+	private $_deleted = false;
 	private $_columns = array();
 
 	protected function _getColumns(){ return( $this->_columns ); }
@@ -15,6 +16,10 @@ class Grid extends PersistableContainer implements Iterator
 		}
 		return( in_array( $this->Torpor()->makeKeyName( $columnName ), $this->_getColumnNames() ) );
 	}
+
+	public function isDeleted(){ return( $this->_deleted ); }
+	public function Delete( $bool = true ){ return( $this->_deleted = ( $bool ? true : false ) ); }
+	public function UnDelete(){ return( $this->Delete( false ) ); }
 
 	public function Column( $columnName ){ return( $this->_getColumn( $columnName ) ); }
 	public function _getColumn( $columnName ){

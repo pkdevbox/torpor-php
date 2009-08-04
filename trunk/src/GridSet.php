@@ -1,12 +1,14 @@
 <?PHP
 // $Rev$
+// TODO: phpdoc
+// TODO: Logically organize methods.
 class GridSet extends PersistableContainer implements Iterator {
 	const ADJECTIVE_FIRST = 'first';
 	const ADJECTIVE_NEXT  = 'next';
 
 	private $_type = null;
 	private $_grids = array();
-	private $_sourceGrid = null;
+	private $_sourceGrids = array();
 	private $_sourceGridAlias = false;
 	private $_sourceCriteria = null;
 
@@ -29,55 +31,59 @@ class GridSet extends PersistableContainer implements Iterator {
 		}
 	}
 
-	public function getSourceGridAlias(){ return( $this->_sourceGridAlias ); }
-	public function getSourceGrid(){ return( $this->_sourceGrid ); }
+	public function getSourceGrid( $gridName ){
+		$gridName = $this->Torpor()->gridKeyName( $gridName );
+		$return = false;
+		$grids = $this->getSourceGrids();
+		if( isset( $grids{ $gridName } ) ){
+			$return = $grids{ $gridName };
+		}
+		return( $return );
+	}
+	public function getSourceGrids(){ return( $this->_sourceGrids ); }
+
 	public function getCriteria(){ return( $this->getSourceCriteria() ); }
 	public function getSourceCriteria(){ return( $this->_sourceCriteria ); }
 
-	public function setGrid( Grid $grid, $alias = false, $cascadeMap = true ){
-		return( $this->setSourceGrid( $grid, $alias, $cascadeMap ) );
-	}
 	public function setSourceGrid( Grid $grid, $alias = false, $cascadeMap = true ){
-		// Need to throw an exception if...
-		// We already have 1 or more grids and either
-		//   sourceGrid is set and it is !== $grid
-		//   OR sourceGrid is not set and Criteria is set
-		// ...otherwise: go ahead and set source grid.
-		// If after that we detect that the count is > 0,
-		// do a cascade set?
-		// And/or should there be an option to always swap out
-		// the grid with a grid of the same type and flush all?
-		if(
-			(
-				(
-					!is_null( $this->getSourceGrid() )
-					&& $grid->_getObjName() !== $this->getSourceGrid()->_getObjName()
-				) || (
-					is_null( $this->getSourceGrid() )
-					&& !is_null( $this->getSourceCriteria() )
-				)
-			) && $this->gridCount() > 0
-		){
-			$this->throwException( 'Cannot set new source grid; grids already added to set.' );
+		// New logic:
+		// Be able to set a source grid at any time, with automatic cascading.
+		// This will take place so long as either A) the type has not yet been
+		// established, or B) the established type canReference( $grid );
+
+		$existingGrid = false;
+		if( $alias ){
+			$alias = $this->Torpor()->makeKeyName( $alias );
 		}
-		$this->_sourceGrid = $grid;
-		$this->_sourceGridAlias = ( !empty( $alias ) ? $alias : false );
-		if( $this->gridCount() > 0 && $cascadeMap ){
-			// TODO: Cascade a map of this grid onto all existing grids?
-			$this->mapAll( $grid, $alias );
+		if(
+			!$this->gridType()
+			|| (
+				$this->gridType()
+				&& $this->Torpor()->canReference( $this->gridType(), $grid, $alias )
+			)
+		){
+			$existingGrid = $this->getGrid( ( $alias ? $alias : $grid ) );
+			if( $existingGrid !== $grid ){
+				$this->_sourceGrids{ ( $alias ? $alias : $grid->_getObjName() ) } = $grid;
+				if( $this->gridCount() > 0 && $cascadeMap ){
+					$this->mapAll( $grid, $alias );
+				}
+			}
+		} else {
+			$this->throwException(
+				'Cannot set new source grid '.$grid->_getObjName()
+				.'; no reference between '.$this->gridType().' and '
+				.$grid->_getObjName().( $alias ? ' as '.$alias : '' )
+			);
 		}
 		return( true );
 	}
 
 	public function setSourceCriteria( Criteria $criteria ){
 		if(
-			(
-				!is_null( $this->getSourceGrid() )
-				|| (
-					!is_null( $this->getSourceCriteria() )
-					&& $this->getSourceCriteria() !== $criteria
-				)
-			) && $this->gridCount() > 0
+			!is_null( $this->getSourceCriteria() )
+			&& $this->getSourceCriteria() !== $criteria
+			&& $this->gridCount() > 0
 		){
 			$this->throwExcetion( 'Cannot set new source criteria; grids already added to set.' );
 		}
@@ -91,54 +97,16 @@ class GridSet extends PersistableContainer implements Iterator {
 	// It is becoming increasingly apparent that the way to go with this is to allow a series of grids to be
 	// associated, one per relationship type, and that this may somehow need to be mapped together with the
 	// criteria storage.
-	public function mapGrid( Grid $grid, $alias = false ){ return( $this->mapAll( $grid, $alias ) ); }
-	public function mapCriteria( Criteria $criteria ){ return( $this->mapAll( $criteria ) ); }
-	public function mapAll( $content, $alias = false ){
-		$map = false;
-		if( $this->gridType() ){
-			if( $content instanceof Grid ){
-				// TODO: Do we need a set of source grids, referenced via $this->_sourceGrids[ gridType || alias ] = $grid ?
-				// Or, more profoundly, the possibility of reflecting a grid relationship in
-				// criteria objects?
-				// Explanation of logic:
-				// The new incoming grid should be set as the source grid for this set if:
-				// 1. There source grid previously set is of the same type (including alias)
-				// 2. There is no grid set, and either no criteria or if we have any criteria
-				//    we do not yet have any corresponding rows (or if we do, they're compatible
-				//    with the incoming grid type/alias relationship)
-				if(
-					(
-						!is_null( $this->getSourceGrid() )
-						&& $content->_getObjName() == $this->getSourceGrid()->_getObjName()
-						&& $alias == $this->getSourceGridAlias() // Loose comparison on purpose
-					) || (
-						is_null( $this->getSourceGrid() )
-						&& (
-							is_null( $this->getSourceCriteria() )
-							|| ( !is_null( $this->getSourceCriteria() )
-								&& (
-									$this->gridCount() == 0
-									|| $this->Torpor()->canReference( $this->gridType(), $content, $alias )
-								)
-							)
-						)
-					)
-				){
-					if( $this->getSourceGrid() !== $content ){
-						trigger_error( 'Replacing source grid', E_USER_WARNING );
-						$this->setSourceGrid( $content, $alias, false );
-					}
-				}
-				if( !$this->Torpor()->canReference( $this->gridType(), $content, $alias ) ){
-					$this->throwException( 'No reference path between '.$this->gridType().' and '.$content->_getObjName() );
-				}
-				$map = true;
-			} else if( $content instanceof Criteria ){
-				// TODO: Criteria introspection.
-				$map = true;
-			}
-		}
-		if( $map && $this->gridCount() > 0 ){
+	public function mapGrid( Grid $grid, $alias = false ){
+		$this->setSourceGrid( $grid, $alias );
+		return( $this->mapAll( $grid, $alias ) );
+	}
+	public function mapCriteria( Criteria $criteria ){
+		// TODO: Add to top-level criteria (AND/OR/XOR/NOT?)
+		return( $this->mapAll( $criteria ) );
+	}
+	protected function mapAll( $content, $alias = false ){
+		if( $this->gridCount() > 0 ){
 			// Using old-style (!foreach) iteration in order to avoid reseting internal
 			// iteration pointers.
 			for( $i = 0; $i < $this->gridCount(); $i++ ){
@@ -176,18 +144,13 @@ class GridSet extends PersistableContainer implements Iterator {
 			$this->throwException( 'Grid type mismatch, "'.$grid->_getObjName().'" cannot be added to collection of type '.$this->gridType() );
 		}
 		$return = false;
-		if( !in_array( $grid, $this->_grids, true ) ){
+		if( !in_array( $grid, $this->getSourceGrids(), true ) ){
 			if( $setGridCriteria ){
-				if( $this->getSourceGrid() instanceof Grid ){
-					$setCommand = Torpor::OPERATION_SET.(
-						$this->getSourceGridAlias()
-						? $this->getSourceGridAlias()
-						: $this->getSourceGrid()->_getObjName()
-					);
-					$grid->$setCommand( $this->getSourceGrid() );
-				} else if( $this->getSourceCriteria() instanceof Criteria ){
-					// TODO: Add deterministic criteria (if we have any) which maps the source
-					// criteria onto the incoming grid object.
+				foreach( $this->getSourceGrids() as $gridRelationship => $sourceGrid ){
+					$this->mapContent( $grid, $sourceGrid, $gridRelationship );
+				}
+				if( !is_null( $this->getSourceCriteria() ) ){
+					$this->mapContent( $grid, $this->getSourceCriteria() );
 				}
 			}
 			$this->_grids[] = $grid;
@@ -233,6 +196,7 @@ class GridSet extends PersistableContainer implements Iterator {
 		return( $pass );
 	}
 
+	// TODO: just-in-time loading & bulk population.
 	// These are essentially facades and aliases to the built-in iterator
 	// interfaces which we've already abstracted on top of $_grids, but are
 	// provided fo convenience and ease of documentation.
@@ -245,6 +209,8 @@ class GridSet extends PersistableContainer implements Iterator {
 
 	public function recordCount(){ return( $this->gridCount() ); }
 	public function gridCount(){ return( count( $this->_grids ) ); } 
+
+	// TODO: add publish methods.
 
 	// Used so we can have descriptive names, such as add<Grid>, etc.
 	public function __call( $function, $arguments ){
@@ -306,18 +272,7 @@ class GridSet extends PersistableContainer implements Iterator {
 					} else if( count( $arguments ) > 0 ){
 						$alias = array_shift( $arguments );
 					}
-					if(
-						!$this->gridType()
-						|| $this->Torpor()->canReference( $this->gridType(), $grid, $alias )
-					){
-						if( $operation == Torpor::OPERATION_MAP ){
-							$return = $this->mapGrid( $grid, $alias );
-						} else {
-							$return = $this->setSourceGrid( $grid, $alias );
-						}
-					} else {
-						$this->throwException( 'No mapping between to grid type '.$grid->_getObjName() );
-					}
+					$this->setSourceGrid( $grid, $alias );
 				} else {
 					$this->throwException( 'Invalid argument to method '.$function );
 				}
