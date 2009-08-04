@@ -9,13 +9,39 @@ require_once( 'Criteria.php' );
 require_once( 'GridSet.php' );
 
 // TODO: phpdoc
-// TODO: Review all singleton vs. object context interfaces and make
-// certain that there are no object context cases that will revert to
-// the singleton, which would thoroughly confuse the user and be a very
-// nasty bug to sort out.
 // TODO: CLEANUP: Order the methods according to some logical paradigm.
+// TODO: Documentation: Need good use case demonstration of linked objects,
+// e.g.:
+//   $user = Torpor()->newUser();
+//   $order = $user->newOrder();
+//   $orderItemOne = $order->newItem();
+//   $orderItemTwo = $order->newItem();
+// right:
+//   $orderItemOne->publish(); // This will properly cascade up the tree.
+//   $orderItemTwo->publish();
+// wrong:
+//   $user->publish();  // Will only publish user.  Everything else still
+//                      // requires manual assistance.
+// TODO: create a TorporDebug version which by default uses <obj>Debug
+// extensions to Grid, Column, GridSet, etc., (and/or one can simply
+// override the default object type for each level in the hierarchy),
+// with these debug objects essentially providing a timestamped debug
+// log via trigger_error indicating when each function call is initiated.
+// Extensive error_reporting will need to be configured to pick up on all
+// the E_USER_NOTICEs that it generates, which means that it's unlikely
+// to affect production but can, with a good default error handler, be
+// switched on in many contexts in order to provide extremely good
+// insight and performance characteristics.  Not recommended to leave
+// it on though, given the amount of string concatenation to be done, etc.
+// Oh, and these just wrap all the calls in trigger_error() notices,
+// then pass everything else up the chain via parent::X( $args ).
+// May be able to provide much of this by overriding __call(), and then
+// following it up with parent::__call( $func, $args ); but only maybe.
+// That wouldn't work for all defined functions, so this will need to
+// be carefully considered.
 class Torpor {
 	const VERSION = 0.1;
+	const DEFAULT_CONFIG_FILE = 'TorporConfig.xml';
 
 	// Options
 	const OPTION_OVERWRITE_ON_LOAD  = 'OverwriteOnLoad';
@@ -113,14 +139,14 @@ class Torpor {
 	}
 	protected function setInitialized( $bool = true ){ return( $this->_isInitialized = ( $bool ? true : false ) ); }
 	protected function checkInitialized(){
-		if( !$this->isInitialized() ){
+		if( !$this->isInitialized() && !$this->initialize() ){
 			$this->throwException( get_class( $this ).' not initialized, cannot continue' );
 		}
 	}
 
 	public static function Version(){ return( self::VERSION ); }
 
-	public function initialize( $config ){
+	public function initialize( $config = null ){
 		$instance = null;
 		if( isset( $this ) && $this instanceof self ){
 			// Called in object context
@@ -129,11 +155,34 @@ class Torpor {
 			// Called in static context
 			$instance = self::getInstance();
 		}
-		// Test if it's a file name...
-		// Test if it's a URL...
-		// Test if it's a config type...
-		// Test if it's XML...
-		$xml = $config;
+
+		$xml = '';
+		// TODO: Load files (from names) directly into SimpleXML via provided loading
+		// routines, rather than slurping contents into memory first.
+		if( !empty( $config ) ){
+			if( is_resource( $config ) ){
+				$xml = stream_get_contents( $config );
+			} else if( is_string( $config ) ){
+				if( preg_match( '/^[a-z]+:\/{2,3}[a-zA-Z0-9_\.]$/', $config ) ){
+					// Looks like a URI
+					$config = fopen( $config, 'r' );
+					$xml = stream_get_contents( $config );
+				} else if( file_exists( $config ) && is_readable( $config ) ){
+					$xml = file_get_contents( $config );
+				} else if( $configFile = $this->getFileInPath( $config ) ){
+					$xml = file_get_contents( $configFile );
+				} else {
+					$xml = $config;
+				}
+			}
+		} else {
+			if( $defaultConfig = $this->getFileInPath( self::DEFAULT_CONFIG_FILE ) ){
+				$config = file_get_contents( $defaultConfig );
+			}
+		}
+		if( empty( $xml ) ){
+			$instance->throwException( 'No configuration found, cannot initialize' );
+		}
 		return( $instance->processConfig( $xml ) );
 	}
 
@@ -750,19 +799,29 @@ class Torpor {
 	}
 
 	public function _getGridFromCriteria( $gridName, Criteria $criteria ){
+		// TODO: This.
 	}
 
-	public function _getGridSetFromRecord( $gridName, Grid $record, Criteria $criteria = null ){
+	public function _getGridSetFromRecord( $gridName, Grid $sourceGrid, Criteria $criteria = null ){
 		// TODO: Ensure $criteria is properly passed through from the Grid->get<Grid>Set( $criteria )
 		// calls in order to AND them together when retrieving corresponding grid records.
-		var_dump( 'getting grid set of type '.$gridName.' from type '.$record->_getObjName() );
+		$gridSet = $this->_newGridSet( $gridName, $sourceGrid );
+		if( $criteria instanceof Criteria ){
+			$gridSet->setSourceCriteria( $criteria );
+		}
+		return( $gridSet );
 	}
 
-	public function _getGridSetFromAliasRecord( $gridName, $alias, Grid $record ){
-		var_dump( 'getting grid set of type '.$gridName.' from type '.$record->_getObjName().' as '.$alias );
+	public function _getGridSetFromAliasRecord( $gridName, $alias, Grid $sourceGrid, Criteria $criteria = null ){
+		$gridSet = $this->_newGridSet( $gridName, $sourceGrid, $alias );
+		if( $criteria instanceof Criteria ){
+			$gridSet->setSourceCriteria( $criteria );
+		}
+		return( $gridSet );
 	}
 
-	public function _getGridSetFromCriteria( $gridName, Grid $record ){
+	public function _getGridSetFromCriteria( $gridName, Criteria $criteria ){
+		return( $this->_newGridSet( $gridName, $criteria ) );
 	}
 
 	public function _newGrid( $gridName ){
@@ -1007,6 +1066,23 @@ class Torpor {
 			}
 		}
 		return( $operation );
+	}
+
+	public static function getFileInPath( $fileName ){
+		$return = false;
+		$paths = explode( PATH_SEPARATOR, get_include_path() );
+		foreach( $paths as $path ){
+			if( empty( $path ) ){ continue; }
+			$testFileName = $path.'/'.$fileName;
+			if( file_exists( $testFileName ) ){
+				if( !is_readable( $testFileName ) ){
+					trigger_error( 'Found file "'.$fileName.'", but can\'t read it.', E_USER_WARNING );
+				}
+				$return = $testFileName;
+				break;
+			}
+		}
+		return( $return );
 	}
 }
 

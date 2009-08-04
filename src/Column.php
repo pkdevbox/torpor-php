@@ -132,6 +132,7 @@ class Column extends PersistableContainer
 	// to keep back references accurate.  Mess with this at your own peril.
 	public function setGrid( Grid $grid = null ){ return( $this->_grid = $grid ); }
 
+	public static function dataTypes(){ return( self::getValidTypes() ); }
 	public static function getValidTypes(){
 		return(
 			array(
@@ -218,10 +219,8 @@ class Column extends PersistableContainer
 		if( $this->isLinked() && !$localOnly ){
 			// TODO: What to do if the linked column no longer exists?
 			if( $this->getLinkedColumn()->hasData() ){
-				$this->setData( $this->getLinkedColumn()->getData() );
-				if( !$this->isLinked( true ) ){
-					$this->destroyLink();
-				}
+				// Setting data automatically destroys links unless it is instructed otherwise.
+				$this->setData( $this->getLinkedColumn()->getData(), $this->perpetuateLink() );
 			}
 		} else {
 			// TODO: WARNING: What to do in the case that Grid is already
@@ -278,6 +277,7 @@ class Column extends PersistableContainer
 		return( $return );
 	}
 
+	public function perpetuateLink(){ return( $this->isLinked( true ) ); }
 	public function isLinked( $continualCheck = false ){
 		$return = false;
 		if( $continualCheck ){
@@ -299,7 +299,7 @@ class Column extends PersistableContainer
 	}
 
 	// Returns bool to indicate whether data has changed.
-	public function setData( $data ){
+	public function setData( $data, $preserveLink = false ){
 		// TODO: Need a way to set data on an unloaded object without
 		// causing it to getData(), in the event that we're working on
 		// a new object and have nothing to actually fetch.
@@ -400,8 +400,10 @@ class Column extends PersistableContainer
 				$return = true;
 			}
 		} else {
-			// Keep internal copy
 			$this->_data = $data;
+			if( $this->isLinked() && !!$preserveLink ){
+				$this->destroyLink();
+			}
 			// Indicate that we have changed since loading.
 			$this->_setDirty();
 			$return = true;
