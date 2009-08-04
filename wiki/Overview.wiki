@@ -1,7 +1,7 @@
 #summary Brief overview of Torpor-PHP objectives, concepts, requirements, and licensing
 
 = Introduction =
-Torpor is a persistence layer abstraction in PHP, providing a form of object-relational-mapping derived from the design of the database (and encouraging good design principles).  It is written entirely in PHP, and has been designed with ease-of implementation and performance as primary goals.
+Torpor is a persistence layer abstraction in PHP, providing a form of object-relational-mapping derived from the design of the database (and encouraging good design principles).  It is written entirely in PHP, and has been designed with ease of implementation and performance as primary goals.
 
 = Objective =
 Torpor was created to perform all the legwork between the design of a database and the most common patterns of access and manipulation to it.  This comes from several years of working with database abstractions in numerous languages and scopes of implementation, from simple one-off scripts up through major infrastructure for insurance, web  hosting, and ecommerce retailers.  In almost all cases, regardless of the tools in play, the ways in which data is accessed, combined, and published, follow very predictable patterns.  There are dozens of projects which seek to encapsulate those patterns into common abstractions, each enforcing their own pragmatism on the implementation, and to date none of them being available for PHP (there are other persistence layer abstractions available for PHP, but all of considerable different scope than Torpor proposes to offer).
