@@ -4,24 +4,10 @@
 // TODO: Callbacks?
 class Grid extends PersistableContainer implements Iterator
 {
+	private $_readOnly = false;
 	private $_deleted = false;
 	private $_columns = array();
 
-	protected function _getColumns(){ return( $this->_columns ); }
-	protected function _getColumnNames(){ return( array_keys( $this->_getColumns() ) ); }
-	public function columnNames(){ return( $this->_getColumnNames() ); }
-	public function hasColumn( $columnName ){
-		if( $columnName instanceof Column ){
-			$columnName = $columnName->_getObjName();
-		}
-		return( in_array( $this->Torpor()->makeKeyName( $columnName ), $this->_getColumnNames() ) );
-	}
-
-	public function isDeleted(){ return( $this->_deleted ); }
-	public function Delete( $bool = true ){ return( $this->_deleted = ( $bool ? true : false ) ); }
-	public function UnDelete(){ return( $this->Delete( false ) ); }
-
-	public function Column( $columnName ){ return( $this->_getColumn( $columnName ) ); }
 	public function _getColumn( $columnName ){
 		$columnName = $this->Torpor()->makeKeyName( $columnName );
 		if( !$this->hasColumn( $columnName ) ){
@@ -31,22 +17,56 @@ class Grid extends PersistableContainer implements Iterator
 		$column = $columns{ $columnName };
 		return( $column );
 	}
+	protected function _getColumns(){ return( $this->_columns ); }
+	protected function _getColumnNames(){ return( array_keys( $this->_getColumns() ) ); }
 
-	public function addColumn( Column $column ){
-		if( $this->hasColumn( $column ) ){
+	// TODO: WARNING: We're definitely starting to tread onto common column name territory here; do we need
+	// a qualifying convention?  We have overrides via Column( $x ), at least...
+	public function isReadOnly(){ return( $this->_readOnly ); }
+	public function setReadOnly( $bool = true ){ return( $this->_readOnly = ( $bool ? true : false ) ); }
+
+	public function Delete( $now = false ){
+		if( $this->isReadOnly() ){
+			$this->throwExceotion( $this->_getObjName().' is marked read only, cannot delete' );
+		}
+		$this->_deleted = true;
+		return( $this->Publish() );
+	}
+
+	public function ColumnNames(){ return( $this->_getColumnNames() ); }
+	public function hasColumn( $columnName ){
+		if( $columnName instanceof Column ){
+			$columnName = $columnName->_getObjName();
+			// Net checking to see if $columnObj->Grid() === $this, because
+			// poor cloning operation s in an inheriting class could cause that
+			// (or some other weird relationship) and we still wouldn't actually
+			// have the column as a member of this class.
+		} else {
+			$columnName = $this->Torpor()->makeKeyName( $columnName );
+		}
+		return( in_array( $columnName, $this->ColumnNames() ) );
+	}
+
+	public function Columns(){ return( $this->_getColumns() ); }
+	public function Column( $columnName ){ return( $this->_getColumn( $columnName ) ); }
+
+	public function addColumn( Column $column, $replace = false ){
+		if( $this->hasColumn( $column ) && !$replace ){
 			$this->throwException( 'Duplicate Column '.$column->_getObjName().' on Grid '.$this->_getObjName() );
 		}
 		$column->setGrid( $this );
-		$this->_columns{ strtoupper( $column->_getObjName() ) } = $column;
+		$this->_columns{ $column->_getObjName() } = $column;
 	}
 
 	public function removeColumn( $columnName ){
 		$return = false;
 		if( !$this->hasColumn( $columnName ) ){
-			trigger_error( $columnName.' is not a member of this '.__CLASS__, E_NOTICE );
+			trigger_error( $columnName.' is not a member of this grid '.$this->_getObjName(), E_NOTICE );
 		} else {
 			if( $columnName instanceof Column ){
 				$columnName = $columnName->_getObjName();
+			} else {
+				$columnName = $this->Torpor()->makeKeyName( $columnName );
 			}
 			$columns = $this->_getColumns();
 			$columns{ $columnName }->setGrid(); // Sets to null
@@ -95,6 +115,18 @@ class Grid extends PersistableContainer implements Iterator
 		return( $pass );
 	}
 
+	public function Reset(){
+		$return = false;
+		if( $this->isLoaded() && $this->isDirty() ){
+			foreach( $this->_getColumns() as $column ){
+				$column->Reset();
+			}
+			$this->_setDirty( false );
+			$return = true;
+		}
+		return( $return );
+	}
+
 	public function Load( $refresh = false ){
 		if(
 			$this->canLoad()
@@ -136,23 +168,58 @@ class Grid extends PersistableContainer implements Iterator
 		}
 		return( $this->isLoaded() );
 	}
-	public function Reset(){
-		$return = false;
-		if( $this->isLoaded() && $this->isDirty() ){
-			foreach( $this->_getColumns() as $column ){
-				$column->Reset();
+
+	public function LoadFromArray( array $array, $setLoaded = false ){
+	}
+
+	// TODO: Need to make all kinds of documentation about the reserved words, and when they will
+	// or will not be usable in the column name as convenience function (perhaps it would be
+	// appropriate to throw a warning when that happens?
+	public function dumpArray( $all = true, $load = true ){
+		if( $load ){ $this->Load(); }
+
+		$returnArray = array();
+		foreach( $this->Columns() as $columnName => $columnObj ){
+			if( $all || $columnObj->hasData() ){
+				$returnArray{ $columnName } = ( $load || $column->hasData() ? $columnObj->getData() : null );
 			}
-			$this->_setDirty( false );
-			$return = true;
+		}
+		return( $returnArray );
+	}
+
+	public function dumpObject( $all = true, $load = true ){
+		return( (object)$this->dumpArray( $all, $load ) );
+	}
+
+	public function canPublish(){ return( $this->validate() ); }
+	public function validate(){
+		$return = true;
+		foreach( $this->Columns() as $column ){
+			if( !$column->hasData() && !$column->isNullable() && !$column->isGeneratedOnPublish() ){
+				$return = false;
+				break;
+			}
 		}
 		return( $return );
 	}
+	public function publishDependencies( $force = false ){
+		if( !$this->canPublish() ){
+			foreach( $this->Columns() as $column ){
+				if( $column->isLinked() && !$column->hasData() ){
+					$column->getLinkedColumn()->publish( $force );
+				}
+			}
+		}
+		return( $this->canPublish() );
+	}
 
-	public function Publish( $force = false ){ return( $this->Persist( $force ) ); }
-	public function Persist( $force = false ){
+	public function Persist( $force = false ){ return( $this->Publish( $force ) ); }
+	public function Publish( $force = false ){
 		if( $this->isDirty() || $force ){
 			$this->_setDirty( false );
 		}
+		// TODO: This
+		// $this->Torpor()->Publish( $this ); // Check return values
 		return( $this->isDirty() );
 	}
 
@@ -212,7 +279,7 @@ class Grid extends PersistableContainer implements Iterator
 							$this->throwException( 'Insufficient reference data: no values in '.$targetColumnName.' when trying to set '.$this->_getObjName().'->'.$sourceColumnName.' from '.$incomingGrid->_getObjName() );
 						}
 					} else {
-						$this->$sourceColumnName = $incomingGrid->$targetColumnName;
+						$this->Column( $sourceColumnName )->setData( $incomingGrid->Column( $targetColumnName )->getData() );
 					}
 				}
 				return( true );
@@ -263,13 +330,39 @@ class Grid extends PersistableContainer implements Iterator
 	}
 
 	public function __get( $name ){
-		$function = 'get'.$name;
+		$function = Torpor::OPERATION_GET.$name;
 		return( $this->$function() );
 	}
 
 	public function __set( $name, $value ){
-		$function = 'set'.$name;
+		$function = Torpor::OPERATION_SET.$name;
 		return( $this->$function( $value ) );
+	}
+
+	public function __isset( $name ){
+		if( !$this->hasColumn( $name ) ){
+			$this->throwException( 'Unknown column or unrecognized member "'.$name.'" requested on grid '.$this->_getObjName() );
+		}
+		return( $this->Column( $name )->hasData() );
+	}
+
+	public function __unset( $name ){
+		$function = Torpor::OPERATION_SET.$name;
+		return( $this->$function( null ) );
+	}
+
+	public function __clone(){
+		foreach( $this->Columns() as $columnObj ){
+			$this->addColumn( clone( $columnObj ), true );
+		}
+	}
+
+	public function destroy(){ return( $this->__destruct() ); }
+	public function __destruct(){
+		foreach( $this->ColumnNames() as $columnName ){
+			$this->removeColumn( $columnName );
+		}
+		return( true );
 	}
 
 	// Iterator interface implementation for accessing columns

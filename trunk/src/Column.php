@@ -43,16 +43,21 @@ class Column extends PersistableContainer
 	private $_isNullable = true;
 	private $_isReadOnly = false;
 	private $_generatedOnPublish = false;
+	private $_dataName = null;
 	private $_attributes = array();
 
 	private $_linkedColumn = null;
 	private $_linkedColumnContinual = true;
 
+	private $_defaultData = false;
 	private $_originalData = null;
 	private $_data = null;
 
-	public function Column( Torpor $torpor, $name = null, SimpleXMLElement $xmlDef = null ){
+	public function Column( Torpor $torpor, $name = null, SimpleXMLElement $xmlDef = null, Grid $grid = null ){
 		parent::__construct( $torpor, $name );
+		if( $grid instanceof Grid ){
+			$this->setGrid( $grid );
+		}
 		if( $xmlDef instanceof SimpleXMLElement ){
 			$this->initialize( $xmlDef );
 		}
@@ -104,14 +109,48 @@ class Column extends PersistableContainer
 				break;
 		}
 
-		if( (string)$xmlDef->attributes()->generatedOnPublish == Torpor::VALUE_TRUE ){
+		if( !isset( $xmlDef->attributes()->dataName ) ){
+			$this->throwException( 'Required attribute dataName not found' );
+		}
+		$this->_dataName = (string)$xmlDef->attributes()->dataName;
+
+		if(
+			isset( $xmlDef->attributes()->generatedOnPublish )
+			&& (string)$xmlDef->attributes()->generatedOnPublish == Torpor::VALUE_TRUE
+		){
 			$this->setGeneratedOnPublish();
+		}
+
+		if(
+			isset( $xmlDef->attributes()->nullable )
+			&& (string)$xmlDef->attributes()->nullable == Torpor::VALUE_FALSE
+		){
+			$this->setNullable( false );
+		}
+		// Set any default data prior to configuring as readOnly
+		if( isset( $xmlDef->attributes()->default ) ){
+			// This way we reset to this for originalData, and are still considered
+			// dirty
+			$this->_data = (string)$xmlDef->attributes()->default;
+			$this->_defaultData = true;
+			$this->_setDirty();
+		}
+
+		if(
+			isset( $xmlDef->attributes()->readOnly )
+			&& (string)$xmlDef->attributes()->readOnly == Torpor::VALUE_TRUE
+		){
+			$this->setReadOnly();
 		}
 		// TODO: options for navigating attributes
 		foreach( $xmlDef->attributes() as $key => $val ){
 			$this->_attributes[ $key ] = (string)$val;
 		}
 	}
+
+	public function getDataName(){ return( $this->_dataName ); }
+
+	public function hasDefaultData(){ return( $this->_defaultData ); }
 
 	public function isGeneratedOnPublish(){ return( $this->_generatedOnPublish ); }
 	public function setGeneratedOnPublish( $bool = true ){
@@ -215,6 +254,11 @@ class Column extends PersistableContainer
 	protected function setOriginalData( $data ){ return( $this->_originalData = $data ); }
 
 	public function __toString(){ return( $this->getData() ); }
+
+	// To be used when persist data and PHP data don't match, such as Y/N enums or ints acting as
+	// bools which require a facade.  It's up to the inheriting class to do anything useful with
+	// this.
+	public function getPersistData( $localOnly = false ){ return( $this->getData( $localOnly ) ); }
 	public function getData( $localOnly = false ){
 		if( $this->isLinked() && !$localOnly ){
 			// TODO: What to do if the linked column no longer exists?
@@ -254,10 +298,18 @@ class Column extends PersistableContainer
 	// definition.
 	public function setLoadData( $data ){
 		$this->_setLoaded();
+		$this->_setDirty( false );
 		$this->_data = $data;
-		if( $this->asClass() ){
-			$this->setClassData( $data );
-		}
+	}
+
+	public function _setDirty( $bool = true ){
+		$bool = ( $bool ? true : false );
+		parent::_setDirty();
+		$this->Grid()->_setDirty();
+	}
+
+	public function publish( $force = false ){
+		return( $this->Grid()->Publish( false ) );
 	}
 
 	// If $continual is set to false, as soon as valid data has been
@@ -298,24 +350,13 @@ class Column extends PersistableContainer
 		return( $return );
 	}
 
-	// Returns bool to indicate whether data has changed.
-	public function setData( $data, $preserveLink = false ){
-		// TODO: Need a way to set data on an unloaded object without
-		// causing it to getData(), in the event that we're working on
-		// a new object and have nothing to actually fetch.
-		// TODO: Loaded primary keys should be read only
-		if( $this->isReadOnly() ){
-			$this->throwException( $this->_getObjName().' is Read Only' );
-		}
-		$return = false;
-			// Do all necessary validation, warnings, and conversion.
+	public function validate( $data ){
 		if( is_null( $data ) ){
 			if( !$this->isNullable() ){
-				$this->throwException( $this->getDBName().' is not nullable' );
+				$this->throwException( $this->_getObjName().' is not nullable' );
 			}
 		} else {
 			switch( $this->getType() ){
-				// TODO: Type-specific validation
 				case self::TYPE_BINARY:
 					// TODO: Need binary save maxLength checking.
 					break;
@@ -324,17 +365,17 @@ class Column extends PersistableContainer
 					break;
 				case self::TYPE_CLASS: break; // No checking on class data.
 				case self::TYPE_DATE:
-					if( !preg_match( $data, '/^'.self::REGEX_DATE.'$/' ) ){
+					if( !preg_match( '/^'.self::REGEX_DATE.'$/', $data ) ){
 						$this->throwException( 'Invalid date specified "'.$data.'"' );
 					}
 					break;
 				case self::TYPE_DATETIME:
-					if( !preg_match( $data, '/^'.self::REGEX_DATE.'\s?'.self::REGEX_TIME.'$/' ) ){
+					if( !preg_match( '/^'.self::REGEX_DATE.'\s?'.self::REGEX_TIME.'$/', $data ) ){
 						$this->throwException( 'Invalid datetime specified "'.$data.'"' );
 					}
 					break;
 				case self::TYPE_TIME:
-					if( !preg_match( $data, '/^'.self::REGEX_TIME.'$/' ) ){
+					if( !preg_match( '/^'.self::REGEX_TIME.'$/', $data ) ){
 						$this->throwException( 'Invalid time specified "'.$data.'"' );
 					}
 					break;
@@ -373,6 +414,20 @@ class Column extends PersistableContainer
 					break;
 			}
 		}
+		return( $data );
+	}
+
+	// Returns bool to indicate whether data has changed.
+	public function setData( $data, $preserveLink = false ){
+		// TODO: Need a way to set data on an unloaded object without
+		// causing it to getData(), in the event that we're working on
+		// a new object and have nothing to actually fetch.
+		// TODO: Loaded primary keys should be read only
+		if( $this->isReadOnly() ){
+			$this->throwException( $this->_getObjName().' is Read Only' );
+		}
+		$return = false;
+		$data = $this->validate( $data );
 
 		// Necessary to directly access the member variable, since there's a chance
 		// we're already in a getData() call doing just-in-time population and don't
@@ -415,7 +470,9 @@ class Column extends PersistableContainer
 		$return = false;
 		if( $this->isLoaded() && $this->isDirty() ){
 			$this->setData( $this->getOriginalData() );
-			$this->_setDirty( false );
+			if( !$this->hasDefaultData() ){
+				$this->_setDirty( false );
+			}
 			$return = true;
 		} 
 		return( $return );
