@@ -2,7 +2,7 @@
 // TODO: Make sure that everything passes this check.  This is the equivalent
 // of 'use strict' in PHP - although it can only produce warnings, they're still
 // useful in directing attention to probable typos etc.
-error_reporting ( E_ALL );
+error_reporting ( E_ALL | E_STRICT );
 
 // TODO: Lazy loading.
 include_once( '../Torpor.php' );
@@ -12,16 +12,12 @@ include_once( '../Torpor.php' );
 // in the XML.
 class PasswordHash extends Column
 {
-	public function setData( $data ){
+	public function validate( $data ){
 		if( $data == $this->User()->getUserName() ){
 			// TODO: TorporError class which identifies the column & grid responsible?
-			$this->Torpor()->addErrorString( 'Password cannot be identical to username' );
-			return( false );
+			$this->throwException( 'Password cannot be identical to username' );
 		}
-		// TODO: should have a different, non-validating means of setting
-		// the internal data that keeps all the hasData() calls correctly
-		// in line?
-		parent::setData( md5( $data ) );
+		return( md5( $data ) );
 	}
 }
 
@@ -35,18 +31,8 @@ class User extends Grid
 	// Also: marvelous for expansion and business logic.
 }
 
-// TODO: Global column type override options: <ColumnOverride type="int" class="MyIntClass"/>
-// Local overrides (w/keyword none): <Column name="Id" dataName="USER_ID" type="int" class="none"/>
-// TODO: Column type of Class (class must extend Column) w/class attribute to say which kind.
-// TODO: Grid type class (class must extend Grid) to instantiate specific grids as a target
-// class of the configuration's choosing (perhaps have local commands to do similar things, which
-// can easily be leveraged by that expansion).
-// TODO: Global default for columns of type 'X', e.g., setting 'ApplicationName' to be a user-defined
-// value that's stuck into the specified columns, and which can be set via the options interface
-// on the Torpor main class.
 // TODO: Default values for columns (and perhaps have the default value maintain an addressing
 // scheme such as 'userDefined:ApplicationName' which indicates where to get that default value.
-// TODO: Data fetch specifications making use of stored procedures/functions instead of tables.
 // TODO: Be able to mark grids as read-only
 $xmlConfig = <<<XML
 <?xml version='1.0'?>
@@ -56,10 +42,11 @@ $xmlConfig = <<<XML
 	<Grids>
 		<Grid name="User" dataName="USERS" class="User">
 			<Columns>
-				<Column name="Id" dataName="USER_ID" type="unsigned"/>
+				<Column name="Id" dataName="USER_ID" type="unsigned" quotes="auto"/>
+				<Column name="ReferringUserId" dataName="REFERRING_USER_ID" type="unsigned"/>
 				<Column name="UserName" dataName="USER_NAME" type="varchar" length="255"/>
 				<Column name="Email" dataName="EMAIL_ADDRESS" type="varchar" length="255"/>
-				<Column name="PasswordHash" dataName="PASSWORD" type="class" class="PasswordHash" length="32"/>
+				<Column name="PasswordHash" dataName="PASSWORD" type="varchar" class="PasswordHash" length="32"/>
 			</Columns>
 			<Keys>
 				<Primary>
@@ -71,7 +58,9 @@ $xmlConfig = <<<XML
 				<Unique>
 					<Key column="Email"/>
 				</Unique>
-				<Foreign/>
+				<Foreign>
+					<Key column="ReferringUserId" referenceGrid="User" referenceGridAlias="ReferringUser" referenceColumn="Id"/>
+				</Foreign>
 			</Keys>
 		</Grid>
 		<Grid name="Order" dataName="ORDERS">
@@ -136,12 +125,29 @@ $userToo = $torpor->newUser();
 $userToo->ID = 54321;
 $userToo->ID++; // Redirect works for increment operators too.
 $userToo->UserName = 'harry';
+$userToo->ReferringUserId = null;
 foreach( $userToo->columnNames() as $column ){
 	var_dump( $userToo->$column );
 }
 foreach( $userToo as $columnName => $column ){
 	var_dump( $columnName.' = '.var_export( $column->getData(), true ) );
 }
+
+print_r( $userToo->dumpArray() );
+print( "\n" );
+
+// Dump only populated values - even if they've
+// been populated with null.
+print_r( $userToo->dumpObject( false ) );
+print( "\n" );
+
+$userX = clone( $userToo );
+$userX->Id++;
+$userX->setUserName( 'montreal' );
+var_dump( $userX->Id()->Grid()->UserName );
+var_dump( $userToo->UserName );
+
+$referringUser = $userToo->getReferringUser();
 
 // One-to-many fetch
 $orderSet = $userToo->getOrderSet();
@@ -168,5 +174,11 @@ $order = Torpor()->newOrder();
 $userThree = $order->getUser();
 
 var_dump( get_class( Torpor()->newUser() ) );
+
+var_dump( Torpor()->USER()->USERNAME );
+
+var_dump( Torpor()->primaryKeyForGrid( Torpor()->User ) );
+var_dump( get_class( Torpor()->getUserById( 98765 ) ) );
+
 
 ?>

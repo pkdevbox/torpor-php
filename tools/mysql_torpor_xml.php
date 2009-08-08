@@ -29,7 +29,7 @@ $dataTypeMap = array(
 	'bigint' => 'integer',
 	'longtext' => 'text',
 	'decimal' => 'float',
-	'date' => 'date'
+	'date' => 'date',
 	'datetime' => 'datetime',
 	'int' => 'integer',
 	'timestamp' => 'datetime',
@@ -56,10 +56,10 @@ while( $table_obj = mysql_fetch_object( $table_result ) ){
 		print "\t\t<Grid dataName=\"".$table_obj->TABLE_NAME."\">\n";
 		print "\t\t\t<Columns>\n";
 		while( $column_obj = mysql_fetch_object( $column_result ) ){
-			print "\t\t\t\t<Column "
+			print "\t\t\t\t<Column"
 				.' dataName="'.$column_obj->COLUMN_NAME.'"'
 				.' type="'.$dataTypeMap[ $column_obj->DATA_TYPE ].'"'
-				.( $column_obj->IS_NULLABLE == 'YES' ? ' nullable="true"' : '' )
+				.( $column_obj->IS_NULLABLE != 'YES' ? ' nullable="false"' : '' )
 				.( $column_obj->CHARACTER_MAXIMUM_LENGTH ? ' length="'.$column_obj->CHARACTER_MAXIMUM_LENGTH.'"' : '' )
 				.( $column_obj->CHARACTER_SET_NAME ? ' encoding="'.$column_obj->CHARACTER_SET_NAME.'"' : '' )
 				.( $column_obj->NUMERIC_PRECISION ? ' precision="'.$column_obj->NUMERIC_PRECISION.'"' : '' )

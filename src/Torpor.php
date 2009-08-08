@@ -7,6 +7,8 @@ require_once( 'Grid.php' );
 require_once( 'Column.php' );
 require_once( 'Criteria.php' );
 require_once( 'GridSet.php' );
+require_once( 'DataStore.php' );
+require_once( 'MySQLDataStore.php' ); // TODO: just-in-time require_once() ?
 
 // TODO: phpdoc
 // TODO: CLEANUP: Order the methods according to some logical paradigm.
@@ -42,6 +44,7 @@ require_once( 'GridSet.php' );
 class Torpor {
 	const VERSION = 0.1;
 	const DEFAULT_CONFIG_FILE = 'TorporConfig.xml';
+	const DEFAULT_CONFIG_SCHEMA = 'TorporConfig.xsd';
 
 	// Options
 	const OPTION_OVERWRITE_ON_LOAD  = 'OverwriteOnLoad';
@@ -60,8 +63,10 @@ class Torpor {
 	const DEFAULT_PERPETUATE_AUTO_LINKS = false;
 
 	// Value constants
-	const VALUE_TRUE = 'true';
-	const VALUE_NONE = 'none';
+	const VALUE_TRUE  = 'true';
+	const VALUE_FALSE = 'false';
+	const VALUE_NONE  = 'none';
+	const VALUE_ID    = 'id';
 	const VALUE_SEPARATOR = '|';
 
 	// Utility
@@ -87,6 +92,8 @@ class Torpor {
 	const OPERATION_SET = 'set';
 	const OPERATION_GET_SET = 'set';
 	const OPERATION_MOD_FROM = 'from';
+	const OPERATION_MOD_BY   = 'by';
+	const OPERATION_MOD_VIA  = 'via';
 	const OPERATION_GET_CRITERIA = 'criteria';
 
 	// TODO: Need a classification or prefix for argument enum/constants?
@@ -99,11 +106,12 @@ class Torpor {
 	const ALIAS_KEYS_ONLY = 3;
 
 	private static $instance;
-	private $_dataEngine;
-	private $_xmlConfig = null;
+	private $_readDataEngine;
+	private $_writeDataEngine;
 	private $_config = array();
 	private $_isInitialized = false;
 
+	private $_prototypeCache = array();
 	private $_cachedCalls = array();
 
 	private $_warnings = array();
@@ -137,6 +145,7 @@ class Torpor {
 			)
 		);
 	}
+
 	protected function setInitialized( $bool = true ){ return( $this->_isInitialized = ( $bool ? true : false ) ); }
 	protected function checkInitialized(){
 		if( !$this->isInitialized() && !$this->initialize() ){
@@ -162,15 +171,19 @@ class Torpor {
 		if( !empty( $config ) ){
 			if( is_resource( $config ) ){
 				$xml = stream_get_contents( $config );
+			} else if( $config instanceof DOMNode ){
+				$xml = simplexml_import_dom( $config );
+			} else if( $config instanceof SimpleXMLElement ){
+				$xml = $config;
 			} else if( is_string( $config ) ){
 				if( preg_match( '/^[a-z]+:\/{2,3}[a-zA-Z0-9_\.]$/', $config ) ){
 					// Looks like a URI
 					$config = fopen( $config, 'r' );
 					$xml = stream_get_contents( $config );
 				} else if( file_exists( $config ) && is_readable( $config ) ){
-					$xml = file_get_contents( $config );
+					$xml = simplexml_load_file( $config );
 				} else if( $configFile = $this->getFileInPath( $config ) ){
-					$xml = file_get_contents( $configFile );
+					$xml = simplexml_load_file( $configFile );
 				} else {
 					$xml = $config;
 				}
@@ -205,8 +218,13 @@ class Torpor {
 		// if( !Torpor::isValidConfig( $xml ) ) {
 		//	throw( new Exception( 'Invalid configuration xml' ) );
 		// }
-		$this->_xmlConfig = $xml;
-		$xmlObj = simplexml_load_string( $xml );
+		$xmlObj = ( $xml instanceof SimpleXMLElement ? $xml : simplexml_load_string( $xml ) );
+		/*
+		dom_import_simplexml( $xmlObj )->ownerDocument->schemaValidate(
+			$this->getFileInPath( self::DEFAULT_CONFIG_SCHEMA )
+		) or $this->throwException( 'Invalid configuration (failed schema check)' );
+		*/
+
 		$options = self::defaultOptions();
 		$grids = array();
 		$gridClasses = array();
@@ -260,7 +278,7 @@ class Torpor {
 				if( isset( $columns{ $gridName }{ $columnName } ) ){
 					$this->throwException( 'Duplicate column name '.$columnName.' on grid '.$gridName );
 				}
-				if( $this->makeKeyName( (string)$xmlColumn->attributes()->type ) == Column::TYPE_CLASS ){
+				if( (string)$xmlColumn->attributes()->class ){
 					$className = (string)$xmlColumn->attributes()->class;
 					if( $className != self::VALUE_NONE ){
 						if( !class_exists( $className ) ){
@@ -350,10 +368,15 @@ class Torpor {
 					if( isset( $references{ $gridName }{ $targetGrid }{ $columnName } ) ){
 						$this->throwException( 'Duplicate column reference '.$columnName.' in foreign key under grid '.$gridName );
 					}
-					$targetColumnName = $this->makeKeyName( (string)$xmlKey->attributes()->referenceColumn );
+					$targetColumnName = (
+						isset( $xmlKey->attributes()->referenceColumn )
+						? $this->makeKeyName( (string)$xmlKey->attributes()->referenceColumn )
+						: $columnName
+					);
 					$references{ $gridName }{ $targetGrid }{ $columnName } = $targetColumnName;
 				}
 			}
+			// TODO: More XML options, build out Commands
 			$this->cacheCall( 'new'.$gridName, '_newGrid', $gridName );
 		}
 
@@ -475,7 +498,7 @@ class Torpor {
 		return( $this->_config{ $x } );
 	}
 	protected function _getOptions(){ return( $this->_getInitX( self::ARKEY_OPTIONS ) ); }
-	protected function _getGrids(){ return( $this->_getInitX( self::ARKEY_GRIDS ) ); }
+	protected function _getGrids( $grid = null ){ return( $this->_getInitX( self::ARKEY_GRIDS, $grid ) ); }
 	protected function _getGridClasses( $grid = null ){ return( $this->_getInitX( self::ARKEY_GRID_CLASSES, $grid ) ); }
 	protected function _getColumns( $grid = null ){ return( $this->_getInitX( self::ARKEY_COLUMNS, $grid ) ); }
 	protected function _getKeys( $grid = null ){ return( $this->_getInitX( self::ARKEY_KEYS, $grid ) ); }
@@ -498,6 +521,9 @@ class Torpor {
 	}
 
 	// Aliases
+	public function dataNameForGrid( $gridName ){
+		return( $this->_getGrids( $gridName ) );
+	}
 	public function primaryKeyForGrid( $gridName ){ return( $this->_getKeys( $gridName ) ); }
 	public function allKeysForGrid( $gridName ){ return( $this->_getAllGridKeys( $gridName ) ); }
 	protected function _setOption( $optionName, $setting ){
@@ -523,7 +549,7 @@ class Torpor {
 			// Set up a temporary key array containing all known keys of the target grid
 			// as $filled_keys[ key_set ][ $keyName ] = false.
 			$filled_keys = array();
-			foreach( $this->_getAllGridKeys( $targetGridName ) as $keys ){
+			foreach( $this->allKeysForGrid( $targetGridName ) as $keys ){
 				if( is_array( $keys ) ){
 					// Not using array_fill_keys due to target compatibility of PHP 5.1.x
 					foreach( $keys as $key ){
@@ -727,36 +753,52 @@ class Torpor {
 		}
 	}
 
-	public function _getGridFromId( $gridName ){
-		// TODO: any _getGridFromX pattern needs to return bool(false) if
-		// the item cannot be loaded?
-		// Variable arguments for the ID based on variable numuber of key fields
-		// TODO: Look in the internal cache first... or is the internal cache only
-		// for use during Load() operations?
-	}
-
-	public function _getGridFromUnique( $gridName ){
-		// Variable arguments for the ID based on variable numuber of key fields
+	public function _getGridById( $gridName ){
+		$this->checkSupportedGrid( $gridName );
+		$grid = $this->_newGrid( $gridName );
+		$primaryKey = $this->primaryKeyForGrid( $gridName );
+		$keyArgs = array_slice( func_get_args(), 1 );
+		if( !is_array( $keyArgs ) || count( $keyArgs ) < 1 ){
+			$this->throwException( 'No keys provided to _getGridById' );
+		}
+		if( !is_array( $primaryKey ) ){
+			if( count( $keyArgs ) > 1 ){
+				trigger_error( 'Wrong number of arguments to _getGridById ('.count( $keyArgs ).' were given, only using 1)', E_USER_WARNING );
+			}
+			$grid->Column( $primaryKey)->setData( array_shift( $keyArgs ) );
+		} else {
+			if( count( $keyArgs ) != count( $primaryKey ) ){
+				if( count( $keyArgs ) > count( $primaryKey ) ){
+					trigger_error( 'Wrong number of arguments to _getGridById ('.count( $keyArgs ).' were given, only using 1)', E_USER_WARNING );
+				} else {
+					$this->throwException( 'Wrong number of arguments to _getGridById - need '.count( $primaryKey ).', got '.count( $keyArgs ) );
+				}
+			}
+			foreach( $primaryKey as $keyName ){
+				$grid->Column( $keyName )->setData( array_shift( $keyArgs ) );
+			}
+		}
+		if( !$grid->canLoad() ){
+			$grid = false;
+		}
+		return( $grid );
 	}
 
 	public function _getGridFromRecord( $gridName, Grid $record ){
 		// TODO: create the GridSet object which allows for the following:
-		// 1. Stores a series of Grids which can be iterated over.
+		//X1. Stores a series of Grids which can be iterated over.
 		// 2. Allows access by PK (variable argument list corresponding to the number
 		//    of members in the object OK)
-		// 3. Stores the criteria by which it was selected, and...
-		// 4. ...if the criteria corresponds to a back-reference, such as keys in this
+		//X3. Stores the criteria by which it was selected, and...
+		//X4. ...if the criteria corresponds to a back-reference, such as keys in this
 		//    Set are positively correlated with a foreign key, then it should be
 		//    possible to addRecord() or otherwise push() a record onto the set and
 		//    immediately inherit that defining criteria.  Similarly, and perhaps making
 		//    direct use of these same features, be able to do a newRecord() call that
 		//    creates and adds one for us, returning the related record.
-		// 5. Has an addressing scheme (or at least method of iteration) that allows
+		//X5. Has an addressing scheme (or at least method of iteration) that allows
 		//    for the access and manipulation of added records which do not as yet have
 		//    a primary key.
-		// NOTE: As of this writing, the PHP::ArrayAccess interface is insufficiently
-		// mature to be useful, due to its inability to return offsetGet() calls by
-		// reference.  Otherwise 'twould be the bomb.
 		//
 		// TODO: Need a Load overwriter or otherwise quick-population scheme for Grids
 		// in order to push the data onto them rather than wait for it to be requested,
@@ -789,7 +831,7 @@ class Torpor {
 		}
 		foreach( $references as $sourceColumnName => $targetColumnName ){
 			if( $record->Column( $sourceColumnName )->hasData() ){
-				$targetGrid->$targetColumnName = $record->$sourceColumnName;
+				$targetGrid->Column( $targetColumnName )->setData( $record->Column( $sourceColumnName )->getData() );
 			}
 		}
 		if( !$targetGrid->canLoad() ){
@@ -825,24 +867,22 @@ class Torpor {
 	}
 
 	public function _newGrid( $gridName ){
-		$gridName = $this->makeKeyName( $gridName );
 		$this->checkSupportedGrid( $gridName );
-		// TODO: Issues with deep clonging, basically the only
-		// way to do it is to iteratively serialize and deserialize
-		// everything in order to clone the columns and not the
-		// column references, and that's pretty unlikely to be
-		// more performant than newly creating it.
-		// if( !$this->cachedPrototype( $gridName ) ){
+		$gridName = $this->gridKeyName( $gridName );
+		// TODO: provide cloning of prototypes, and add special notes
+		// to the documentation in Extending Base Classes about the
+		// necessity of overriding this (and still calling parent::__clone)
+		// on object inheriting Grid which contain their own references.
+		if( !$this->cachedPrototype( $gridName ) ){
 			$class = $this->gridClass( $gridName );
 			$grid = new $class( $this, $gridName );
 			foreach( $this->_getColumns( $gridName ) as $columnName => $xmlColumn ){
 				$class = $this->columnClass( $gridName, $columnName );
-				$grid->addColumn( new $class( $this, $columnName, $xmlColumn ) );
+				$grid->addColumn( new $class( $this, $columnName, $xmlColumn, $grid ) );
 			}
-			return( $grid );
-			// $this->cachePrototype( $grid );
-		// }
-		// return( clone $this->cachedPrototype( $gridName ) );
+			$this->cachePrototype( $grid );
+		}
+		return( clone $this->cachedPrototype( $gridName ) );
 	}
 
 	// Works by finding the relationship between the target and source, verifying that
@@ -907,7 +947,6 @@ class Torpor {
 					) == self::OPERATION_GET_SET
 				){
 					$targetGridType = substr( $funcRemainder, 0, ( -1 * strlen( self::OPERATION_GET_SET ) ) );
-					var_dump( $targetGridType );
 					if( $this->supportedGrid( $targetGridType ) ){
 						$return = $this->_newGridSet(
 							$targetGridType,
@@ -924,47 +963,68 @@ class Torpor {
 				}
 				break;
 			case self::OPERATION_GET:
-				// Get a Grid instance from...
-				$targetGridType = null;
-				$sourceGridType = null;
 				if( $this->supportedGrid( $funcRemainder ) ){
 					// Assume we're getting it from either an ID or a unique constraint
+					array_unshift( $arguments, $funcRemainder );
+					$return = call_user_func_array( array( $this, '_getGridById' ), $arguments );
+				} else {
+					$byId = self::OPERATION_MOD_BY.self::VALUE_ID;
+					if(
+						(
+							strpos( $funcRemainder, $byId ) + strlen( $byId )
+						) == strlen( $funcRemainder )
+					){
+						$targetGridType = substr( $funcRemainder, 0, strpos( $funcRemainder, $byId ) );
+						array_unshift( $arguments, $targetGridType );
+						$return = call_user_func_array( array( $this, '_getGridById' ), $arguments );
+					} else if( strpos( $funcRemainder, self::OPERATION_MOD_FROM ) ){
+						// TODO: Any known relationship should already be supported and known via
+						// the cachedCall map, which we've prepopulated (and ostensibly will maintain
+						// during any dynamic supported object modification).  So should this even
+						// be possible?
+						// Get a Grid instance from...
+						$targetGridType = null;
+						$sourceGridType = null;
+
+						list( $source, $target ) = explode( self::OPERATION_MOD_FROM, $funcRemainder );
+						print_r( $source );
+						print_r( $target );
+
+						// A record of unknown type
+						// Another Record of known type
+					}
 				}
-				if( stripos( $funcRemainder, self::OPERATION_MOD_FROM ) ){
-					list( $source, $target ) = explode( self::OPERATION_MOD_FROM, $funcRemainder );
-					// TODO: Leaving off here...
-					print_r( $source );
-					print_r( $target );
-				}
-				// A record of unknown type
-				// Another Record of known type
-				// Primary Key
-				// Unique Key
 				break;
 			default:
-				$this->throwException( 'Unrecognized function "'.$function.'" requested on '.get_class( $this ) );
+				if( $this->supportedGrid( $function ) ){
+					$columns = array_keys( $this->_getColumns( $function ) );
+					$return = (object)array_combine( $columns, $columns );
+				} else {
+					$this->throwException( 'Unrecognized function "'.$function.'" requested on '.get_class( $this ) );
+				}
 				break;
 		}
 		return( $return );
 	}
 
-	// Cache functions
-	// TODO: Grid instance cache, mechanisms to flush or override
-	// TODO: Unsaved object cache and dependency tree for related
-	// but unpublished grids that need to cascade, with recursion
-	// checking on the cascading publish routines.
+	public function __get( $name ){
+		$this->checkSupportedGrid( $name );
+		return( $this->makeKeyName( $name ) );
+	}
 
+
+	// Cache functions
 	public function can( $callName ){
 		return( $this->cachedCall( $callName ) );
 	}
 	protected function cachedCall( $callName ){
-		return( in_array( $this->makeKeyName( $callName ), array_keys( $this->_cachedCalls ) ) );
+		return( isset( $this->_cachedCalls{ $this->makeKeyName( $callName ) } ) );
 	}
 	protected function cacheCall( $callName, $mappedCall ){
 		// WARNING: Expeditious use of magic number corresponding
 		// to the number of known arguments in caching this call
 		$this->_cachedCalls{ $this->makeKeyName( $callName ) } = array(
-			$mappedCall => array_splice( func_get_args(), 2 )
+			$mappedCall => array_slice( func_get_args(), 2 )
 		);
 	}
 	protected function callCachedCall( $callName, $newArgs ){
@@ -972,7 +1032,8 @@ class Torpor {
 		if( !$this->cachedCall( $callName ) ){
 			$this->throwException( 'Unknown cached call "'.$callName.'"' );
 		}
-		$call = array_shift( array_keys( $this->_cachedCalls{ $callName } ) );
+		// 2 step process to play nice with E_STRICT
+		list( $call ) = array_keys( $this->_cachedCalls{ $callName } );
 		// WARNING: Magic numbers (again) used to splice off the number of known arguments to get
 		// the number of unknown arguments.
 		$args = array_merge( $this->_cachedCalls{ $callName }{ $call }, $newArgs );
@@ -981,9 +1042,9 @@ class Torpor {
 
 	protected function cachedPrototype( $gridName ){
 		$gridName = $this->gridKeyName( $gridName );
-		return( $this->_prototypeCache{ $gridName } );
+		return( ( isset( $this->_prototypeCache{ $gridName } ) ? $this->_prototypeCache{ $gridName } : false ) );
 	}
-	// Warning: These 2 names 
+	// Warning: These 2 names differ only by a single character.
 	protected function cachePrototype( Grid $grid ){
 		if( $this->cachedPrototype( $grid ) ){
 			trigger_error( 'Overwriting existing prototype cache for grid '.$grid->_getObjName(), E_USER_WARNING );
@@ -991,15 +1052,9 @@ class Torpor {
 		return( $this->_prototypeCache{ $grid->_getObjName() } = $grid );
 	}
 
-	// TODO: Figure out the actual error handling mechanisms.
-	public function addWarningString( $warning ){ array_push( $this->_warnings, $warning ); }
-	public function warnings(){ return( $this->_warnings ); }
-	public function nextWarning(){ return( array_shift( $this->_warnings ) ); }
-	public function addErrorString( $error ){ array_push( $this->_errors, $error ); }
-	public function errors(){ return( $this->_errors ); }
-	public function nextError(){ return( array_shift( $this->_errors ) ); }
-
-	// Utility Functions
+	//***********************
+	//*  Utility Functions  *
+	//***********************
 	public static function throwException( $msg = 'An unkown error has occurred' ){
 		throw( new TorporException( $msg ) );
 	}
