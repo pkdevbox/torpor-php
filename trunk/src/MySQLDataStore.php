@@ -1,4 +1,5 @@
 <?PHP
+// $Rev$
 // TODO: Create a PHP 5.3+ version MySQLiDataStore() extension which uses mysqli
 class MySQLDataStore implements DataStore {
 	private $_connection = null;
@@ -49,7 +50,7 @@ class MySQLDataStore implements DataStore {
 		}
 
 		if( in_array( $grid, self::$_publishing, true ) ){
-			throw( new Exception( 'Recursion in dependent object publish or horribly improbable timing collision in duplicate publish attempts' ) );
+			throw( new TorporException( 'Recursion in dependent object publish or horribly improbable timing collision in duplicate publish attempts' ) );
 		} else {
 			array_push( self::$_publishing, $grid );
 		}
@@ -57,17 +58,19 @@ class MySQLDataStore implements DataStore {
 		// TODO:
 		// 1. Check if grid is new vs. existing
 		// 2. See if there are any defined commands corresponding
-		//    the the target action
+		//    the the target action.  When parsing command, return errors
+		//    if the parameter name doesn't correllate to any of $grid's $columns
 		// 3. Execute 2 or dynamically create & execute SQL
 		if( $grid->isReadOnly() ){
-			throw( new Exception( 'Cannot publish Read Only grid' ) );
+			throw( new TorporException( 'Cannot publish Read Only grid' ) );
 		}
 		if( !$grid->canPublish() && !$grid->publishDependencies() ){
-			throw( new Exception( 'Cannot publish grid: required data members not set' ) );
+			throw( new TorporException( 'Cannot publish grid: required data members not set' ) );
 		}
 
 		// Dynamic query construction
-		$sql = 'REPLACE INTO `'.$this->escape( $grid->Torpor()->dataNameForGrid( $grid ) ).'` SET';
+		$sql = ( $grid->isLoaded() ? 'UPDATE' : 'INSERT INTO' )
+			.' '.$this->gridTableName( $grid ).' SET';
 		$commands = array();
 		foreach( $grid->Columns() as $column ){
 			if( $column->isDirty() || $force ){
@@ -76,18 +79,54 @@ class MySQLDataStore implements DataStore {
 		}
 		if( count( $commands ) < 1 ){
 			if( $force ){
-				throw( new Exception( 'Cannot force publish grid: no data members found' ) );
+				throw( new TorporException( 'Cannot force publish grid: no data members found' ) );
 			}
 		} else {
 			$sql.= ' '.implode( ',', $commands );
 			if( $grid->isLoaded() || $grid->canLoad() ){
 				$clauses = $this->makeClauses( $grid );
 				if( count( $clauses ) < 1 ){
-					throw( new Exception( 'Cannot publish grid: no identifying criteria' ) );
+					throw( new TorporException( 'Cannot publish grid: no identifying criteria' ) );
 				}
 				$sql.= ' WHERE '.implode( ' AND ', $clauses );
 			}
 			var_dump( $sql );
+			if( mysql_query( $sql, $this->getConnection() ) ){
+				// LAST_INSERT_ID() on BIGINT types fail on translation into PHP long, so this
+				// will be fetched manually rather than via mysql_insert_id().  Also, this paradigm
+				// is only supported for a single column, and will automatically fall to the first
+				// generatedOnPublish() column in the primary key for this grid.
+				if( !$grid->isLoaded() ){
+					if( mysql_affected_rows( $this->getConnection() ) != 1 ){
+						throw( new Exception( 'Insert failed' ) );
+					}
+					$primaryKey = $grid->primaryKey();
+					$foundKeyColumn = false;
+					if( is_array( $primaryKey ) ){
+						foreach( $primaryKey as $keyColumn ){
+							if( !$keyColumn->isGeneratedOnPublish() || $keyColumn->hasData() ){ continue; }
+							$foundKeyColumn = $keyColumn;
+							break;
+						}
+					} else if( $primaryKey->isGeneratedOnPublish() && !$primaryKey->hasData() ){
+						$foundKeyColumn = $primaryKey;
+					}
+					if( $foundKeyColumn ){
+						$result = mysql_query( 'SELECT LAST_INSERT_ID()', $this->getConnection() );
+						if( !$result || mysql_num_rows( $result ) != 1 ){
+							throw( new TorporException( 'Attempt to fetch last insert id value failed: '.mysql_error( $this->getConnection() ) ) );
+						}
+						$dataRow = mysql_fetch_row( $result );
+						$foundKeyColumn->setData( array_shift( $dataRow ) );
+					}
+				}
+				// TODO: Need to reset the grid so the only values it contains are the known
+				// keys, so it invokes a just-in-time fetch (but only if it canLoad() after all
+				// of the above).  This is more resource intensive than just setting it to a
+				// loaded status and !dirty, but far more accurate.
+			} else {
+				throw( new TorporException( 'Publish failed: '.mysql_error( $this->getConnection() ) ) );
+			}
 			// TODO: How to determine, based on keys that are generatedOnPublish, which ones
 			// will actually ve available?
 			// TODO: Retrieve any generatedOnPublish data
@@ -99,11 +138,32 @@ class MySQLDataStore implements DataStore {
 		return( $return );
 	}
 
+	public function Delete( Grid $grid ){
+		$return = false;
+		$clauses = $this->makeClauses( $grid );
+		if( !$grid->canLoad() || count( $clauses ) < 1 ){
+			throw( new TorporException( 'Cannot publish grid: no identifying criteria' ) );
+		}
+		$sql = 'DELETE FROM '.$this->gridTableName( $grid )
+			.' WHERE '.implode( ' AND ', $clauses )
+			.' LIMIT 1';
+		if( !mysql_query( $sql, $this->getConnection() ) ){
+			throw( new Exception( 'Delete failed: '.mysql_error( $this->getConnection() ) ) );
+		} else {
+			if( mysql_affected_rows( $this->getConnection() ) !== 1 ){
+				trigger_error( 'No records deleted', E_USER_WARNING );
+			} else {
+				$return = true;
+			}
+		}
+		return( $return );
+	}
+
 	public function Load( Grid $grid, $refresh = false ){
 		$return = false;
 		if( !$grid->canLoad() ){
 			if( $refresh ){
-				throw( new Exception( 'Cannot load grid: no identifying criteria' ) );
+				throw( new TorporException( 'Cannot load grid: no identifying criteria' ) );
 			}
 		} else if( !$grid->isLoaded() || $refresh ){
 			// TODO: Look for Load commands from /TorporConfig/Grids/Grid/Commands/*
@@ -113,11 +173,12 @@ class MySQLDataStore implements DataStore {
 			}
 			$clauses = $this->makeClauses( $grid );
 			if( count( $clauses ) < 1 ){
-				throw( new Exception( 'Cannot publish grid: no identifying criteria' ) );
+				throw( new TorporException( 'Cannot publish grid: no identifying criteria' ) );
 			}
 			$sql = 'SELECT '.implode( ', ', $commands )
-				.' FROM `'.$this->escape( $grid->Torpor()->dataNameForGrid( $grid ) ).'`'
+				.' FROM '.$this->gridTableName( $grid )
 				.' WHERE '.implode( ' AND ', $clauses );
+			// TODO: Execute SQL, generate a named array, and send that to the grid.
 			var_dump( $sql );
 		}
 		return( $return );
@@ -184,7 +245,7 @@ class MySQLDataStore implements DataStore {
 						)
 					){
 						throw(
-							new Exception( 'Could not change users on MySQL connection: '.mysql_error() )
+							new TorporException( 'Could not change users on MySQL connection: '.mysql_error( $this->getConnection() ) )
 						);
 					}
 				}
@@ -218,7 +279,7 @@ class MySQLDataStore implements DataStore {
 		if( $database !== $this->getDatabase() ){
 			if( $this->isConnected() ){
 				if( !mysql_select_db( $database, $this->getConnection() ) ){
-					throw( new Exception( 'Could not change database to '.$database.': '.mysql_error() ) );
+					throw( new TorporException( 'Could not change database to '.$database.': '.mysql_error( $this->getConnection() ) ) );
 				}
 			}
 			$return = $this->_database = $database;
@@ -237,7 +298,7 @@ class MySQLDataStore implements DataStore {
 				$reconnect
 			);
 			if( !$connection ){
-				throw( new Exception( 'Could not connect to MySQL using supplied credentials: '.mysql_error() ) );
+				throw( new TorporException( 'Could not connect to MySQL using supplied credentials: '.mysql_error() ) );
 			}
 			if( $this->getDatabase() ){
 				mysql_select_db( $this->getDatabase(), $connection );
@@ -252,7 +313,7 @@ class MySQLDataStore implements DataStore {
 
 	protected function setConnection( $connection ){
 		if( !is_resource( $connection ) ){
-			throw( new Exception( 'Connection argument is not a valid resource' ) );
+			throw( new TorporException( 'Connection argument is not a valid resource' ) );
 		}
 		return( $this->_connection = $connection );
 	}
@@ -262,7 +323,7 @@ class MySQLDataStore implements DataStore {
 	}
 	protected function escape( $arg ){
 		return(
-			preg_replace( '/`/', '',
+			preg_replace( '/`/', '\\`',
 				mysql_real_escape_string( $arg, $this->getConnection() )
 			)
 		);
@@ -288,14 +349,70 @@ class MySQLDataStore implements DataStore {
 					
 	}
 
+	// No support for generic bind variables using mysql interfaces; the mysqli
+	// implementation for 5.3.0 does; use that if you can.
+	public function parseCommand( PersistenceCommand $command, Grid $grid ){
+		$commandText = $command->getCommand();
+		$placeholder = $command->getPlaceholder();
+		if( empty( $commandText ) ){
+			throw( new TorporException( 'Invalid command text (empty)' ) );
+		}
+		foreach( $command->getParameters() as $parameter ){
+			$parameterPlaceholder = null;
+			if( strpos( $parameter, Torpor::VALUE_SEPARATOR ) ){
+				// WARNING: Magic Number
+				list( $parameter, $parameterPlaceholder ) = explode( Torpor::VALUE_SEPARATOR, $parameter, 2 );
+			}
+			if( !$grid->hasColumn( $parameter ) ){
+				throw( new TorporException( 'Unknown parameter "'.$parameter.'" (no matching column on grid '.$grid->_getObjName() ) );
+			}
+			if( !empty( $parameterPlaceholder ) ){
+				if( strpos( $commandText, $parameterPlaceholder ) === false ){
+					throw( new TorporException( 'Named placeholder "'.$parameterPlaceholder.'" not found in command: '.$commandText ) );
+				}
+				// Replace all instances.
+				$commandText = str_replace(
+					$parameterPlaceholder,
+					$this->autoQuoteColumn( $grid->Column( $parameter ) ),
+					$commandText
+				);
+			} else if( !empty( $placeholder ) ){
+				if( strpos( $commandText, $placeholder ) === false ){
+					throw( new TorporException( 'Placeholder "'.$placeholder.'" not found in command: '.$commandText ) );
+				}
+				// Replace only a single instance.
+				$commandText = substr_replace(
+					$commandText,
+					$this->autoQuoteColumn( $grid->Column( $parameter ) ),
+					strpos( $commandText, $placeholder ),
+					strlen( $placeholder )
+				);
+			} else {
+				throw( new TorporException( 'Empty bind variable, cannot parse '.$parameter.' into command: '.$commandText ) );
+			}
+		}
+		if( !empty( $placeholder ) && strpos( $commandText, $placeholder ) !== false ){
+			throw( new TorporException( 'Un-parsed placeholders found in command: '.$commandText ) );
+		}
+		return( $commandText );
+	}
+
+	public function gridTableName( Grid $grid ){
+		return( '`'.$this->escape( $grid->Torpor()->dataNameForGrid( $grid ) ).'`' );
+	}
+
 	public function autoQuoteColumn( Column $column ){
 		$return = null;
 		if( $column->hasData() ){
-			$return = (
-				self::isQuotedType( $column )
-				? '\''.$this->escape( $column->getPersistData() ).'\''
-				: $column->getPersistData()
-			);
+			if( is_null( $column->getPersistData() ) ){
+				$return = 'NULL';
+			} else {
+				$return = (
+					self::isQuotedType( $column )
+					? '\''.$this->escape( $column->getPersistData() ).'\''
+					: $column->getPersistData()
+				);
+			}
 		}
 		return( $return );
 	}
