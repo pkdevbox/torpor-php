@@ -7,6 +7,7 @@ require_once( 'Grid.php' );
 require_once( 'Column.php' );
 require_once( 'Criteria.php' );
 require_once( 'GridSet.php' );
+require_once( 'PersistenceCommand.php' );
 require_once( 'DataStore.php' );
 require_once( 'MySQLDataStore.php' ); // TODO: just-in-time require_once() ?
 
