@@ -48,26 +48,30 @@ class Torpor {
 	const DEFAULT_CONFIG_SCHEMA = 'TorporConfig.xsd';
 
 	// Options
-	const OPTION_OVERWRITE_ON_LOAD  = 'OverwriteOnLoad';
-	const DEFAULT_OVERWRITE_ON_LOAD = false;
-
-	const OPTION_GRID_CLASS  = 'DefaultGridClass';
-	const DEFAULT_GRID_CLASS = 'Grid';
-
-	const OPTION_COLUMN_CLASS  = 'DefaultColumnClass';
+	const OPTION_COLUMN_CLASS  = 'ColumnClass';
 	const DEFAULT_COLUMN_CLASS = 'Column';
+
+	const OPTION_DEBUG = 'Debug';
+	const DEFAULT_DEBUG = false;
+
+	const OPTION_GRID_CLASS  = 'GridClass';
+	const DEFAULT_GRID_CLASS = 'Grid';
 
 	const OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS = 'LinkUnpublishedReferenceColumns';
 	const DEFAULT_LINK_UNPUBLISHED_REFERENCE_COLUMNS = true;
+
+	const OPTION_OVERWRITE_ON_LOAD  = 'OverwriteOnLoad';
+	const DEFAULT_OVERWRITE_ON_LOAD = false;
 
 	const OPTION_PERPETUATE_AUTO_LINKS = 'PerpetuateAutoLinks';
 	const DEFAULT_PERPETUATE_AUTO_LINKS = false;
 
 	// Value constants
-	const VALUE_TRUE  = 'true';
-	const VALUE_FALSE = 'false';
-	const VALUE_NONE  = 'none';
-	const VALUE_ID    = 'id';
+	const VALUE_TRUE   = 'true';
+	const VALUE_FALSE  = 'false';
+	const VALUE_NONE   = 'none';
+	const VALUE_GLOBAL = 'global';
+	const VALUE_ID     = 'id';
 	const VALUE_SEPARATOR = '|';
 
 	// Utility
@@ -75,9 +79,10 @@ class Torpor {
 	const REGEX_KEYNAME = '[^A-Za-z0-9]';
 
 	// Internal use only
+	const ARKEY_DATATYPEMAP  = 'datatype_map';
+	const ARKEY_COLUMNS      = 'columns';
 	const ARKEY_GRIDS        = 'grids';
 	const ARKEY_GRID_CLASSES = 'grid_classes';
-	const ARKEY_COLUMNS      = 'columns';
 	const ARKEY_KEYS         = 'keys';
 	const ARKEY_UNIQUEKEYS   = 'uniquekeys';
 	const ARKEY_REFERENCES   = 'references';
@@ -107,8 +112,8 @@ class Torpor {
 	const ALIAS_KEYS_ONLY = 3;
 
 	private static $instance;
-	private $_readDataEngine;
-	private $_writeDataEngine;
+	private $_readDataStore;
+	private $_writeDataStore;
 	private $_config = array();
 	private $_isInitialized = false;
 
@@ -203,10 +208,11 @@ class Torpor {
 	public static function defaultOptions(){
 		return(
 			array(
-				self::OPTION_OVERWRITE_ON_LOAD => self::DEFAULT_OVERWRITE_ON_LOAD,
-				self::OPTION_GRID_CLASS => self::DEFAULT_GRID_CLASS,
 				self::OPTION_COLUMN_CLASS => self::DEFAULT_COLUMN_CLASS,
+				self::OPTION_DEBUG => self::DEFAULT_DEBUG,
+				self::OPTION_GRID_CLASS => self::DEFAULT_GRID_CLASS,
 				self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS => self::DEFAULT_LINK_UNPUBLISHED_REFERENCE_COLUMNS,
+				self::OPTION_OVERWRITE_ON_LOAD => self::DEFAULT_OVERWRITE_ON_LOAD,
 				self::OPTION_PERPETUATE_AUTO_LINKS => self::DEFAULT_PERPETUATE_AUTO_LINKS
 			)
 		);
@@ -214,19 +220,21 @@ class Torpor {
 
 	public function processConfig( $xml ){
 		$return = false;
-		// TODO: Test against XSD; possibly throw or propagate any of those errors
-		// as an exception?
-		// if( !Torpor::isValidConfig( $xml ) ) {
-		//	throw( new Exception( 'Invalid configuration xml' ) );
-		// }
 		$xmlObj = ( $xml instanceof SimpleXMLElement ? $xml : simplexml_load_string( $xml ) );
-		/*
+
+		if( !$this->getFileInPath( self::DEFAULT_CONFIG_SCHEMA ) ){
+			$this->throwException( 'Schema document '.self::DEFAULT_CONFIG_SCHEMA.' not found in path' );
+		}
+
 		dom_import_simplexml( $xmlObj )->ownerDocument->schemaValidate(
 			$this->getFileInPath( self::DEFAULT_CONFIG_SCHEMA )
 		) or $this->throwException( 'Invalid configuration (failed schema check)' );
-		*/
 
 		$options = self::defaultOptions();
+		$dataTypeMap = array(
+			self::OPTION_GRID_CLASS => array(),
+			self::VALUE_GLOBAL => array()
+		);
 		$grids = array();
 		$gridClasses = array();
 		$columns = array();
@@ -234,8 +242,55 @@ class Torpor {
 		$uniqueKeys = array();
 		$references = array();
 
+		if( isset( $xmlObj->Options ) ){
+			foreach( $xmlObj->Options->children() as $option ){
+				switch( $option->getName() ){
+					case self::OPTION_COLUMN_CLASS:
+						$className = (string)$option;
+						$this->checkColumnClass( $className );
+						$options{ self::OPTION_COLUMN_CLASS } = $className;
+						break;
+					case self::OPTION_DEBUG:
+						$options{ self::OPTION_DEBUG } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
+					case self::OPTION_GRID_CLASS:
+						$className = (string)$option;
+						$this->checkGridClass( $className );
+						$options{ self::OPTION_GRID_CLASS } = $className;
+						break;
+					case self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS:
+						$options{ self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
+					case self::OPTION_OVERWRITE_ON_LOAD:
+						$options{ self::OPTION_OVERWRITE_ON_LOAD } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
+					case self::OPTION_PERPETUATE_AUTO_LINKS:
+						$options{ self::OPTION_PERPETUATE_AUTO_LINKS } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
+					case 'DataTypeMap':
+						$dataTypeMap{ self::VALUE_GLOBAL } = $this->parseDataTypeMap( $option );
+						break;
+					default:
+						$this->throwException( 'Unrecognized option "'.$option->getName().'"' );
+						break;
+				}
+			}
+		}
+
+		if( isset( $xmlObj->Repository ) ){
+			// LEAVING OFF HERE:
+			// Need good common mechanism for instantiating
+			// any of the different data store types,
+			// and parsing their Parameters for instantiation.
+			// TODO: Encrypted parameter support.
+			$readDataStore = null;
+			$writeDataStore = null;
+			if( isset( $xmlObj->Repository->DataStore ) ){
+			} else {
+			}
+		}
+
 		// TODO:
-		// 1. Parse Options
 		// 2. Set up data store
 		foreach( $xmlObj->Grids->Grid as $xmlGrid ){
 			$gridName = $this->xmlObjKeyName( $xmlGrid );
@@ -245,6 +300,8 @@ class Torpor {
 			if( isset( $grids{ $gridName } ) ){
 				$this->throwException( 'Duplicate grid name '.$gridName );
 			}
+			// TODO: Auto-pruning or just-in-time generation, so as not to have empty
+			// arrays all over the place?
 			$grids{ $gridName } = (string)$xmlGrid->attributes()->dataName;
 			$columns{ $gridName } = array();
 			$keys{ $gridName } = array();
@@ -254,21 +311,15 @@ class Torpor {
 				if( $className == self::VALUE_NONE ){
 					$className = self::DEFAULT_GRID_CLASS;
 				} else {
-					if( !class_exists( $className ) ){
-						$this->throwException( 'Undefined class "'.$className.'" requested for grid '.$gridName );
-					}
-					if(
-						$className != self::DEFAULT_GRID_CLASS
-						&& !in_array( self::DEFAULT_GRID_CLASS, class_parents( $className ) )
-					){
-						trigger_error(
-							'Requested class "'.$className.'" does not appear to inherit from '
-							.self::DEFAULT_GRID_CLASS.' for grid '.$gridName
-							.' - I hope you know what you\'re doing', E_USER_WARNING
-						);
-					}
 				}
 				$gridClasses{ $gridName } = $className;
+			}
+
+			// TODO: Parse Commands
+			// $commands{ $gridName } = array();
+
+			if( isset( $xmlGrid->DataTypeMap ) ){
+				$dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $gridName } = $this->parseDataTypeMap( $xmlGrid->DataTypeMap );
 			}
 
 			foreach( $xmlGrid->Columns->Column as $xmlColumn ){
@@ -282,19 +333,7 @@ class Torpor {
 				if( (string)$xmlColumn->attributes()->class ){
 					$className = (string)$xmlColumn->attributes()->class;
 					if( $className != self::VALUE_NONE ){
-						if( !class_exists( $className ) ){
-							$this->throwException( 'Undefined class "'.$className.'" requested for column '.$columnName.' on grid '.$gridName );
-						}
-						if(
-							$className != self::DEFAULT_COLUMN_CLASS 
-							&& !in_array( self::DEFAULT_COLUMN_CLASS, class_parents( $className ) )
-						){
-							trigger_error(
-								'Requested class "'.$className.'" does not appear to inherit from '
-								.self::DEFAULT_COLUMN_CLASS.' for column '.$columnName.' on grid '.$gridName
-								.' - I hope you know what you\'re doing', E_USER_WARNING
-							);
-						}
+						$this->checkColumnClass( $className );
 					}
 				}
 				$columns{ $gridName }{ $columnName } = $xmlColumn; // We want this one to hang around.
@@ -384,13 +423,14 @@ class Torpor {
 		// TODO: Where/how to cache this, as identified by the resource initially fed to
 		// us (in order to rapidly reload on successive iterations)?
 		$this->_config = array(
-			self::ARKEY_OPTIONS      => $options,
+			self::ARKEY_COLUMNS      => $columns,
+			self::ARKEY_DATATYPEMAP  => $dataTypeMap,
 			self::ARKEY_GRIDS        => $grids,
 			self::ARKEY_GRID_CLASSES => $gridClasses,
-			self::ARKEY_COLUMNS      => $columns,
 			self::ARKEY_KEYS         => $keys,
-			self::ARKEY_UNIQUEKEYS   => $uniqueKeys,
-			self::ARKEY_REFERENCES   => $references
+			self::ARKEY_OPTIONS      => $options,
+			self::ARKEY_REFERENCES   => $references,
+			self::ARKEY_UNIQUEKEYS   => $uniqueKeys
 		);
 		$this->setInitialized();
 
@@ -498,13 +538,42 @@ class Torpor {
 		}
 		return( $this->_config{ $x } );
 	}
-	protected function _getOptions(){ return( $this->_getInitX( self::ARKEY_OPTIONS ) ); }
+	protected function _getColumns( $grid = null ){ return( $this->_getInitX( self::ARKEY_COLUMNS, $grid ) ); }
+	protected function _getDataTypeMap( $grid = null ){
+		$dataTypeMap = $this->_getInitX( self::ARKEY_DATATYPEMAP );
+		if( !empty( $grid ) ){
+			$grid = $this->gridKeyName( $grid );
+			if( isset( $dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $grid } ) ){
+				$dataTypeMap = $dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $grid };
+			} else {
+				$dataTypeMap = array();
+			}
+		} else {
+			$dataTypeMap = $dataTypeMap{ self::VALUE_GLOBAL };
+		}
+		return( $dataTypeMap );
+	}
 	protected function _getGrids( $grid = null ){ return( $this->_getInitX( self::ARKEY_GRIDS, $grid ) ); }
 	protected function _getGridClasses( $grid = null ){ return( $this->_getInitX( self::ARKEY_GRID_CLASSES, $grid ) ); }
-	protected function _getColumns( $grid = null ){ return( $this->_getInitX( self::ARKEY_COLUMNS, $grid ) ); }
 	protected function _getKeys( $grid = null ){ return( $this->_getInitX( self::ARKEY_KEYS, $grid ) ); }
-	protected function _getUniqueKeys( $grid = null ){ return( $this->_getInitX( self::ARKEY_UNIQUEKEYS, $grid ) ); }
+	protected function _getOptions(){ return( $this->_getInitX( self::ARKEY_OPTIONS ) ); }
 	protected function _getReferences( $grid = null ){ return( $this->_getInitX( self::ARKEY_REFERENCES, $grid ) ); }
+	protected function _getUniqueKeys( $grid = null ){ return( $this->_getInitX( self::ARKEY_UNIQUEKEYS, $grid ) ); }
+
+	public function ReadDataStore( DataStore $dataStore = null ){
+		if( !is_null( $dataStore ) ){
+			$this->_readDataStore = $dataStore;
+		}
+		return( $this->_readDataStore );
+	}
+	public function WriteDataStore( DataStore $dataStore = null ){
+		if( !is_null( $dataStore ) ){
+			$this->_writeDataStore = $dataStore;
+		}
+		return( $this->_writeDataStore );
+	}
+
+	// Aliases
 	protected function _getAllGridKeys( $gridName ){
 		$gridName = $this->gridKeyName( $gridName );
 		if( !$this->supportedGrid( $gridName ) ){
@@ -521,7 +590,6 @@ class Torpor {
 		return( ( count( $key_sets ) > 0 ? $key_sets : false ) );
 	}
 
-	// Aliases
 	public function dataNameForGrid( $gridName ){
 		return( $this->_getGrids( $gridName ) );
 	}
@@ -717,22 +785,24 @@ class Torpor {
 		if( !$columns{ $columnName } ){
 			$this->throwException( 'Unrecognized column "'.$columnName.'" for grid '.$gridName.' requested in columnClass' );
 		}
-		$xmlColumn = $columns{ $columnName };
-		// TODO: Need to fall back in this pattern:
-		// 1. Column class definition
-		// 2. Grid data type class definition
-		// 3. Global data type class definition
-		// 4. Global column class definition
-		// 5. Default column class definition
 		$className = $this->options( self::OPTION_COLUMN_CLASS );
-		if( $this->makeKeyName( (string)$xmlColumn->attributes()->type ) == Column::TYPE_CLASS ){
-			if( $xmlColumn->attributes()->class == self::VALUE_NONE ){
-				$className = self::DEFAULT_COLUMN_CLASS;
-			} else {
-				$className = (string)$xmlColumn->attributes()->class;
-			}
+		$xmlColumn = $columns{ $columnName };
+		if( isset( $xmlColumn->attributes()->class ) ){
+			$className = (string)$xmlColumn->attributes()->class;
 		} else {
-			// TODO: Continue fallback to as-yet-undefined XML as specified above.
+			$type = strtoupper( (string)$xmlColumn->attributes()->type );
+			$gridTypeMap = $this->_getDataTypeMap( $gridName );
+			if( count( $gridTypeMap ) > 0 && isset( $gridTypeMap{ $type } ) ){
+				$className = $gridTypeMape{ $type };
+			} else {
+				$dataTypeMap = $this->_getDataTypeMap();
+				if( count( $dataTypeMap ) > 0 && isset( $dataTypeMap{ $type } ) ){
+					$className = $dataTypeMap{ $type };
+				}
+			}
+		}
+		if( $className == self::VALUE_NONE ){
+			$className = $this->options( self::OPTION_COLUMN_CLASS );
 		}
 		return( $className );
 	}
@@ -1060,19 +1130,6 @@ class Torpor {
 		throw( new TorporException( $msg ) );
 	}
 
-	public static function stringContainsKeywordSubstring( $name ){
-		$return = false;
-		$name = strtolower( $name );
-		if( substr_count( $name, self::OPERATION_MOD_FROM ) ){
-			$return = true;
-		} else if( substr( $name, ( -1 * strlen( self::OPERATION_GET_SET ) ) ) == self::OPERATION_GET_SET ){
-			$return = true;
-		} else if( substr( $name, ( -1 * strlen( self::OPERATION_GET_CRITERIA ) ) ) == self::OPERATION_GET_CRITERIA ){
-			$return = true;
-		}
-		return( $return );
-	}
-
 	// Takes a Grid or (string) argument and either retrieves or
 	// sanitizes to return the key name version of the same.
 	public static function gridKeyName( $gridName ){
@@ -1096,6 +1153,50 @@ class Torpor {
 		$name = self::makeKeyName( (string)$xmlObj->attributes()->name );
 		if( !$name ){ $name = self::makeKeyName( (string)$xmlObj->attributes()->dataName ); }
 		return( $name );
+	}
+
+	public static function checkClass( $className, $gridColumn ){
+		if( empty( $className ) || !class_exists( $className ) ){
+			self::throwException( 'Undefined '.( $gridColumn ? 'grid' : 'column' ).' class "'.$className.'" requested' );
+		}
+		if(
+			(
+				$gridColumn
+				&& (
+					$className != self::DEFAULT_GRID_CLASS
+					&& !in_array( self::DEFAULT_GRID_CLASS, class_parents( $className ) )
+				)
+			) || (
+				!$gridColumn
+				&& (
+					$className != self::DEFAULT_COLUMN_CLASS
+					&& !in_array( self::DEFAULT_COLUMN_CLASS, class_parents( $className ) )
+				)
+			)
+		){
+			trigger_error(
+				'Requested '.( $gridClass ? 'grid' : 'column' ).' class "'.$className.'" does not appear to inherit from '
+				.( $gridClass ? self::DEFAULT_GRID_CLASS : self::DEFAULT_COLUMN_CLASS )
+				.' - I hope you know what you\'re doing', E_USER_WARNING
+			);
+		}
+		return( true );
+	}
+	public static function checkColumnClass( $className ){ return( self::checkClass( $className, false ) ); }
+	public static function checkGridClass( $className ){ return( self::checkClass( $className, true ) ); }
+
+	public static function parseDataTypeMap( SimpleXMLElement $dataTypeMap ){
+		$mapArray = array();
+		foreach( $dataTypeMap->children() as $map ){
+			$type = strtoupper( (string)$map->attributes()->type );
+			if( !in_array( $type, Column::getValidTypes() ) ){
+				$this->throwException( 'Unrecognized column type "'.$type.'"' );
+			}
+			$className = (string)$map->attributes()->class;
+			self::checkColumnClass( $className );
+			$mapArray{ $type } = $className;
+		}
+		return( $mapArray );
 	}
 
 	public static function detectOperation( $functionName, $compound = false ){

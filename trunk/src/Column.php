@@ -131,7 +131,9 @@ class Column extends PersistableContainer
 		if( isset( $xmlDef->attributes()->default ) ){
 			// This way we reset to this for originalData, and are still considered
 			// dirty
-			$this->_data = (string)$xmlDef->attributes()->default;
+			// WARNING: validating content from the dataStore; which can throw some
+			// strange warnings if the XML and the repository definitions don't agree.
+			$this->_data = $this->validate( (string)$xmlDef->attributes()->default );
 			$this->_defaultData = true;
 			$this->_setDirty();
 		}
@@ -361,7 +363,7 @@ class Column extends PersistableContainer
 					// TODO: Need binary save maxLength checking.
 					break;
 				case self::TYPE_BOOL:
-					$data = ( $data ? true : false );
+					$data = ( $data && strtolower( $data ) !== Torpor::VALUE_FALSE ? true : false );
 					break;
 				case self::TYPE_CLASS: break; // No checking on class data.
 				case self::TYPE_DATE:
