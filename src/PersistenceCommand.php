@@ -5,19 +5,27 @@ class PersistenceCommand {
 	const TYPE_PUBLISH = 'PUBLISH';
 	const CONTEXT_NEW      = 'NEW';
 	const CONTEXT_EXISTING = 'EXISTING';
-	const CONTEXT_BOTH     = 'BOTH';
+	const CONTEXT_ALL      = 'ALL';
 
 	private $_type = null;
 	private $_context = null;
 	private $_command = null;
-	private $_placeholder = null;
+	private $_commandType = null;
+	private $_placeholder = '?';
 	private $_parameters = array();
 
-	public function PersistenceCommand( $type = null, $context = null, $command = null, $placeholder = null ){
+	public function PersistenceCommand(
+		$type = null,
+		$context = null,
+		$command = null,
+		$placeholder = null,
+		$commandType = null
+	){
 		if( !empty( $type ) ){ $this->setType( $type ); }
 		if( !empty( $context ) ){ $this->setContext( $context ); }
 		if( !empty( $command ) ){ $this->setCommand( $command ); }
 		if( !empty( $placeholder ) ){ $this->setPlaceholder( $placeholder ); }
+		if( !empty( $commandType ) ){ $this->setCommandType( $commandType ); }
 	}
 
 	public function getType(){ return( $this->_type ); }
@@ -73,6 +81,9 @@ class PersistenceCommand {
 
 	public function getPlaceholder(){ return( $this->_placeholder ); }
 	public function setPlaceholder( $placeholder ){ return( $this->_placeholder = $placeholder ); }
+
+	public function getCommandType(){ return( $this->_commandType ); }
+	public function setCommandType( $commandType ){ return( $this->_commandType = $commandType ); }
 
 	public function getParameters(){ return( $this->_parameters ); }
 	public function addParameter( $parameterName, $placeholder = null ){

@@ -98,7 +98,7 @@ class MySQLDataStore implements DataStore {
 				// generatedOnPublish() column in the primary key for this grid.
 				if( !$grid->isLoaded() ){
 					if( mysql_affected_rows( $this->getConnection() ) != 1 ){
-						throw( new Exception( 'Insert failed' ) );
+						throw( new TorporException( 'Insert failed' ) );
 					}
 					$primaryKey = $grid->primaryKey();
 					$foundKeyColumn = false;
