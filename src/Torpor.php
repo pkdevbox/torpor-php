@@ -9,7 +9,6 @@ require_once( 'Criteria.php' );
 require_once( 'GridSet.php' );
 require_once( 'PersistenceCommand.php' );
 require_once( 'DataStore.php' );
-require_once( 'MySQLDataStore.php' ); // TODO: just-in-time require_once() ?
 
 // TODO: phpdoc
 // TODO: CLEANUP: Order the methods according to some logical paradigm.
@@ -66,7 +65,10 @@ class Torpor {
 	const OPTION_PERPETUATE_AUTO_LINKS = 'PerpetuateAutoLinks';
 	const DEFAULT_PERPETUATE_AUTO_LINKS = false;
 
+	const DATA_STORE_CLASS = 'DataStore';
+
 	// Value constants
+	const VALUE_ENC_PREFIX = 'enc://';
 	const VALUE_TRUE   = 'true';
 	const VALUE_FALSE  = 'false';
 	const VALUE_NONE   = 'none';
@@ -79,14 +81,15 @@ class Torpor {
 	const REGEX_KEYNAME = '[^A-Za-z0-9]';
 
 	// Internal use only
-	const ARKEY_DATATYPEMAP  = 'datatype_map';
-	const ARKEY_COLUMNS      = 'columns';
-	const ARKEY_GRIDS        = 'grids';
-	const ARKEY_GRID_CLASSES = 'grid_classes';
-	const ARKEY_KEYS         = 'keys';
-	const ARKEY_UNIQUEKEYS   = 'uniquekeys';
-	const ARKEY_REFERENCES   = 'references';
-	const ARKEY_OPTIONS      = 'options';
+	const ARKEY_DATATYPEMAP   = 'datatype_map';
+	const ARKEY_COLUMNS       = 'columns';
+	const ARKEY_GRIDS         = 'grids';
+	const ARKEY_GRID_CLASSES  = 'grid_classes';
+	const ARKEY_GRID_COMMANDS = 'grid_commands';
+	const ARKEY_KEYS          = 'keys';
+	const ARKEY_UNIQUEKEYS    = 'uniquekeys';
+	const ARKEY_REFERENCES    = 'references';
+	const ARKEY_OPTIONS       = 'options';
 
 	const COMMON_OPERATION_LENGTH = 3;
 	const OPERATION_ADD = 'add';
@@ -237,6 +240,7 @@ class Torpor {
 		);
 		$grids = array();
 		$gridClasses = array();
+		$gridCommands = array();
 		$columns = array();
 		$keys = array();
 		$uniqueKeys = array();
@@ -285,15 +289,85 @@ class Torpor {
 			// TODO: Encrypted parameter support.
 			$readDataStore = null;
 			$writeDataStore = null;
+			$readXml = null;
+			$writeXml = null;
 			if( isset( $xmlObj->Repository->DataStore ) ){
+				$readXml = $writeXml = $xmlObj->Repository->DataStore;
 			} else {
+				$readXml = $xmlObj->Repository->ReadDataStore;
+				$writeXml = $xmlObj->Repository->WriteDataStore;
+			}
+			foreach(
+				array(
+					'read' => $readXml,
+					'write' => $writeXml
+				) as $storeType => $dataStoreXml
+			){
+				if( $storeType == 'write' && $writeXml === $readXml ){ continue; }
+				$settings = array();
+				foreach( $dataStoreXml->Parameter as $parameterXml ){
+					$settings{ (string)$parameterXml->attributes()->name } = (
+						(string)$parameterXml->attributes()->encrypted == self::VALUE_TRUE
+						? self::VALUE_ENC_PREFIX
+						: ''
+					).(string)$parameterXml->attributes()->value;
+				}
+
+				$className = self::DATA_STORE_CLASS;
+				if( isset( $dataStoreXml->attributes()->class ) ){
+					$className = (string)$dataStoreXml->attributes()->class;
+					if( empty( $className ) || !class_exists( $className ) ){
+						$this->throwException( 'Undefined '.self::DATA_STORE_CLASS.' class "'.$className.'" requested' );
+					}
+					if(
+						$className != self::DATA_STORE_CLASS
+						&& !in_array( self::DATA_STORE_CLASS, class_parents( $className ) )
+					){
+						trigger_error( 'Requested DataStore class "'.$className.'" does not appear to inherit from '.self::DATA_STORE_CLASS
+							.' - I hope you know what you\'re doing', E_USER_WARNING );
+					}
+				} else {
+					switch( strtolower( (string)$dataStoreXml->attributes()->type ) ){
+						// Using just-in-time require_once calls in the event that lazy loading
+						// has not been enabled on this system.  Should be negligible with
+						// regard to performance.
+						case 'mysql':
+							require_once( ( $className = 'MySQLDataStore' ).'.php' );
+							break;
+						case 'mysqli':
+							if( !version_compare( PHP_VERSION, '5.3.0', '>=' ) ){
+								$this->throwException( 'The MySQLi interface is available only in PHP version 5.3.0 or greater (current version is '.PHP_VERSION.')' );
+							}
+							// TODO: Write these files.
+							require_once( ( $className = 'MySQLiDataStore' ).'.php' );
+							break;
+						case 'odbc':
+							require_once( ( $className = 'ODBCDataStore' ).'.php' );
+							break;
+						case 'oracle':
+							require_once( ( $className = 'OracleDataStore' ).'.php' );
+							break;
+						case 'sqlite':
+							require_once( ( $className = 'SQLiteDataStore' ).'.php' );
+							break;
+						default:
+							$this->throwException( 'Unrecognized data store type "'.(string)$dataStoreXml->attributes()->type.'" requested' );
+							break;
+					}
+				}
+
+				$dataStore = new $className( $settings );
+				if( $storeType == 'read' ){
+					$this->_readDataStore = $dataStore;
+				}
+				if( $storeType == 'write' || $writeXml === $readXml ){
+					$this->_writeDataStore = $dataStore;
+				}
 			}
 		}
 
-		// TODO:
-		// 2. Set up data store
-		foreach( $xmlObj->Grids->Grid as $xmlGrid ){
-			$gridName = $this->xmlObjKeyName( $xmlGrid );
+		foreach( $xmlObj->Grids->Grid as $gridXml ){
+			$gridName = $this->xmlObjKeyName( $gridXml );
 			if( !$gridName ){
 				$this->throwException( 'Could not extract a suitable grid name' );
 			}
@@ -302,12 +376,12 @@ class Torpor {
 			}
 			// TODO: Auto-pruning or just-in-time generation, so as not to have empty
 			// arrays all over the place?
-			$grids{ $gridName } = (string)$xmlGrid->attributes()->dataName;
+			$grids{ $gridName } = (string)$gridXml->attributes()->dataName;
 			$columns{ $gridName } = array();
 			$keys{ $gridName } = array();
 			$uniqueKeys{ $gridName } = array();
 			$references{ $gridName } = array();
-			if( $className = (string)$xmlGrid->attributes()->class ){
+			if( $className = (string)$gridXml->attributes()->class ){
 				if( $className == self::VALUE_NONE ){
 					$className = self::DEFAULT_GRID_CLASS;
 				} else {
@@ -318,11 +392,11 @@ class Torpor {
 			// TODO: Parse Commands
 			// $commands{ $gridName } = array();
 
-			if( isset( $xmlGrid->DataTypeMap ) ){
-				$dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $gridName } = $this->parseDataTypeMap( $xmlGrid->DataTypeMap );
+			if( isset( $gridXml->DataTypeMap ) ){
+				$dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $gridName } = $this->parseDataTypeMap( $gridXml->DataTypeMap );
 			}
 
-			foreach( $xmlGrid->Columns->Column as $xmlColumn ){
+			foreach( $gridXml->Columns->Column as $xmlColumn ){
 				$columnName = $this->xmlObjKeyName( $xmlColumn );
 				if( !$columnName ){
 					$this->throwException( 'Could not extract a suitable column name' );
@@ -339,9 +413,9 @@ class Torpor {
 				$columns{ $gridName }{ $columnName } = $xmlColumn; // We want this one to hang around.
 			}
 
-			if( $xmlGrid->Keys->Primary ){
+			if( $gridXml->Keys->Primary ){
 				$keyArray = array();
-				foreach( $xmlGrid->Keys->Primary->Key as $xmlKey ){
+				foreach( $gridXml->Keys->Primary->Key as $xmlKey ){
 					$keyName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
 					if( !$keyName ){
 						$this->throwException( 'Invalid key name '.(string)$xmlKey->attributes()->column.' in '.$gridName );
@@ -358,8 +432,8 @@ class Torpor {
 				}
 			}
 
-			if( $xmlGrid->Keys->Unique ){
-				foreach( $xmlGrid->Keys->Unique as $xmlUnique ){
+			if( $gridXml->Keys->Unique ){
+				foreach( $gridXml->Keys->Unique as $xmlUnique ){
 					$keyArray = array();
 					foreach( $xmlUnique->Key as $xmlKey ){
 						$keyName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
@@ -385,8 +459,8 @@ class Torpor {
 				trigger_error( 'No primary or unique keys defined for grid '.$gridName.', object update will be impossible', E_USER_WARNING );
 			}
 
-			if( $xmlGrid->Keys->Foreign ){
-				foreach( $xmlGrid->Keys->Foreign->Key as $xmlKey ){
+			if( $gridXml->Keys->Foreign ){
+				foreach( $gridXml->Keys->Foreign->Key as $xmlKey ){
 					$targetGrid = $this->makeKeyName( (string)$xmlKey->attributes()->referenceGrid );
 					if( !$targetGrid ){
 						$this->throwException( 'Invalid referenceGrid '.(string)$xmlKey->attributes()->referenceGrid.' in foreign key under grid '.$gridName );
@@ -416,21 +490,26 @@ class Torpor {
 					$references{ $gridName }{ $targetGrid }{ $columnName } = $targetColumnName;
 				}
 			}
-			// TODO: More XML options, build out Commands
+			// TODO: Build out Commands
+			if( isset( $gridXml->Commands ) ){
+				foreach( $gridXml->Commands->Command as $commandXml ){
+				}
+			}
 			$this->cacheCall( 'new'.$gridName, '_newGrid', $gridName );
 		}
 
 		// TODO: Where/how to cache this, as identified by the resource initially fed to
 		// us (in order to rapidly reload on successive iterations)?
 		$this->_config = array(
-			self::ARKEY_COLUMNS      => $columns,
-			self::ARKEY_DATATYPEMAP  => $dataTypeMap,
-			self::ARKEY_GRIDS        => $grids,
-			self::ARKEY_GRID_CLASSES => $gridClasses,
-			self::ARKEY_KEYS         => $keys,
-			self::ARKEY_OPTIONS      => $options,
-			self::ARKEY_REFERENCES   => $references,
-			self::ARKEY_UNIQUEKEYS   => $uniqueKeys
+			self::ARKEY_COLUMNS       => $columns,
+			self::ARKEY_DATATYPEMAP   => $dataTypeMap,
+			self::ARKEY_GRIDS         => $grids,
+			self::ARKEY_GRID_CLASSES  => $gridClasses,
+			self::ARKEY_GRID_COMMANDS => $gridCommands,
+			self::ARKEY_KEYS          => $keys,
+			self::ARKEY_OPTIONS       => $options,
+			self::ARKEY_REFERENCES    => $references,
+			self::ARKEY_UNIQUEKEYS    => $uniqueKeys
 		);
 		$this->setInitialized();
 
