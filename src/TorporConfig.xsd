@@ -1,8 +1,6 @@
 <?xml version="1.0"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-	targetNamespace="http://www.tricornersoftware.com/Products/Torpor/Config/0.1"
-	xmlns="http://www.tricornersoftware.com/Products/Torpor/Config/0.1"
-	elementFormDefault="unqualified">
+<!-- $Rev$ -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://www.tricornersoftware.com/Products/Torpor/Config/0.1" xmlns="http://www.tricornersoftware.com/Products/Torpor/Config/0.1" elementFormDefault="unqualified">
 	<xs:element name="TorporConfig" type="TorporConfig"/>
 	<xs:complexType name="TorporConfig">
 		<xs:sequence>
@@ -24,41 +22,37 @@
 								</xs:restriction>
 							</xs:simpleType>
 						</xs:element>
-						<xs:element default="true" minOccurs="0"
-							name="LinkUnpublishedReferenceColumns" type="xs:boolean"/>
-						<xs:element default="false" minOccurs="0" name="PerpetuateAutoLinks"
-							type="xs:boolean"/>
-						<xs:element default="false" minOccurs="0" name="OverwriteOnLoad"
-							type="xs:boolean"/>
+						<xs:element default="true" minOccurs="0" name="LinkUnpublishedReferenceColumns" type="xs:boolean"/>
+						<xs:element default="false" minOccurs="0" name="PerpetuateAutoLinks" type="xs:boolean"/>
+						<xs:element default="false" minOccurs="0" name="OverwriteOnLoad" type="xs:boolean"/>
 						<xs:element minOccurs="0" name="DataTypeMap">
 							<xs:complexType>
 								<xs:sequence>
-									<xs:element form="unqualified" maxOccurs="unbounded"
-										name="DataMap">
+									<xs:element form="unqualified" maxOccurs="unbounded" name="DataMap">
 										<xs:complexType>
 											<xs:attribute name="class" use="required">
 												<xs:simpleType>
-												<xs:restriction base="xs:string">
-												<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
-												</xs:restriction>
+													<xs:restriction base="xs:string">
+														<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
+													</xs:restriction>
 												</xs:simpleType>
 											</xs:attribute>
 											<xs:attribute name="type" use="required">
 												<xs:simpleType>
-												<xs:restriction base="xs:string">
-												<xs:enumeration value="binary"/>
-												<xs:enumeration value="bool"/>
-												<xs:enumeration value="char"/>
-												<xs:enumeration value="class"/>
-												<xs:enumeration value="date"/>
-												<xs:enumeration value="datetime"/>
-												<xs:enumeration value="float"/>
-												<xs:enumeration value="integer"/>
-												<xs:enumeration value="text"/>
-												<xs:enumeration value="unsigned"/>
-												<xs:enumeration value="varchar"/>
-												<xs:enumeration value="none"/>
-												</xs:restriction>
+													<xs:restriction base="xs:string">
+														<xs:enumeration value="binary"/>
+														<xs:enumeration value="bool"/>
+														<xs:enumeration value="char"/>
+														<xs:enumeration value="class"/>
+														<xs:enumeration value="date"/>
+														<xs:enumeration value="datetime"/>
+														<xs:enumeration value="float"/>
+														<xs:enumeration value="integer"/>
+														<xs:enumeration value="text"/>
+														<xs:enumeration value="unsigned"/>
+														<xs:enumeration value="varchar"/>
+														<xs:enumeration value="none"/>
+													</xs:restriction>
 												</xs:simpleType>
 											</xs:attribute>
 										</xs:complexType>
@@ -77,11 +71,9 @@
 								<xs:sequence minOccurs="0">
 									<xs:element maxOccurs="unbounded" minOccurs="0" name="Parameter">
 										<xs:complexType mixed="true">
-											<xs:attribute name="name" type="xs:string"
-												use="required"/>
+											<xs:attribute name="name" type="xs:string" use="required"/>
 											<xs:attribute name="value" type="xs:string"/>
-											<xs:attribute default="false" name="encrypted"
-												type="xs:boolean"/>
+											<xs:attribute default="false" name="encrypted" type="xs:boolean"/>
 										</xs:complexType>
 									</xs:element>
 								</xs:sequence>
@@ -99,14 +91,11 @@
 							<xs:element name="ReadDataStore">
 								<xs:complexType>
 									<xs:sequence minOccurs="0">
-										<xs:element maxOccurs="unbounded" minOccurs="0"
-											name="Parameter">
+										<xs:element maxOccurs="unbounded" minOccurs="0" name="Parameter">
 											<xs:complexType mixed="true">
-												<xs:attribute name="name" type="xs:string"
-												use="required"/>
+												<xs:attribute name="name" type="xs:string" use="required"/>
 												<xs:attribute name="value" type="xs:string"/>
-												<xs:attribute default="false" name="encrypted"
-												type="xs:boolean"/>
+												<xs:attribute default="false" name="encrypted" type="xs:boolean"/>
 											</xs:complexType>
 										</xs:element>
 									</xs:sequence>
@@ -123,14 +112,11 @@
 							<xs:element name="WriteDataStore">
 								<xs:complexType>
 									<xs:sequence minOccurs="0">
-										<xs:element maxOccurs="unbounded" minOccurs="0"
-											name="Parameter">
+										<xs:element maxOccurs="unbounded" minOccurs="0" name="Parameter">
 											<xs:complexType mixed="true">
-												<xs:attribute name="name" type="xs:string"
-												use="required"/>
+												<xs:attribute name="name" type="xs:string" use="required"/>
 												<xs:attribute name="value" type="xs:string"/>
-												<xs:attribute default="false" name="encrypted"
-												type="xs:boolean"/>
+												<xs:attribute default="false" name="encrypted" type="xs:boolean"/>
 											</xs:complexType>
 										</xs:element>
 									</xs:sequence>
@@ -154,66 +140,62 @@
 						<xs:element name="Grid" maxOccurs="unbounded">
 							<xs:complexType>
 								<xs:sequence>
-									<xs:element name="Columns">
+									<xs:element name="Columns" minOccurs="0">
 										<xs:complexType>
 											<xs:sequence>
-												<xs:element maxOccurs="unbounded" minOccurs="0"
-												name="Column">
-												<xs:complexType>
-												<xs:attribute name="class" use="optional">
-												<xs:simpleType>
-												<xs:restriction base="xs:string">
-												<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
-												</xs:restriction>
-												</xs:simpleType>
-												</xs:attribute>
-												<xs:attribute name="dataName" type="xs:string"
-												use="required"/>
-												<xs:attribute name="default" type="xs:string"/>
-												<xs:attribute name="encoding" type="xs:string"/>
-												<xs:attribute default="false"
-												name="generatedOnPublish" type="xs:boolean"/>
-												<xs:attribute default="-1" name="length">
-												<xs:simpleType>
-												<xs:restriction base="xs:integer">
-												<xs:minInclusive value="-1"/>
-												</xs:restriction>
-												</xs:simpleType>
-												</xs:attribute>
-												<xs:attribute name="name">
-												<xs:simpleType>
-												<xs:restriction base="xs:string">
-												<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
-												</xs:restriction>
-												</xs:simpleType>
-												</xs:attribute>
-												<xs:attribute default="true" name="nullable"
-												type="xs:boolean"/>
-												<xs:attribute name="precision">
-												<xs:simpleType>
-												<xs:restriction base="xs:integer">
-												<xs:minInclusive value="0"/>
-												</xs:restriction>
-												</xs:simpleType>
-												</xs:attribute>
-												<xs:attribute name="type" use="required">
-												<xs:simpleType>
-												<xs:restriction base="xs:string">
-												<xs:enumeration value="binary"/>
-												<xs:enumeration value="bool"/>
-												<xs:enumeration value="char"/>
-												<xs:enumeration value="class"/>
-												<xs:enumeration value="date"/>
-												<xs:enumeration value="datetime"/>
-												<xs:enumeration value="float"/>
-												<xs:enumeration value="integer"/>
-												<xs:enumeration value="text"/>
-												<xs:enumeration value="unsigned"/>
-												<xs:enumeration value="varchar"/>
-												</xs:restriction>
-												</xs:simpleType>
-												</xs:attribute>
-												</xs:complexType>
+												<xs:element maxOccurs="unbounded" minOccurs="1" name="Column">
+													<xs:complexType>
+														<xs:attribute name="class" use="optional">
+															<xs:simpleType>
+																<xs:restriction base="xs:string">
+																	<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
+																</xs:restriction>
+															</xs:simpleType>
+														</xs:attribute>
+														<xs:attribute name="dataName" type="xs:string" use="required"/>
+														<xs:attribute name="default" type="xs:string"/>
+														<xs:attribute name="encoding" type="xs:string"/>
+														<xs:attribute default="false" name="generatedOnPublish" type="xs:boolean"/>
+														<xs:attribute default="-1" name="length">
+															<xs:simpleType>
+																<xs:restriction base="xs:integer">
+																	<xs:minInclusive value="-1"/>
+																</xs:restriction>
+															</xs:simpleType>
+														</xs:attribute>
+														<xs:attribute name="name">
+															<xs:simpleType>
+																<xs:restriction base="xs:string">
+																	<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
+																</xs:restriction>
+															</xs:simpleType>
+														</xs:attribute>
+														<xs:attribute default="true" name="nullable" type="xs:boolean"/>
+														<xs:attribute name="precision">
+															<xs:simpleType>
+																<xs:restriction base="xs:integer">
+																	<xs:minInclusive value="0"/>
+																</xs:restriction>
+															</xs:simpleType>
+														</xs:attribute>
+														<xs:attribute name="type" use="required">
+															<xs:simpleType>
+																<xs:restriction base="xs:string">
+																	<xs:enumeration value="binary"/>
+																	<xs:enumeration value="bool"/>
+																	<xs:enumeration value="char"/>
+																	<xs:enumeration value="class"/>
+																	<xs:enumeration value="date"/>
+																	<xs:enumeration value="datetime"/>
+																	<xs:enumeration value="float"/>
+																	<xs:enumeration value="integer"/>
+																	<xs:enumeration value="text"/>
+																	<xs:enumeration value="unsigned"/>
+																	<xs:enumeration value="varchar"/>
+																</xs:restriction>
+															</xs:simpleType>
+														</xs:attribute>
+													</xs:complexType>
 												</xs:element>
 											</xs:sequence>
 										</xs:complexType>
@@ -222,43 +204,39 @@
 										<xs:complexType>
 											<xs:sequence>
 												<xs:element name="Command" maxOccurs="unbounded">
-												<xs:complexType>
-												<xs:sequence>
-												<xs:element name="CommandText">
-												<xs:complexType mixed="true">
-												<xs:attribute name="type" type="xs:string"/>
-												<xs:attribute default="?" name="placeholder"
-												type="xs:string"/>
-												</xs:complexType>
-												</xs:element>
-												<xs:element maxOccurs="unbounded" minOccurs="0"
-												name="CommandParameter">
-												<xs:complexType>
-												<xs:attribute name="column" type="xs:string"
-												use="required"/>
-												<xs:attribute default="?" name="placeholder"
-												type="xs:string"/>
-												</xs:complexType>
-												</xs:element>
-												</xs:sequence>
-												<xs:attribute name="type" use="required">
-												<xs:simpleType>
-												<xs:restriction base="xs:string">
-												<xs:enumeration value="publish"/>
-												<xs:enumeration value="load"/>
-												</xs:restriction>
-												</xs:simpleType>
-												</xs:attribute>
-												<xs:attribute name="context">
-												<xs:simpleType>
-												<xs:restriction base="xs:string">
-												<xs:enumeration value="new"/>
-												<xs:enumeration value="existing"/>
-												<xs:enumeration value="all"/>
-												</xs:restriction>
-												</xs:simpleType>
-												</xs:attribute>
-												</xs:complexType>
+													<xs:complexType>
+														<xs:sequence>
+															<xs:element name="CommandText">
+																<xs:complexType mixed="true">
+																	<xs:attribute name="type" type="xs:string"/>
+																	<xs:attribute default="?" name="placeholder" type="xs:string"/>
+																</xs:complexType>
+															</xs:element>
+															<xs:element maxOccurs="unbounded" minOccurs="0" name="CommandParameter">
+																<xs:complexType>
+																	<xs:attribute name="column" type="xs:string" use="required"/>
+																	<xs:attribute default="?" name="placeholder" type="xs:string"/>
+																</xs:complexType>
+															</xs:element>
+														</xs:sequence>
+														<xs:attribute name="type" use="required">
+															<xs:simpleType>
+																<xs:restriction base="xs:string">
+																	<xs:enumeration value="publish"/>
+																	<xs:enumeration value="load"/>
+																</xs:restriction>
+															</xs:simpleType>
+														</xs:attribute>
+														<xs:attribute name="context">
+															<xs:simpleType>
+																<xs:restriction base="xs:string">
+																	<xs:enumeration value="new"/>
+																	<xs:enumeration value="existing"/>
+																	<xs:enumeration value="all"/>
+																</xs:restriction>
+															</xs:simpleType>
+														</xs:attribute>
+													</xs:complexType>
 												</xs:element>
 											</xs:sequence>
 										</xs:complexType>
@@ -266,35 +244,34 @@
 									<xs:element minOccurs="0" name="DataTypeMap">
 										<xs:complexType>
 											<xs:sequence>
-												<xs:element form="unqualified" maxOccurs="unbounded"
-												name="DataMap">
-												<xs:complexType>
-												<xs:attribute name="type" use="required">
-												<xs:simpleType>
-												<xs:restriction base="xs:string">
-												<xs:enumeration value="binary"/>
-												<xs:enumeration value="bool"/>
-												<xs:enumeration value="char"/>
-												<xs:enumeration value="class"/>
-												<xs:enumeration value="date"/>
-												<xs:enumeration value="datetime"/>
-												<xs:enumeration value="float"/>
-												<xs:enumeration value="integer"/>
-												<xs:enumeration value="text"/>
-												<xs:enumeration value="unsigned"/>
-												<xs:enumeration value="varchar"/>
-												<xs:enumeration value="none"/>
-												</xs:restriction>
-												</xs:simpleType>
-												</xs:attribute>
-												<xs:attribute name="class" use="required">
-												<xs:simpleType>
-												<xs:restriction base="xs:string">
-												<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
-												</xs:restriction>
-												</xs:simpleType>
-												</xs:attribute>
-												</xs:complexType>
+												<xs:element form="unqualified" maxOccurs="unbounded" name="DataMap">
+													<xs:complexType>
+														<xs:attribute name="type" use="required">
+															<xs:simpleType>
+																<xs:restriction base="xs:string">
+																	<xs:enumeration value="binary"/>
+																	<xs:enumeration value="bool"/>
+																	<xs:enumeration value="char"/>
+																	<xs:enumeration value="class"/>
+																	<xs:enumeration value="date"/>
+																	<xs:enumeration value="datetime"/>
+																	<xs:enumeration value="float"/>
+																	<xs:enumeration value="integer"/>
+																	<xs:enumeration value="text"/>
+																	<xs:enumeration value="unsigned"/>
+																	<xs:enumeration value="varchar"/>
+																	<xs:enumeration value="none"/>
+																</xs:restriction>
+															</xs:simpleType>
+														</xs:attribute>
+														<xs:attribute name="class" use="required">
+															<xs:simpleType>
+																<xs:restriction base="xs:string">
+																	<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
+																</xs:restriction>
+															</xs:simpleType>
+														</xs:attribute>
+													</xs:complexType>
 												</xs:element>
 											</xs:sequence>
 										</xs:complexType>
@@ -303,47 +280,40 @@
 										<xs:complexType>
 											<xs:sequence>
 												<xs:element minOccurs="0" name="Foreign">
-												<xs:complexType>
-												<xs:sequence>
-												<xs:element maxOccurs="unbounded" name="Key">
-												<xs:complexType>
-												<xs:attribute name="column" type="xs:string"
-												use="required"/>
-												<xs:attribute name="referenceColumn"
-												type="xs:string"/>
-												<xs:attribute name="referenceGrid"
-												type="xs:string" use="required"/>
-												<xs:attribute name="referenceGridAlias"
-												type="xs:string"/>
-												</xs:complexType>
-												</xs:element>
-												</xs:sequence>
-												</xs:complexType>
+													<xs:complexType>
+														<xs:sequence>
+															<xs:element maxOccurs="unbounded" name="Key">
+																<xs:complexType>
+																	<xs:attribute name="column" type="xs:string" use="required"/>
+																	<xs:attribute name="referenceColumn" type="xs:string"/>
+																	<xs:attribute name="referenceGrid" type="xs:string" use="required"/>
+																	<xs:attribute name="referenceGridAlias" type="xs:string"/>
+																</xs:complexType>
+															</xs:element>
+														</xs:sequence>
+													</xs:complexType>
 												</xs:element>
 												<xs:element minOccurs="0" name="Primary">
-												<xs:complexType>
-												<xs:sequence>
-												<xs:element maxOccurs="unbounded" name="Key">
-												<xs:complexType>
-												<xs:attribute name="column" type="xs:string"
-												use="required"/>
-												</xs:complexType>
+													<xs:complexType>
+														<xs:sequence>
+															<xs:element maxOccurs="unbounded" name="Key">
+																<xs:complexType>
+																	<xs:attribute name="column" type="xs:string" use="required"/>
+																</xs:complexType>
+															</xs:element>
+														</xs:sequence>
+													</xs:complexType>
 												</xs:element>
-												</xs:sequence>
-												</xs:complexType>
-												</xs:element>
-												<xs:element maxOccurs="unbounded" minOccurs="0"
-												name="Unique">
-												<xs:complexType>
-												<xs:sequence>
-												<xs:element maxOccurs="unbounded" name="Key">
-												<xs:complexType>
-												<xs:attribute name="column" type="xs:string"
-												use="required"/>
-												</xs:complexType>
-												</xs:element>
-												</xs:sequence>
-												</xs:complexType>
+												<xs:element maxOccurs="unbounded" minOccurs="0" name="Unique">
+													<xs:complexType>
+														<xs:sequence>
+															<xs:element maxOccurs="unbounded" name="Key">
+																<xs:complexType>
+																	<xs:attribute name="column" type="xs:string" use="required"/>
+																</xs:complexType>
+															</xs:element>
+														</xs:sequence>
+													</xs:complexType>
 												</xs:element>
 											</xs:sequence>
 										</xs:complexType>
@@ -373,7 +343,6 @@
 			</xs:element>
 		</xs:sequence>
 		<xs:attribute name="version" form="unqualified" use="required">
-
 			<xs:simpleType>
 				<xs:restriction base="xs:float">
 					<xs:minInclusive value="0"/>

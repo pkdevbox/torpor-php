@@ -8,18 +8,20 @@ class MySQLDataStore implements DataStore {
 	private $_password = null;
 	private $_database = null;
 	private $_salt = null;
+	private $_torpor = null;
 
 	public static $_publishing = array();
 
-	public function MySQLDataStore( $settings = null ){
-		if( is_array( $settings ) ){
-			$this->initialize( $settings );
+	public function MySQLDataStore( Torpor $torpor = null, array $settings = null ){
+		if( $torpor instanceof Torpor && is_array( $settings ) ){
+			$this->initialize( $torpor, $settings );
 		}
 	}
 
-	public function initialize( array $settings ){
+	public function initialize( Torpor $torpor, array $settings ){
 		// TODO: create a new salt
 		// TODO: Evaluate settings.
+		$this->setTorpor( $torpor );
 		foreach( $settings as $key => $value ){
 			switch( strtolower( $key ) ){
 				case 'host':
@@ -68,71 +70,89 @@ class MySQLDataStore implements DataStore {
 			throw( new TorporException( 'Cannot publish grid: required data members not set' ) );
 		}
 
-		// Dynamic query construction
-		$sql = ( $grid->isLoaded() ? 'UPDATE' : 'INSERT INTO' )
-			.' '.$this->gridTableName( $grid ).' SET';
+		$new = ( $grid->isLoaded() ? false : true );
 		$commands = array();
-		foreach( $grid->Columns() as $column ){
-			if( $column->isDirty() || $force ){
-				$commands[] = $this->columnEqualsData( $column );
+		if( $gridCommands = $grid->Torpor()->gridCommands( $grid, PersistenceCommand::TYPE_PUBLISH ) ){
+			$context = ( $new ? PersistenceCommand::CONTEXT_NEW : PersistenceCommand::CONTEXT_EXISTING );
+			foreach( $gridCommands as $command ){
+				if( $command->getContext() == $context || $command->getContext() == PersistenceCommand::CONTEXT_ALL ){
+					$commands[] = $command;
+				}
 			}
 		}
-		if( count( $commands ) < 1 ){
-			if( $force ){
-				throw( new TorporException( 'Cannot force publish grid: no data members found' ) );
+		if( count( $commands ) > 0 ){
+			foreach( $commands as $command ){
+				$result = mysql_query( $this->parseCommand( $command, $grid ), $this->getConnection() );
+				// TODO: Examine return $result for type bool, look for affected rows, and generally 
+				// match up keys or otherwise determine the auto_increment keys for the current $grid
 			}
 		} else {
-			$sql.= ' '.implode( ',', $commands );
-			if( $grid->isLoaded() || $grid->canLoad() ){
-				$clauses = $this->makeClauses( $grid );
-				if( count( $clauses ) < 1 ){
-					throw( new TorporException( 'Cannot publish grid: no identifying criteria' ) );
+			// Dynamic query construction
+			$sql = ( $new ? 'UPDATE' : 'INSERT INTO' )
+				.' '.$this->gridTableName( $grid ).' SET';
+			$declarations = array();
+			foreach( $grid->Columns() as $column ){
+				if( $column->isDirty() || $force ){
+					$declarations[] = $this->columnEqualsData( $column );
 				}
-				$sql.= ' WHERE '.implode( ' AND ', $clauses );
 			}
-			var_dump( $sql );
-			if( mysql_query( $sql, $this->getConnection() ) ){
-				// LAST_INSERT_ID() on BIGINT types fail on translation into PHP long, so this
-				// will be fetched manually rather than via mysql_insert_id().  Also, this paradigm
-				// is only supported for a single column, and will automatically fall to the first
-				// generatedOnPublish() column in the primary key for this grid.
-				if( !$grid->isLoaded() ){
-					if( mysql_affected_rows( $this->getConnection() ) != 1 ){
-						throw( new TorporException( 'Insert failed' ) );
-					}
-					$primaryKey = $grid->primaryKey();
-					$foundKeyColumn = false;
-					if( is_array( $primaryKey ) ){
-						foreach( $primaryKey as $keyColumn ){
-							if( !$keyColumn->isGeneratedOnPublish() || $keyColumn->hasData() ){ continue; }
-							$foundKeyColumn = $keyColumn;
-							break;
-						}
-					} else if( $primaryKey->isGeneratedOnPublish() && !$primaryKey->hasData() ){
-						$foundKeyColumn = $primaryKey;
-					}
-					if( $foundKeyColumn ){
-						$result = mysql_query( 'SELECT LAST_INSERT_ID()', $this->getConnection() );
-						if( !$result || mysql_num_rows( $result ) != 1 ){
-							throw( new TorporException( 'Attempt to fetch last insert id value failed: '.mysql_error( $this->getConnection() ) ) );
-						}
-						$dataRow = mysql_fetch_row( $result );
-						$foundKeyColumn->setData( array_shift( $dataRow ) );
-					}
+			if( count( $declarations ) < 1 ){
+				if( $force ){
+					throw( new TorporException( 'Cannot force publish grid: no data members found' ) );
 				}
-				// TODO: Need to reset the grid so the only values it contains are the known
-				// keys, so it invokes a just-in-time fetch (but only if it canLoad() after all
-				// of the above).  This is more resource intensive than just setting it to a
-				// loaded status and !dirty, but far more accurate.
 			} else {
-				throw( new TorporException( 'Publish failed: '.mysql_error( $this->getConnection() ) ) );
+				$sql.= ' '.implode( ',', $declarations );
+				if( $grid->isLoaded() || $grid->canLoad() ){
+					$clauses = $this->makeClauses( $grid );
+					if( count( $clauses ) < 1 ){
+						throw( new TorporException( 'Cannot publish grid: no identifying criteria' ) );
+					}
+					$sql.= ' WHERE '.implode( ' AND ', $clauses );
+				}
+				var_dump( $sql );
+				if( mysql_query( $sql, $this->getConnection() ) ){
+					// LAST_INSERT_ID() on BIGINT types fail on translation into PHP long, so this
+					// will be fetched manually rather than via mysql_insert_id().  Also, this paradigm
+					// is only supported for a single column, and will automatically fall to the first
+					// generatedOnPublish() column in the primary key for this grid.
+					if( !$grid->isLoaded() ){
+						if( mysql_affected_rows( $this->getConnection() ) != 1 ){
+							throw( new TorporException( 'Insert failed' ) );
+						}
+						$primaryKey = $grid->primaryKey();
+						$foundKeyColumn = false;
+						if( is_array( $primaryKey ) ){
+							foreach( $primaryKey as $keyColumn ){
+								if( !$keyColumn->isGeneratedOnPublish() || $keyColumn->hasData() ){ continue; }
+								$foundKeyColumn = $keyColumn;
+								break;
+							}
+						} else if( $primaryKey->isGeneratedOnPublish() && !$primaryKey->hasData() ){
+							$foundKeyColumn = $primaryKey;
+						}
+						if( $foundKeyColumn ){
+							$result = mysql_query( 'SELECT LAST_INSERT_ID()', $this->getConnection() );
+							if( !$result || mysql_num_rows( $result ) != 1 ){
+								throw( new TorporException( 'Attempt to fetch last insert id value failed: '.mysql_error( $this->getConnection() ) ) );
+							}
+							$dataRow = mysql_fetch_row( $result );
+							$foundKeyColumn->setData( array_shift( $dataRow ) );
+						}
+					}
+					// TODO: Need to reset the grid so the only values it contains are the known
+					// keys, so it invokes a just-in-time fetch (but only if it canLoad() after all
+					// of the above).  This is more resource intensive than just setting it to a
+					// loaded status and !dirty, but far more accurate.
+				} else {
+					throw( new TorporException( 'Publish failed: '.mysql_error( $this->getConnection() ) ) );
+				}
+				// TODO: How to determine, based on keys that are generatedOnPublish, which ones
+				// will actually be available?
+				// TODO: Retrieve any generatedOnPublish data
+				// TODO: Propagate any MySQL warnings and modifications to the data
+				// TODO: Set the actual $grid as isLoaded with corresponding data
+				$return = true; // Dependent on the success of the actual query.
 			}
-			// TODO: How to determine, based on keys that are generatedOnPublish, which ones
-			// will actually ve available?
-			// TODO: Retrieve any generatedOnPublish data
-			// TODO: Propagate any MySQL warnings and modifications to the data
-			// TODO: Set the actual $grid as isLoaded with corresponding data
-			$return = true; // Dependent on the success of the actual query.
 		}
 		unset( self::$_publishing[ array_search( $grid, self::$_publishing, true ) ] );
 		return( $return );
@@ -167,15 +187,15 @@ class MySQLDataStore implements DataStore {
 			}
 		} else if( !$grid->isLoaded() || $refresh ){
 			// TODO: Look for Load commands from /TorporConfig/Grids/Grid/Commands/*
-			$commands = array();
+			$declarations = array();
 			foreach( $grid->Columns() as $column ){
-				$commands[] = $column->getDataName().' AS \''.$this->escape( $column->_getObjName() ).'\'';
+				$declarations[] = $column->getDataName().' AS \''.$this->escape( $column->_getObjName() ).'\'';
 			}
 			$clauses = $this->makeClauses( $grid );
 			if( count( $clauses ) < 1 ){
 				throw( new TorporException( 'Cannot publish grid: no identifying criteria' ) );
 			}
-			$sql = 'SELECT '.implode( ', ', $commands )
+			$sql = 'SELECT '.implode( ', ', $declarations )
 				.' FROM '.$this->gridTableName( $grid )
 				.' WHERE '.implode( ' AND ', $clauses );
 			// TODO: Execute SQL, generate a named array, and send that to the grid.
@@ -321,6 +341,10 @@ class MySQLDataStore implements DataStore {
 		if( !$this->isConnected() ){ $this->connect(); }
 		return( $this->_connection );
 	}
+
+	public function setTorpor( Torpor $torpor ){ return( $this->_torpor = $torpor ); }
+	public function getTorpor(){ return( $this->_torpor ); }
+
 	protected function escape( $arg ){
 		return(
 			preg_replace( '/`/', '\\`',
@@ -346,7 +370,6 @@ class MySQLDataStore implements DataStore {
 				: 'NULL'
 			)
 		);
-					
 	}
 
 	// No support for generic bind variables using mysql interfaces; the mysqli
@@ -360,7 +383,11 @@ class MySQLDataStore implements DataStore {
 		foreach( $command->getParameters() as $parameter ){
 			$parameterPlaceholder = null;
 			if( strpos( $parameter, Torpor::VALUE_SEPARATOR ) ){
-				// WARNING: Magic Number
+				// WARNING: Magic Number, splitting into at most 2 members, which allows for the possible
+				// existence of VALUE_SEPARATOR in the remaining code (which we won't falsely detect, because
+				// if there's a placeholder at all regardless of whether VALUE_SEPARATOR exists in it, we've
+				// used that same value as a glue betwixt us and it, so this detection and split routine is
+				// redundancy safe).
 				list( $parameter, $parameterPlaceholder ) = explode( Torpor::VALUE_SEPARATOR, $parameter, 2 );
 			}
 			if( !$grid->hasColumn( $parameter ) ){
@@ -413,6 +440,8 @@ class MySQLDataStore implements DataStore {
 					: $column->getPersistData()
 				);
 			}
+		} else {
+			$return = 'NULL';
 		}
 		return( $return );
 	}

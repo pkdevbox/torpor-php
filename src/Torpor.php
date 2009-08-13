@@ -282,11 +282,6 @@ class Torpor {
 		}
 
 		if( isset( $xmlObj->Repository ) ){
-			// LEAVING OFF HERE:
-			// Need good common mechanism for instantiating
-			// any of the different data store types,
-			// and parsing their Parameters for instantiation.
-			// TODO: Encrypted parameter support.
 			$readDataStore = null;
 			$writeDataStore = null;
 			$readXml = null;
@@ -310,7 +305,11 @@ class Torpor {
 						(string)$parameterXml->attributes()->encrypted == self::VALUE_TRUE
 						? self::VALUE_ENC_PREFIX
 						: ''
-					).(string)$parameterXml->attributes()->value;
+					).(
+						isset( $parameterXml->attributes()->value )
+						? (string)$parameterXml->attributes()->value
+						: (string)$parameterXml
+					);
 				}
 
 				$className = self::DATA_STORE_CLASS;
@@ -356,7 +355,8 @@ class Torpor {
 					}
 				}
 
-				$dataStore = new $className( $settings );
+				$dataStore = new $className();
+				$dataStore->initialize( $this,  $settings );
 				if( $storeType == 'read' ){
 					$this->_readDataStore = $dataStore;
 				}
@@ -389,53 +389,65 @@ class Torpor {
 				$gridClasses{ $gridName } = $className;
 			}
 
-			// TODO: Parse Commands
-			// $commands{ $gridName } = array();
-
-			if( isset( $gridXml->DataTypeMap ) ){
-				$dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $gridName } = $this->parseDataTypeMap( $gridXml->DataTypeMap );
-			}
-
-			foreach( $gridXml->Columns->Column as $xmlColumn ){
-				$columnName = $this->xmlObjKeyName( $xmlColumn );
+			foreach( $gridXml->Columns->Column as $columnXml ){
+				$columnName = $this->xmlObjKeyName( $columnXml );
 				if( !$columnName ){
 					$this->throwException( 'Could not extract a suitable column name' );
 				}
 				if( isset( $columns{ $gridName }{ $columnName } ) ){
 					$this->throwException( 'Duplicate column name '.$columnName.' on grid '.$gridName );
 				}
-				if( (string)$xmlColumn->attributes()->class ){
-					$className = (string)$xmlColumn->attributes()->class;
+				if( (string)$columnXml->attributes()->class ){
+					$className = (string)$columnXml->attributes()->class;
 					if( $className != self::VALUE_NONE ){
 						$this->checkColumnClass( $className );
 					}
 				}
-				$columns{ $gridName }{ $columnName } = $xmlColumn; // We want this one to hang around.
+				$columns{ $gridName }{ $columnName } = $columnXml; // We want this one to hang around.
 			}
 
-			if( $gridXml->Keys->Primary ){
-				$keyArray = array();
-				foreach( $gridXml->Keys->Primary->Key as $xmlKey ){
-					$keyName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
-					if( !$keyName ){
-						$this->throwException( 'Invalid key name '.(string)$xmlKey->attributes()->column.' in '.$gridName );
+			if( isset( $gridXml->Commands ) ){
+				foreach( $gridXml->Commands->Command as $commandXml ){
+					$command = new PersistenceCommand();
+					$command->setCommand( (string)$commandXml->CommandText );
+					$command->setType( $this->makeKeyName( (string)$commandXml->attributes()->type ) );
+					if( isset( $commandXml->attributes()->context ) ){
+						$command->setContext( $this->makeKeyName( (string)$commandXml->attributes()->context ) );
 					}
-					$keyArray[] = $keyName;
-				}
-				if( count( $keyArray ) <= 0 ){
-					$this->throwException( 'No suitable primary keys defined for grid '.$gridName );
-				} else if( count( $keyArray ) == 1 ){
-					// One key and only one key, which is nice
-					$keys{ $gridName } = array_shift( $keyArray );
-				} else {
-					$keys{ $gridName } = $keyArray;
+					if( isset( $commandXml->attributes()->placeholder ) ){
+						$command->setPlaceholder( (string)$commandXml->attributes()->placeholder );
+					}
+					if( isset( $commandXml->CommandText->attributes()->type ) ){
+						$command->setCommandType( (string)$commandXml->CommandText->attributes()->type );
+					}
+					if( isset( $commandXml->CommandParameter ) ){
+						foreach( $commandXml->CommandParameter as $parameterXml ){
+							$command->addParameter(
+								$this->makeKeyName( (string)$parameterXml->attributes()->column ),
+								(
+									isset( $parameterXml->attributes()->placeholder )
+									? (string)$parameterXml->attributes()->placeholder
+									: null
+								)
+							);
+						}
+					}
+					if( !isset( $gridCommands{ $gridName } ) ){ $gridCommands{ $gridName } = array(); }
+					if( !isset( $gridCommands{ $gridName }{ $command->getType() } ) ){
+						$gridCommands{ $gridName }{ $command->getType() } = array();
+					}
+					$gridCommands{ $gridName }{ $command->getType() }[] = $command;
 				}
 			}
 
-			if( $gridXml->Keys->Unique ){
-				foreach( $gridXml->Keys->Unique as $xmlUnique ){
+			if( isset( $gridXml->DataTypeMap ) ){
+				$dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $gridName } = $this->parseDataTypeMap( $gridXml->DataTypeMap );
+			}
+
+			if( isset( $gridXml->Keys ) ){
+				if( isset( $gridXml->Keys->Primary ) ){
 					$keyArray = array();
-					foreach( $xmlUnique->Key as $xmlKey ){
+					foreach( $gridXml->Keys->Primary->Key as $xmlKey ){
 						$keyName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
 						if( !$keyName ){
 							$this->throwException( 'Invalid key name '.(string)$xmlKey->attributes()->column.' in '.$gridName );
@@ -443,58 +455,75 @@ class Torpor {
 						$keyArray[] = $keyName;
 					}
 					if( count( $keyArray ) <= 0 ){
-						$this->throwException( 'No suitable unique keys defined for grid '.$gridName );
+						$this->throwException( 'No suitable primary keys defined for grid '.$gridName );
 					} else if( count( $keyArray ) == 1 ){
 						// One key and only one key, which is nice
-						$uniqueKeys{ $gridName }[] = array_shift( $keyArray );
+						$keys{ $gridName } = array_shift( $keyArray );
 					} else {
-						$uniqueKeys{ $gridName }[] = $keyArray;
+						$keys{ $gridName } = $keyArray;
 					}
 				}
-			}
-			if(
-				count( $keys{ $gridName } ) == 0
-				&& count( $uniqueKeys{ $gridName } ) == 0
-			){
-				trigger_error( 'No primary or unique keys defined for grid '.$gridName.', object update will be impossible', E_USER_WARNING );
+
+				if( isset( $gridXml->Keys->Unique ) ){
+					foreach( $gridXml->Keys->Unique as $xmlUnique ){
+						$keyArray = array();
+						foreach( $xmlUnique->Key as $xmlKey ){
+							$keyName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
+							if( !$keyName ){
+								$this->throwException( 'Invalid key name '.(string)$xmlKey->attributes()->column.' in '.$gridName );
+							}
+							$keyArray[] = $keyName;
+						}
+						if( count( $keyArray ) <= 0 ){
+							$this->throwException( 'No suitable unique keys defined for grid '.$gridName );
+						} else if( count( $keyArray ) == 1 ){
+							// One key and only one key, which is nice
+							$uniqueKeys{ $gridName }[] = array_shift( $keyArray );
+						} else {
+							$uniqueKeys{ $gridName }[] = $keyArray;
+						}
+					}
+				}
+				if(
+					count( $keys{ $gridName } ) == 0
+					&& count( $uniqueKeys{ $gridName } ) == 0
+				){
+					trigger_error( 'No primary or unique keys defined for grid '.$gridName.', object update will be impossible', E_USER_WARNING );
+				}
+
+				if( isset( $gridXml->Keys->Foreign ) ){
+					foreach( $gridXml->Keys->Foreign->Key as $xmlKey ){
+						$targetGrid = $this->makeKeyName( (string)$xmlKey->attributes()->referenceGrid );
+						if( !$targetGrid ){
+							$this->throwException( 'Invalid referenceGrid '.(string)$xmlKey->attributes()->referenceGrid.' in foreign key under grid '.$gridName );
+						}
+						if( $xmlKey->attributes()->referenceGridAlias ){
+							$alias = $this->makeKeyName( (string)$xmlKey->attributes()->referenceGridAlias );
+							$targetGrid.= self::VALUE_SEPARATOR.$alias;
+						}
+						$columnName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
+						if( !$columnName || !isset( $columns{ $gridName }{ $columnName } ) ){
+							$this->throwException( 'Invalid column reference '.(string)$xmlKey->attributes()->column.' in foreign key under grid '.$gridName );
+						}
+						if(
+							!isset( $references{ $gridName }{ $targetGrid } )
+							|| !is_array( $references{ $gridName }{ $targetGrid } )
+						){
+							$references{ $gridName }{ $targetGrid } = array();
+						}
+						if( isset( $references{ $gridName }{ $targetGrid }{ $columnName } ) ){
+							$this->throwException( 'Duplicate column reference '.$columnName.' in foreign key under grid '.$gridName );
+						}
+						$targetColumnName = (
+							isset( $xmlKey->attributes()->referenceColumn )
+							? $this->makeKeyName( (string)$xmlKey->attributes()->referenceColumn )
+							: $columnName
+						);
+						$references{ $gridName }{ $targetGrid }{ $columnName } = $targetColumnName;
+					}
+				}
 			}
 
-			if( $gridXml->Keys->Foreign ){
-				foreach( $gridXml->Keys->Foreign->Key as $xmlKey ){
-					$targetGrid = $this->makeKeyName( (string)$xmlKey->attributes()->referenceGrid );
-					if( !$targetGrid ){
-						$this->throwException( 'Invalid referenceGrid '.(string)$xmlKey->attributes()->referenceGrid.' in foreign key under grid '.$gridName );
-					}
-					if( $xmlKey->attributes()->referenceGridAlias ){
-						$alias = $this->makeKeyName( (string)$xmlKey->attributes()->referenceGridAlias );
-						$targetGrid.= self::VALUE_SEPARATOR.$alias;
-					}
-					$columnName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
-					if( !$columnName || !isset( $columns{ $gridName }{ $columnName } ) ){
-						$this->throwException( 'Invalid column reference '.(string)$xmlKey->attributes()->column.' in foreign key under grid '.$gridName );
-					}
-					if(
-						!isset( $references{ $gridName }{ $targetGrid } )
-						|| !is_array( $references{ $gridName }{ $targetGrid } )
-					){
-						$references{ $gridName }{ $targetGrid } = array();
-					}
-					if( isset( $references{ $gridName }{ $targetGrid }{ $columnName } ) ){
-						$this->throwException( 'Duplicate column reference '.$columnName.' in foreign key under grid '.$gridName );
-					}
-					$targetColumnName = (
-						isset( $xmlKey->attributes()->referenceColumn )
-						? $this->makeKeyName( (string)$xmlKey->attributes()->referenceColumn )
-						: $columnName
-					);
-					$references{ $gridName }{ $targetGrid }{ $columnName } = $targetColumnName;
-				}
-			}
-			// TODO: Build out Commands
-			if( isset( $gridXml->Commands ) ){
-				foreach( $gridXml->Commands->Command as $commandXml ){
-				}
-			}
 			$this->cacheCall( 'new'.$gridName, '_newGrid', $gridName );
 		}
 
@@ -603,6 +632,8 @@ class Torpor {
 		}
 	}
 
+	// TODO: Need a good way to return deep array references in order
+	// to avoid a lot of copying overhead.
 	private function _getInitX( $x, $gridName = null ){
 		$this->checkInitialized();
 		if( $gridName ){
@@ -634,6 +665,7 @@ class Torpor {
 	}
 	protected function _getGrids( $grid = null ){ return( $this->_getInitX( self::ARKEY_GRIDS, $grid ) ); }
 	protected function _getGridClasses( $grid = null ){ return( $this->_getInitX( self::ARKEY_GRID_CLASSES, $grid ) ); }
+	protected function _getGridCommands( $grid = null ){ return( $this->_getInitX( self::ARKEY_GRID_COMMANDS, $grid ) ); }
 	protected function _getKeys( $grid = null ){ return( $this->_getInitX( self::ARKEY_KEYS, $grid ) ); }
 	protected function _getOptions(){ return( $this->_getInitX( self::ARKEY_OPTIONS ) ); }
 	protected function _getReferences( $grid = null ){ return( $this->_getInitX( self::ARKEY_REFERENCES, $grid ) ); }
@@ -865,11 +897,11 @@ class Torpor {
 			$this->throwException( 'Unrecognized column "'.$columnName.'" for grid '.$gridName.' requested in columnClass' );
 		}
 		$className = $this->options( self::OPTION_COLUMN_CLASS );
-		$xmlColumn = $columns{ $columnName };
-		if( isset( $xmlColumn->attributes()->class ) ){
-			$className = (string)$xmlColumn->attributes()->class;
+		$columnXml = $columns{ $columnName };
+		if( isset( $columnXml->attributes()->class ) ){
+			$className = (string)$columnXml->attributes()->class;
 		} else {
-			$type = strtoupper( (string)$xmlColumn->attributes()->type );
+			$type = strtoupper( (string)$columnXml->attributes()->type );
 			$gridTypeMap = $this->_getDataTypeMap( $gridName );
 			if( count( $gridTypeMap ) > 0 && isset( $gridTypeMap{ $type } ) ){
 				$className = $gridTypeMape{ $type };
@@ -884,6 +916,14 @@ class Torpor {
 			$className = $this->options( self::OPTION_COLUMN_CLASS );
 		}
 		return( $className );
+	}
+
+	public function gridCommands( $gridName, $commandType = null ){
+		$commands = $this->_getGridCommands( $gridName );
+		if( !empty( $commandType ) && isset( $commands ) ){
+			$commands = ( isset( $commands{ $commandType } ) ? $commands{ $commandType } : null );
+		}
+		return( $commands );
 	}
 
 	// Uses dbEngine to tanslate $table into however
@@ -1026,9 +1066,9 @@ class Torpor {
 		if( !$this->cachedPrototype( $gridName ) ){
 			$class = $this->gridClass( $gridName );
 			$grid = new $class( $this, $gridName );
-			foreach( $this->_getColumns( $gridName ) as $columnName => $xmlColumn ){
+			foreach( $this->_getColumns( $gridName ) as $columnName => $columnXml ){
 				$class = $this->columnClass( $gridName, $columnName );
-				$grid->addColumn( new $class( $this, $columnName, $xmlColumn, $grid ) );
+				$grid->addColumn( new $class( $this, $columnName, $columnXml, $grid ) );
 			}
 			$this->cachePrototype( $grid );
 		}
@@ -1223,7 +1263,7 @@ class Torpor {
 	public static function makeKeyName( $name ){
 		$keyName = strtoupper( preg_replace( '/'.self::REGEX_KEYNAME.'/', '', $name ) );
 		if( preg_match( '/^\d/', $keyName ) ){
-			self::throwException( 'First character of key names musb be alphabetical' );
+			self::throwException( 'First character of key names must be alphabetical' );
 		}
 		return( $keyName );
 	}
