@@ -8,7 +8,7 @@ class PersistenceCommand {
 	const CONTEXT_ALL      = 'ALL';
 
 	private $_type = null;
-	private $_context = null;
+	private $_context = self::CONTEXT_ALL;
 	private $_command = null;
 	private $_commandType = null;
 	private $_placeholder = '?';

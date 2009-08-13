@@ -1,7 +1,7 @@
 <?PHP
 // $Rev$
 interface DataStore {
-	public function initialize( array $settings );
+	public function initialize( Torpor $torpor, array $settings );
 	public function Publish( Grid $grid, $force = false );
 	public function Delete( Grid $grid );
 	public function Load( Grid $grid, $refresh = false );
