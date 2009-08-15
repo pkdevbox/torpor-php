@@ -20,7 +20,11 @@ class PersistableContainer
 	public function _setObjName( $name ){ return( $this->_name = Torpor::makeKeyName( $name ) ); }
 
 	public function isLoaded(){ return( $this->_isLoaded ); }
-	protected function _setLoaded( $bool = true ){ return( $this->_isLoaded = ( $bool ? true : false ) ); }
+	protected function _setLoaded( $bool = true ){
+		$bool = ( $bool ? true : false );
+		if( $bool ){ $this->_setDirty( $bool ); }
+		return( $this->_isLoaded = $bool );
+	}
 
 	public function isDirty(){ return( $this->_isDirty ); }
 	protected function _setDirty( $bool = true ){ return( $this->_isDirty = ( $bool ? true : false ) ); }

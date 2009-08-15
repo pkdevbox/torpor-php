@@ -23,8 +23,11 @@
 							</xs:simpleType>
 						</xs:element>
 						<xs:element default="true" minOccurs="0" name="LinkUnpublishedReferenceColumns" type="xs:boolean"/>
-						<xs:element default="false" minOccurs="0" name="PerpetuateAutoLinks" type="xs:boolean"/>
 						<xs:element default="false" minOccurs="0" name="OverwriteOnLoad" type="xs:boolean"/>
+						<xs:element default="false" minOccurs="0" name="PerpetuateAutoLinks" type="xs:boolean"/>
+						<xs:element default="false" minOccurs="0" name="PublishAllFields" type="xs:boolean"/>
+						<xs:element default="true" minOccurs="0" name="PublishCascade" type="xs:boolean"/>
+						<xs:element default="true" minOccurs="0" name="ReloadAfterPublish" type="xs:boolean"/>
 						<xs:element minOccurs="0" name="DataTypeMap">
 							<xs:complexType>
 								<xs:sequence>
@@ -178,6 +181,7 @@
 																</xs:restriction>
 															</xs:simpleType>
 														</xs:attribute>
+														<xs:attribute default="false" name="readOnly" type="xs:boolean"/>
 														<xs:attribute name="type" use="required">
 															<xs:simpleType>
 																<xs:restriction base="xs:string">
@@ -326,8 +330,6 @@
 										</xs:restriction>
 									</xs:simpleType>
 								</xs:attribute>
-								<xs:attribute name="dataName" type="xs:string" use="required"/>
-								<xs:attribute name="name" type="xs:string"/>
 								<xs:attribute default="data" name="type">
 									<xs:simpleType>
 										<xs:restriction base="xs:string">
@@ -336,6 +338,9 @@
 										</xs:restriction>
 									</xs:simpleType>
 								</xs:attribute>
+								<xs:attribute name="dataName" type="xs:string" use="required"/>
+								<xs:attribute name="name" type="xs:string"/>
+								<xs:attribute default="false" name="readOnly" type="xs:boolean"/>
 							</xs:complexType>
 						</xs:element>
 					</xs:sequence>

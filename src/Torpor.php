@@ -65,6 +65,15 @@ class Torpor {
 	const OPTION_PERPETUATE_AUTO_LINKS = 'PerpetuateAutoLinks';
 	const DEFAULT_PERPETUATE_AUTO_LINKS = false;
 
+	const OPTION_PUBLISH_ALL_FIELDS = 'PublishAllFields';
+	const DEFAULT_PUBLISH_ALL_FIELDS = false;
+
+	const OPTION_PUBLISH_CASCADE = 'PublishCascade';
+	const DEFAULT_PUBLISH_CASCADE = true;
+
+	const OPTION_RELOAD_AFTER_PUBLISH = 'ReloadAfterPublish';
+	const DEFAULT_RELOAD_AFTER_PUBLISH = true;
+
 	const DATA_STORE_CLASS = 'DataStore';
 
 	// Value constants
@@ -216,7 +225,10 @@ class Torpor {
 				self::OPTION_GRID_CLASS => self::DEFAULT_GRID_CLASS,
 				self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS => self::DEFAULT_LINK_UNPUBLISHED_REFERENCE_COLUMNS,
 				self::OPTION_OVERWRITE_ON_LOAD => self::DEFAULT_OVERWRITE_ON_LOAD,
-				self::OPTION_PERPETUATE_AUTO_LINKS => self::DEFAULT_PERPETUATE_AUTO_LINKS
+				self::OPTION_PERPETUATE_AUTO_LINKS => self::DEFAULT_PERPETUATE_AUTO_LINKS,
+				self::OPTION_PUBLISH_ALL_FIELDS => self::DEFAULT_PUBLISH_ALL_FIELDS,
+				self::OPTION_PUBLISH_CASCADE => self::DEFAULT_PUBLISH_CASCADE,
+				self::OPTION_RELOAD_AFTER_PUBLISH => self::DEFAULT_RELOAD_AFTER_PUBLISH
 			)
 		);
 	}
@@ -270,6 +282,15 @@ class Torpor {
 						break;
 					case self::OPTION_PERPETUATE_AUTO_LINKS:
 						$options{ self::OPTION_PERPETUATE_AUTO_LINKS } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
+					case self::OPTION_PUBLISH_ALL_FIELDS:
+						$options{ self::OPTION_PUBLISH_ALL_FIELDS } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
+					case self::OPTION_PUBLISH_CASCADE:
+						$options{ self::OPTION_CASCADE } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
+					case self::OPTION_RELOAD_AFTER_PUBLISH:
+						$options{ self::OPTION_RELOAD_AFTER_PUBLISH } = ( (string)$option == self::VALUE_TRUE ? true : false );
 						break;
 					case 'DataTypeMap':
 						$dataTypeMap{ self::VALUE_GLOBAL } = $this->parseDataTypeMap( $option );
@@ -356,7 +377,7 @@ class Torpor {
 				}
 
 				$dataStore = new $className();
-				$dataStore->initialize( $this,  $settings );
+				$dataStore->initialize( $settings );
 				if( $storeType == 'read' ){
 					$this->_readDataStore = $dataStore;
 				}
@@ -872,6 +893,15 @@ class Torpor {
 	public function perpetuateAutoLinks(){
 		return( $this->options( self::OPTION_PERPETUATE_AUTO_LINKS ) );
 	}
+	public function publishAllFields(){
+		return( $this->options( self::OPTION_PUBLISH_ALL_FIELDS ) );
+	}
+	public function publishCascade(){
+		return( $this->options( self::OPTION_PUBLISH_CASCADE ) );
+	}
+	public function reloadAfterPublish(){
+		return( $this->options( self::OPTION_RELOAD_AFTER_PUBLISH ) );
+	}
 
 	public function gridClass( $gridName ){
 		if( is_object( $gridName ) ){
@@ -926,10 +956,38 @@ class Torpor {
 		return( $commands );
 	}
 
-	// Uses dbEngine to tanslate $table into however
-	// the record needs to be stored.
-	public function publishGrid( Grid $grid ){ return( $this->persistGrid( $grid ) ); }
-	public function persistGrid( Grid $grid ){
+	public function Publish( Grid $grid, $force = false ){
+		if( !is_object( $this->WriteDataStore() ) ){
+			$this->throwException( 'No write data store defined, cannot persist grid '.$grid->_getObjName() );
+		}
+		return( $this->WriteDataStore()->Publish( $grid, $force ) );
+	}
+
+	public function Load( $grid, $refresh = false ){
+		if( !is_object( $this->ReadDataStore() ) ){
+			$this->throwException( 'No read data store defined, cannot load grid '.$grid->_getObjName() );
+		}
+		if( $grid instanceof Grid ){
+			return( $this->ReadDataStore()->Load( $grid, $refresh ) );
+		} else if( $grid instanceof GridSet ){
+			return( $this->ReadDataStore()->LoadSet( $grid, $refresh ) );
+		} else {
+			$this->throwException( 'Cannot load object of type '
+				.gettype( $grid ).( is_object( $grid ) ? '('.get_class( $grid ).')' : '' )
+				.', don\'t know how to handle it'
+			);
+		}
+	}
+
+	public function Delete( Grid $grid ){
+		if( !is_object( $this->WriteDataStore() ) ){
+			$this->throwException( 'No write data store defined, cannot persist grid '.$grid->_getObjName() );
+		}
+		$return = false;
+		if( $grid->canLoad() ){
+			$return = $this->WriteDataStore()->Delete( $grid );
+		}
+		return( $return );
 	}
 
 	public function supportedGrid( $gridName ){

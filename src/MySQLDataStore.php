@@ -12,16 +12,14 @@ class MySQLDataStore implements DataStore {
 
 	public static $_publishing = array();
 
-	public function MySQLDataStore( Torpor $torpor = null, array $settings = null ){
-		if( $torpor instanceof Torpor && is_array( $settings ) ){
-			$this->initialize( $torpor, $settings );
+	public function MySQLDataStore( array $settings = null ){
+		if( is_array( $settings ) ){
+			$this->initialize( $settings );
 		}
 	}
 
-	public function initialize( Torpor $torpor, array $settings ){
-		// TODO: create a new salt
+	public function initialize( array $settings ){
 		// TODO: Evaluate settings.
-		$this->setTorpor( $torpor );
 		foreach( $settings as $key => $value ){
 			switch( strtolower( $key ) ){
 				case 'host':
@@ -41,14 +39,14 @@ class MySQLDataStore implements DataStore {
 					break;
 			}
 		}
-		// TODO: Return success of initialization
+		return( true );
 	}
 
 	public function Publish( Grid $grid, $force = false ){
-		$return = false; // Indicates whether we have published anything.
+		$published = false;
 		if( !$grid->isDirty() && !$force ){
 			// No reason to continue - bail early, it's cheaper.
-			return( $return );
+			return( $published );
 		}
 
 		if( in_array( $grid, self::$_publishing, true ) ){
@@ -64,10 +62,15 @@ class MySQLDataStore implements DataStore {
 		//    if the parameter name doesn't correllate to any of $grid's $columns
 		// 3. Execute 2 or dynamically create & execute SQL
 		if( $grid->isReadOnly() ){
-			throw( new TorporException( 'Cannot publish Read Only grid' ) );
+			throw( new TorporException( 'Cannot publish read only '.$grid->_getObjName().' grid' ) );
 		}
-		if( !$grid->canPublish() && !$grid->publishDependencies() ){
-			throw( new TorporException( 'Cannot publish grid: required data members not set' ) );
+		if( !$grid->canPublish() ){
+			if( $grid->Torpor()->publishCascade() ){
+				$grid->publishDependencies( $force );
+			}
+			if( !$grid->canPublish() ){
+				throw( new TorporException( 'Cannot publish '.$grid->_getObjName().' grid: required data members not set' ) );
+			}
 		}
 
 		$new = ( $grid->isLoaded() ? false : true );
@@ -83,96 +86,139 @@ class MySQLDataStore implements DataStore {
 		if( count( $commands ) > 0 ){
 			foreach( $commands as $command ){
 				$result = mysql_query( $this->parseCommand( $command, $grid ), $this->getConnection() );
-				// TODO: Examine return $result for type bool, look for affected rows, and generally 
-				// match up keys or otherwise determine the auto_increment keys for the current $grid
+				if( is_resource( $result ) ){
+					if( mysql_num_rows( $result ) > 1 ){
+						trigger_error( 'Too many results returned from command; only using first row', E_USER_WARNING );
+					}
+					$grid->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
+				} else if( $result === true ){
+					if( $new ){
+						if( ( $affected = mysql_affected_rows( $this->getConnection() ) ) != 1 ){
+							trigger_error( 'Successful publish command execution affected '.$affected.' rows; insert success unknown', E_USER_WARNING );
+						} else {
+							$published = true;
+							$this->scanForInsertId( $grid );
+						}
+					} else {
+						$published = true;
+					}
+				} else if( $result === false ){
+					throw( new TorporException( $grid->_getObjName().' publish command failed: '.mysql_error( $this->getConnection() ) ) );
+				}
 			}
 		} else {
 			// Dynamic query construction
-			$sql = ( $new ? 'UPDATE' : 'INSERT INTO' )
+			$sql = ( $new ? 'INSERT INTO' : 'UPDATE' )
 				.' '.$this->gridTableName( $grid ).' SET';
 			$declarations = array();
-			foreach( $grid->Columns() as $column ){
-				if( $column->isDirty() || $force ){
-					$declarations[] = $this->columnEqualsData( $column );
+			foreach( $grid->ColumnNames() as $columnName ){
+				if(
+					$force
+					|| $grid->Column( $columnName )->isDirty()
+					|| $grid->Column( $columnName )->isLinked()
+					|| $grid->Torpor()->publishAllFields()
+				){
+					$declarations[] = $this->columnEqualsData( $grid->Column( $columnName ) );
 				}
 			}
 			if( count( $declarations ) < 1 ){
 				if( $force ){
-					throw( new TorporException( 'Cannot force publish grid: no data members found' ) );
+					throw( new TorporException( 'Cannot force publish '.$grid->_getObjName().' grid: no data members found' ) );
 				}
 			} else {
 				$sql.= ' '.implode( ',', $declarations );
 				if( $grid->isLoaded() || $grid->canLoad() ){
 					$clauses = $this->makeClauses( $grid );
 					if( count( $clauses ) < 1 ){
-						throw( new TorporException( 'Cannot publish grid: no identifying criteria' ) );
+						throw( new TorporException( 'Cannot publish '.$grid->_getObjName().' grid: no identifying criteria' ) );
 					}
 					$sql.= ' WHERE '.implode( ' AND ', $clauses );
 				}
-				var_dump( $sql );
 				if( mysql_query( $sql, $this->getConnection() ) ){
 					// LAST_INSERT_ID() on BIGINT types fail on translation into PHP long, so this
 					// will be fetched manually rather than via mysql_insert_id().  Also, this paradigm
 					// is only supported for a single column, and will automatically fall to the first
 					// generatedOnPublish() column in the primary key for this grid.
-					if( !$grid->isLoaded() ){
+
+					if( $new ){
 						if( mysql_affected_rows( $this->getConnection() ) != 1 ){
-							throw( new TorporException( 'Insert failed' ) );
+							throw( new TorporException( $grid->_getObjName().' insert failed' ) );
 						}
-						$primaryKey = $grid->primaryKey();
-						$foundKeyColumn = false;
-						if( is_array( $primaryKey ) ){
-							foreach( $primaryKey as $keyColumn ){
-								if( !$keyColumn->isGeneratedOnPublish() || $keyColumn->hasData() ){ continue; }
-								$foundKeyColumn = $keyColumn;
-								break;
-							}
-						} else if( $primaryKey->isGeneratedOnPublish() && !$primaryKey->hasData() ){
-							$foundKeyColumn = $primaryKey;
-						}
-						if( $foundKeyColumn ){
-							$result = mysql_query( 'SELECT LAST_INSERT_ID()', $this->getConnection() );
-							if( !$result || mysql_num_rows( $result ) != 1 ){
-								throw( new TorporException( 'Attempt to fetch last insert id value failed: '.mysql_error( $this->getConnection() ) ) );
-							}
-							$dataRow = mysql_fetch_row( $result );
-							$foundKeyColumn->setData( array_shift( $dataRow ) );
-						}
+						$published = true;
+						$this->scanForInsertId( $grid );
+					} else {
+						// The affected rows might be 0 if we've published a record with zero changes.
+						$published = true;
 					}
-					// TODO: Need to reset the grid so the only values it contains are the known
-					// keys, so it invokes a just-in-time fetch (but only if it canLoad() after all
-					// of the above).  This is more resource intensive than just setting it to a
-					// loaded status and !dirty, but far more accurate.
 				} else {
 					throw( new TorporException( 'Publish failed: '.mysql_error( $this->getConnection() ) ) );
 				}
-				// TODO: How to determine, based on keys that are generatedOnPublish, which ones
-				// will actually be available?
-				// TODO: Retrieve any generatedOnPublish data
-				// TODO: Propagate any MySQL warnings and modifications to the data
-				// TODO: Set the actual $grid as isLoaded with corresponding data
-				$return = true; // Dependent on the success of the actual query.
+			}
+		}
+		if( $published ){
+			if( !$grid->canLoad() ){
+				// We've successfully published, but have no way of finding the record we inserted.
+				$this->throwException( 'Successful publish but no identifying criteria returned; '.$grid->_getObjName().' grid cannot continue' );
+			}
+			if( $grid->Torpor()->reloadAfterPublish() ){
+				// TODO: Need to reset the grid so the only values it contains are the known
+				// keys, so it invokes a just-in-time fetch (but only if it canLoad() after all
+				// of the above).  This is more resource intensive than just setting it to a
+				// loaded status and !dirty, but far more accurate.
+				$grid->UnLoad();
+			} else {
+				// Causes all of the internal values to be reset to their current version,
+				// as well as setting a new reset point.  Dump all fields, and do not attempt
+				// to load.
+				$grid->LoadFromArray( $grid->dumpArray( true, false ), true );
 			}
 		}
 		unset( self::$_publishing[ array_search( $grid, self::$_publishing, true ) ] );
-		return( $return );
+		return( $published );
+	}
+
+	protected function scanForInsertId( $grid ){
+		if( !$grid->isLoaded() ){
+			$primaryKey = $grid->primaryKey();
+			$foundKeyColumn = false;
+			if( is_array( $primaryKey ) ){
+				foreach( $primaryKey as $keyColumn ){
+					if( !$keyColumn->isGeneratedOnPublish() || $keyColumn->hasData() ){ continue; }
+					$foundKeyColumn = $keyColumn;
+					break;
+				}
+			} else if( $primaryKey->isGeneratedOnPublish() && !$primaryKey->hasData() ){
+				$foundKeyColumn = $primaryKey;
+			}
+			if( $foundKeyColumn ){
+				// Executing the query directly, since the mysql_insert_id() command casts the return
+				// value to c(long), and may truncate.
+				$result = mysql_query( 'SELECT LAST_INSERT_ID()', $this->getConnection() );
+				if( !$result || mysql_num_rows( $result ) != 1 ){
+					throw( new TorporException( 'Attempt to fetch last insert id value failed: '.mysql_error( $this->getConnection() ) ) );
+				}
+				$dataRow = mysql_fetch_row( $result );
+				$foundKeyColumn->setData( array_shift( $dataRow ) );
+			}
+		}
 	}
 
 	public function Delete( Grid $grid ){
 		$return = false;
 		$clauses = $this->makeClauses( $grid );
 		if( !$grid->canLoad() || count( $clauses ) < 1 ){
-			throw( new TorporException( 'Cannot publish grid: no identifying criteria' ) );
+			throw( new TorporException( 'Cannot publish '.$grid->_getObjName().' grid: no identifying criteria' ) );
 		}
 		$sql = 'DELETE FROM '.$this->gridTableName( $grid )
 			.' WHERE '.implode( ' AND ', $clauses )
 			.' LIMIT 1';
 		if( !mysql_query( $sql, $this->getConnection() ) ){
-			throw( new Exception( 'Delete failed: '.mysql_error( $this->getConnection() ) ) );
+			throw( new TorporException( $grid->_getObjName().' delete failed: '.mysql_error( $this->getConnection() ) ) );
 		} else {
 			if( mysql_affected_rows( $this->getConnection() ) !== 1 ){
-				trigger_error( 'No records deleted', E_USER_WARNING );
+				trigger_error( 'No '.$grid->_getObjName().' records deleted', E_USER_WARNING );
 			} else {
+				$grid->UnLoad( false );
 				$return = true;
 			}
 		}
@@ -183,25 +229,34 @@ class MySQLDataStore implements DataStore {
 		$return = false;
 		if( !$grid->canLoad() ){
 			if( $refresh ){
-				throw( new TorporException( 'Cannot load grid: no identifying criteria' ) );
+				throw( new TorporException( 'Cannot load '.$grid->_getObjName().' grid: no identifying criteria' ) );
 			}
 		} else if( !$grid->isLoaded() || $refresh ){
 			// TODO: Look for Load commands from /TorporConfig/Grids/Grid/Commands/*
 			$declarations = array();
-			foreach( $grid->Columns() as $column ){
-				$declarations[] = $column->getDataName().' AS \''.$this->escape( $column->_getObjName() ).'\'';
+			foreach( $grid->ColumnNames() as $columnName ){
+				$declarations[] = $grid->Column( $columnName )->getDataName().' AS \''.$this->escape( $grid->Column( $columnName )->_getObjName() ).'\'';
 			}
 			$clauses = $this->makeClauses( $grid );
 			if( count( $clauses ) < 1 ){
-				throw( new TorporException( 'Cannot publish grid: no identifying criteria' ) );
+				throw( new TorporException( 'Cannot publish '.$grid->_getObjName().' grid: no identifying criteria' ) );
 			}
 			$sql = 'SELECT '.implode( ', ', $declarations )
 				.' FROM '.$this->gridTableName( $grid )
 				.' WHERE '.implode( ' AND ', $clauses );
-			// TODO: Execute SQL, generate a named array, and send that to the grid.
-			var_dump( $sql );
+			$result = mysql_query( $sql, $this->getConnection() );
+			if( $result === false ){
+				throw( new TorpoException( 'Load of '.$grid->_getObjName().' grid failed: '.mysql_error( $this->_getConnection() ) ) );
+			} else if( is_resource( $result ) ){
+				$rowCount = mysql_num_rows( $result );
+				if( $rowCount == 1 ){
+					$grid->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
+				} else if( $rowCount > 1 ){
+					throw( new TorporException( 'Wrong number of results returned in '.$grid->_getObjName().' load (got '.$rowCount.', expected 1)' ) );
+				}
+			}
 		}
-		return( $return );
+		return( $grid->isLoaded() );
 	}
 
 	protected function makeClauses( Grid $grid ){
@@ -391,11 +446,11 @@ class MySQLDataStore implements DataStore {
 				list( $parameter, $parameterPlaceholder ) = explode( Torpor::VALUE_SEPARATOR, $parameter, 2 );
 			}
 			if( !$grid->hasColumn( $parameter ) ){
-				throw( new TorporException( 'Unknown parameter "'.$parameter.'" (no matching column on grid '.$grid->_getObjName() ) );
+				throw( new TorporException( 'Unknown parameter "'.$parameter.'" (no matching column on '.$grid->_getObjName().' grid' ) );
 			}
 			if( !empty( $parameterPlaceholder ) ){
 				if( strpos( $commandText, $parameterPlaceholder ) === false ){
-					throw( new TorporException( 'Named placeholder "'.$parameterPlaceholder.'" not found in command: '.$commandText ) );
+					throw( new TorporException( 'Named placeholder "'.$parameterPlaceholder.'" not found in '.$grid->_getObjName().' grid command: '.$commandText ) );
 				}
 				// Replace all instances.
 				$commandText = str_replace(
@@ -405,7 +460,7 @@ class MySQLDataStore implements DataStore {
 				);
 			} else if( !empty( $placeholder ) ){
 				if( strpos( $commandText, $placeholder ) === false ){
-					throw( new TorporException( 'Placeholder "'.$placeholder.'" not found in command: '.$commandText ) );
+					throw( new TorporException( 'Placeholder "'.$placeholder.'" not found in '.$grid->_getObjName().' grid command: '.$commandText ) );
 				}
 				// Replace only a single instance.
 				$commandText = substr_replace(
@@ -415,11 +470,11 @@ class MySQLDataStore implements DataStore {
 					strlen( $placeholder )
 				);
 			} else {
-				throw( new TorporException( 'Empty bind variable, cannot parse '.$parameter.' into command: '.$commandText ) );
+				throw( new TorporException( 'Empty bind variable, cannot parse '.$parameter.' into '.$grid->_getObjName().' grid command: '.$commandText ) );
 			}
 		}
 		if( !empty( $placeholder ) && strpos( $commandText, $placeholder ) !== false ){
-			throw( new TorporException( 'Un-parsed placeholders found in command: '.$commandText ) );
+			throw( new TorporException( 'Un-parsed placeholders found in '.$grid->_getObjName().' grid command: '.$commandText ) );
 		}
 		return( $commandText );
 	}
