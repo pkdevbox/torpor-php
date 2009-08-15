@@ -658,7 +658,7 @@ class Torpor {
 	private function &_getInitX( $x, $gridName = null ){
 		$this->checkInitialized();
 		if( $gridName ){
-			$gridName = $this->gridKeyName( $gridName );
+			$gridName = $this->containerKeyName( $gridName );
 			if( isset( $this->_config{ $x }{ $gridName } ) ){
 				return $this->_config{ $x }{ $gridName };
 			} else {
@@ -673,7 +673,7 @@ class Torpor {
 		$return = null;
 		$dataTypeMap = &$this->_getInitX( self::ARKEY_DATATYPEMAP );
 		if( !empty( $grid ) ){
-			$grid = $this->gridKeyName( $grid );
+			$grid = $this->containerKeyName( $grid );
 			if( isset( $dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $grid } ) ){
 				$return = $dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $grid };
 			} else {
@@ -707,7 +707,7 @@ class Torpor {
 
 	// Aliases
 	protected function _getAllGridKeys( $gridName ){
-		$gridName = $this->gridKeyName( $gridName );
+		$gridName = $this->containerKeyName( $gridName );
 		if( !$this->supportedGrid( $gridName ) ){
 			// This should only ever be called internall, so we shouldn't even hit this.
 			$this->throwException( 'Unknown grid "'.$gridName.'" requested in key collection fetch' );
@@ -732,10 +732,10 @@ class Torpor {
 	}
 
 	public function canReference( $sourceGridName, $targetGridName, $specificAlias = false ){
-		$sourceGridName = $this->gridKeyName( $sourceGridName );
-		$targetGridName = $this->gridKeyName( $targetGridName );
+		$sourceGridName = $this->containerKeyName( $sourceGridName );
+		$targetGridName = $this->containerKeyName( $targetGridName );
 		if( $specificAlias && $specificAlias != self::VALUE_NONE ){
-			$specificAlias = $this->gridKeyName( $specificAlias );
+			$specificAlias = $this->containerKeyName( $specificAlias );
 		}
 		$return = false;
 		if( $this->can(
@@ -805,8 +805,8 @@ class Torpor {
 	// TODO: Should we return all non-alias references, all references
 	// regardless, and if so do we include alias designations?
 	public function referenceKeysBetween( $sourceGridName, $targetGridName, $keyTypes = self::ALL_KEYS_DEEP ){
-		$sourceGridName = $this->gridKeyName( $sourceGridName );
-		$targetGridName = $this->gridKeyName( $targetGridName );
+		$sourceGridName = $this->containerKeyName( $sourceGridName );
+		$targetGridName = $this->containerKeyName( $targetGridName );
 		$returnKeys = array();
 		$sourceGridReferenceKeys = &$this->_getReferences( $sourceGridName );
 		if( $keyTypes <= self::NON_ALIAS_KEYS ){
@@ -855,9 +855,9 @@ class Torpor {
 	public function aliasReferenceKeysBetween( $sourceGridName, $targetGridName, $specificAlias = false ){
 		$referenceKeys = $this->referenceKeysBetween( $sourceGridName, $targetGridName, self::ALIAS_KEYS_ONLY );
 		if( $specificAlias ){
-			$specificAlias = $this->gridKeyName( $specificAlias );
+			$specificAlias = $this->containerKeyName( $specificAlias );
 			if( !isset( $referenceKeys{ $specificAlias } ) ){
-				$this->throwException( 'Unsupported or unrecognized alias "'.$specificAlias.'" reference requested between '.$this->gridKeyName( $sourceGridName ).' and '.$this->gridKeyName( $targetGridName ) );
+				$this->throwException( 'Unsupported or unrecognized alias "'.$specificAlias.'" reference requested between '.$this->containerKeyName( $sourceGridName ).' and '.$this->containerKeyName( $targetGridName ) );
 			}
 			$referenceKeys = $referenceKeys{ $specificAlias };
 		}
@@ -918,7 +918,7 @@ class Torpor {
 		);
 	}
 	public function columnClass( $gridName, $columnName ){
-		$gridName = $this->gridKeyName( $gridName );
+		$gridName = $this->containerKeyName( $gridName );
 		if( is_object( $columnName ) ){
 			return( get_class( $columnName ) );
 		}
@@ -1065,7 +1065,7 @@ class Torpor {
 			list( $gridName, $alias ) = explode( self::VALUE_SEPARATOR, $gridName );
 			$alias = $this->makeKeyName( $alias );
 		}
-		$gridName = $this->gridKeyName( $gridName );
+		$gridName = $this->containerKeyName( $gridName );
 		if( !$this->canReference( $record, $gridName, $alias ) ){
 			$this->throwException( $record->_getObjName().' can not reference '.$gridName.( $alias ? ' as '.$alias : '' ) );
 		}
@@ -1117,7 +1117,7 @@ class Torpor {
 
 	public function _newGrid( $gridName ){
 		$this->checkSupportedGrid( $gridName );
-		$gridName = $this->gridKeyName( $gridName );
+		$gridName = $this->containerKeyName( $gridName );
 		// TODO: provide cloning of prototypes, and add special notes
 		// to the documentation in Extending Base Classes about the
 		// necessity of overriding this (and still calling parent::__clone)
@@ -1143,7 +1143,7 @@ class Torpor {
 		if( !$this->canReference( $gridName, $record, $alias ) ){
 			$this->throwException( $record->_getObjName().' can not reference '.$gridName.( $alias ? ' as '.$alias : '' ) );
 		}
-		$targetGrid = $this->_newGrid( $this->gridKeyName( $gridName ) );
+		$targetGrid = $this->_newGrid( $this->containerKeyName( $gridName ) );
 		$setCommand = self::OPERATION_SET.( $alias ? $alias : $record->_getObjName() );
 		$targetGrid->$setCommand( $record );
 		return( $targetGrid );
@@ -1290,7 +1290,7 @@ class Torpor {
 	}
 
 	protected function cachedPrototype( $gridName ){
-		$gridName = $this->gridKeyName( $gridName );
+		$gridName = $this->containerKeyName( $gridName );
 		return( ( isset( $this->_prototypeCache{ $gridName } ) ? $this->_prototypeCache{ $gridName } : false ) );
 	}
 	// Warning: These 2 names differ only by a single character.
@@ -1310,13 +1310,13 @@ class Torpor {
 
 	// Takes a Grid or (string) argument and either retrieves or
 	// sanitizes to return the key name version of the same.
-	public static function gridKeyName( $gridName ){
-		if( $gridName instanceof Grid ){
-			$gridName = $gridName->_getObjName();
+	public static function containerKeyName( $container ){
+		if( $container instanceof PersistableContainer ){
+			$container = $container->_getObjName();
 		} else {
-			$gridName = self::makeKeyName( $gridName );
+			$container = self::makeKeyName( $container );
 		}
-		return( $gridName );
+		return( $container );
 	}
 
 	public static function makeKeyName( $name ){
