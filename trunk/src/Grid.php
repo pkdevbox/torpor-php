@@ -14,8 +14,7 @@ class Grid extends PersistableContainer implements Iterator
 			$this->throwException( $columnName.' is not a valid column on '.$this->_getObjName() );
 		}
 		$columns = $this->_getColumns();
-		$column = $columns{ $columnName };
-		return( $column );
+		return( $columns{ $columnName } );
 	}
 	protected function _getColumns(){ return( $this->_columns ); }
 	protected function _getColumnNames(){ return( array_keys( $this->_getColumns() ) ); }
@@ -25,12 +24,11 @@ class Grid extends PersistableContainer implements Iterator
 	public function isReadOnly(){ return( $this->_readOnly ); }
 	public function setReadOnly( $bool = true ){ return( $this->_readOnly = ( $bool ? true : false ) ); }
 
-	public function Delete( $now = false ){
+	public function Delete(){
 		if( $this->isReadOnly() ){
 			$this->throwExceotion( $this->_getObjName().' is marked read only, cannot delete' );
 		}
-		$this->_deleted = true;
-		return( $this->Publish() );
+		return( $this->Torpor()->Delete( $this ) );
 	}
 
 	public function ColumnNames(){ return( $this->_getColumnNames() ); }
@@ -81,20 +79,37 @@ class Grid extends PersistableContainer implements Iterator
 		$primaryKeys = $this->Torpor()->primaryKeyForGrid( $this );
 		if( $primaryKeys ){
 			if( !is_array( $primaryKeys ) ){
-				$keyColumns = $this->_getColumn( $primaryKeys );
+				$keyColumns = $this->Column( $primaryKeys );
 			} else {
 				$keyColumns = array();
 				foreach( $primaryKeys as $keyName ){
-					$keyColumns[] = $this->_getColumn( $keyName );
+					$keyColumns[] = $this->Column( $keyName );
 				}
 			}
 		}
 		return( $keyColumns );
 	}
 
+	public function KeyColumnNames( $flat = true ){
+		$keys = $this->Torpor()->allKeysForGrid( $this );
+		if( $flat ){
+			$flatArray = array();
+			while( $temp = array_shift( $keys ) ){
+				if( is_array( $temp ) ){
+					// Flatten the array
+					$keys = array_merge( $temp, $keys );
+				} else {
+					$flatArray[] = $temp;
+				}
+			}
+			$keys = $flatArray;
+		}
+		return( array_unique( $keys ) );
+	}
+
 	public function canLoad(){
 		$pass = true;
-		$allKeys = $this->Torpor()->allKeysForGrid( $this );
+		$allKeys = $this->KeyColumnNames( false );
 		foreach( $allKeys as $key ){
 			$pass = false;
 			if( is_array( $key ) ){
@@ -128,48 +143,53 @@ class Grid extends PersistableContainer implements Iterator
 	}
 
 	public function Load( $refresh = false ){
-		if(
-			$this->canLoad()
-			&& ( !$this->isLoaded() || $refresh )
-		){
-			if( false ){
-			// TODO: Actually get the data
-			// Will need to use grid name and columns to construct fetch
-			// then walk through columns doing setData() routines.
-			// Includes doing the isKey() checks on the columns to come
-			// up with the binding WHERE clause.
-			// How does the selection with criteria work?  That should
-			// probably be part of the Torpor factory classes using get(Grid)From(X)
-			// instead of the new (Grid) approach, as the blank slate.
-			// if( $dataMembers = $torpor->_getDataForGrid() ){}
-				$this->_setLoaded();
-				// TODO: Walk through the columns and look for data, or walk through the
-				// data and look for columns?
-				foreach( $this->_getColumns() as $column ){
-					$newData = 'imagine_a_database_value_here';
-					if( $column->hasData() && $column->getData() != $newData ){
-						if( !$reset || $this->Torpor()->overwriteOnLoad() ){
-							trigger_error( 'Overwriting user-data during load of column '.$column->_getObjName().' on grid '.$this->_getObjName(), E_USER_WARNING );
-						}
-					}
-					$column->setLoadData( $newData );
+		if( $this->canLoad() ){
+			if( !$this->isLoaded() || $refresh ){
+				$this->Torpor()->Load( $this, $refresh );
+				if( !$this->isLoaded() ){
+					$this->throwException( 'Load of '.$this->_getObjName().' failed' );
 				}
-			} else {
-				// TODO: If we supposedly can load, and we haven't found any data,
-				// then a couple of things are possible.  1: the criteria provided
-				// is new, and not intended to actually find something.  2: The load
-				// failed.  Given the possibilities of 1:, we probably shouldn't do
-				// anything.  The user documentation will need to include information
-				// about checking for the load status.
-				// As an alternative, it may be possible that any of the Torpor
-				// factory classes which getXFromY will return bool(false) instead of
-				// an empty grid, avoiding problems in the first place.
 			}
+		} else {
+			$this->throwException( 'Cannot load '.$this->_getObjName().': no identifying criteria' );
 		}
 		return( $this->isLoaded() );
 	}
 
-	public function LoadFromArray( array $array, $setLoaded = false ){
+	public function UnLoad( $preserveKeys = true ){
+		$keys = ( $preserveKeys ? $this->KeyColumnNames() : array() );
+		foreach( $this->Columns() as $columnName => $columnObj ){
+			if( in_array( $columnName, $keys ) ){ continue; }
+			$columnObj->UnLoad();
+		}
+		$this->_setLoaded( false );
+		return( true );
+	}
+
+	public function LoadFromArray( array $dataRow, $setLoaded = false, $fromDataStore = false ){
+		$return = false;
+		foreach( $dataRow as $key => $data ){
+			if( $this->hasColumn( $key ) ){
+				if( $setLoaded ){
+					$this->Column( $key )->setLoadData( $data, $fromDataStore );
+				} else {
+					$this->Column( $key )->setData(
+						(
+							$fromDataStore
+							? $this->Column( $key )->validatePersistData( $data )
+							: $data
+						)
+					);
+				}
+				$return = true;
+			} else {
+				trigger_error( 'Skipping unrecognized Column "'.$key.'" for grid '.$grid->_getObjName(), E_USER_WARNING );
+			}
+		}
+		if( $return && $setLoaded ){
+			$this->_setLoaded();
+		}
+		return( $return );
 	}
 
 	// TODO: Need to make all kinds of documentation about the reserved words, and when they will
@@ -215,12 +235,10 @@ class Grid extends PersistableContainer implements Iterator
 
 	public function Persist( $force = false ){ return( $this->Publish( $force ) ); }
 	public function Publish( $force = false ){
-		if( $this->isDirty() || $force ){
-			$this->_setDirty( false );
+		if( $this->isReadOnly() ){
+			$this->throwException( 'Cannot publish a read-only record' );
 		}
-		// TODO: This
-		// $this->Torpor()->Publish( $this ); // Check return values
-		return( $this->isDirty() );
+		return( $this->Torpor()->Publish( $this, $force ) );
 	}
 
 	// Abstract all getter & setter methods.
@@ -235,6 +253,9 @@ class Grid extends PersistableContainer implements Iterator
 		$operation = $this->Torpor()->detectOperation( $function );
 		if( $operation === false ){
 			$this->throwException( 'Unkown or unsupported method "'.$function.'" requested' );
+		}
+		if( $operation === Torpor::OPERATION_SET && $this->isReadOnly() ){
+			$this->throwException( 'Cannot set values on a read-only record' );
 		}
 		$noun = $this->Torpor()->makeKeyName( substr( $function, strlen( $operation ) ) );
 		if( !$this->hasColumn( $noun ) ){
@@ -260,7 +281,11 @@ class Grid extends PersistableContainer implements Iterator
 					$targetColumn = $incomingGrid->Column( $targetColumnName );
 
 					// Get data of data can be got.
-					if( !$targetColumn->hasData() ){
+					if(
+						!$targetColumn->hasData()
+						&& !$targetColumn->isLoaded()
+						&& $targetColumn->Grid()->canLoad()
+					){
 						$targetColumn->Load();
 					}
 
@@ -328,6 +353,8 @@ class Grid extends PersistableContainer implements Iterator
 		}
 		return( $return );
 	}
+
+	public function dirtyColumn(){ $this->_setDirty(); }
 
 	public function __get( $name ){
 		$function = Torpor::OPERATION_GET.$name;

@@ -49,7 +49,7 @@ class Column extends PersistableContainer
 	private $_linkedColumn = null;
 	private $_linkedColumnContinual = true;
 
-	private $_defaultData = false;
+	private $_defaultData = null;
 	private $_originalData = null;
 	private $_data = null;
 
@@ -127,14 +127,20 @@ class Column extends PersistableContainer
 		){
 			$this->setNullable( false );
 		}
+
+		if( isset( $xmlDef->attributes()->precision ) ){
+			$this->setPrecision( (string)$xmlDef->attributes()->precision );
+		}
+
 		// Set any default data prior to configuring as readOnly
 		if( isset( $xmlDef->attributes()->default ) ){
 			// This way we reset to this for originalData, and are still considered
 			// dirty
 			// WARNING: validating content from the dataStore; which can throw some
 			// strange warnings if the XML and the repository definitions don't agree.
-			$this->_data = $this->validate( (string)$xmlDef->attributes()->default );
-			$this->_defaultData = true;
+			$this->_defaultData = (string)$xmlDef->attributes()->default;
+			$this->_data = $this->validate( $this->_defaultData );
+			$this->setOriginalData( $this->_data );
 			$this->_setDirty();
 		}
 
@@ -152,7 +158,7 @@ class Column extends PersistableContainer
 
 	public function getDataName(){ return( $this->_dataName ); }
 
-	public function hasDefaultData(){ return( $this->_defaultData ); }
+	public function hasDefaultData(){ return( !is_null( $this->_defaultData ) ); }
 
 	public function isGeneratedOnPublish(){ return( $this->_generatedOnPublish ); }
 	public function setGeneratedOnPublish( $bool = true ){
@@ -162,6 +168,7 @@ class Column extends PersistableContainer
 	public function Grid(){ return( $this->getGrid() ); }
 	public function getTable(){ return( $this->getGrid() ); }
 	public function getGrid(){ return( $this->_grid ); }
+
 	public function __call( $func, $args ){
 		if( $this->Torpor()->makeKeyName( $func ) == $this->getGrid()->_getObjName() ){
 			return( $this->getGrid() );
@@ -277,9 +284,10 @@ class Column extends PersistableContainer
 			if(
 				!$this->isLoaded()
 				&& !$this->isDirty()
-				&& $this->getGrid() instanceof Grid
+				&& $this->Grid() instanceof Grid
+				&& $this->Grid()->canLoad()
 			){
-				$this->getGrid()->Load();
+				$this->Grid()->Load();
 			}
 		}
 		return( $this->_data );
@@ -298,19 +306,42 @@ class Column extends PersistableContainer
 	// constraint checking (since we expect data coming straight from the
 	// store to be compliant with the constraints, which come from the store
 	// definition.
-	public function setLoadData( $data ){
+	public function setLoadData( $data, $fromDataStore = false ){
 		$this->_setLoaded();
 		$this->_setDirty( false );
-		$this->_data = $data;
+		$this->setOriginalData(
+			$this->_data = (
+				$fromDataStore
+				? $this->validatePersistData( $data )
+				: $this->validate( $data )
+			)
+		);
 	}
 
-	public function _setDirty( $bool = true ){
+	public function UnLoad(){
+		$this->_setLoaded( false );
+		$this->setOriginalData(
+			$this->_data = (
+				$this->hasDefaultData()
+				? $this->_defaultData
+				: null
+			)
+		);
+		if( $this->hasDefaultData() ){
+			$this->_setDirty();
+		}
+	}
+
+	protected function _setDirty( $bool = true ){
 		$bool = ( $bool ? true : false );
-		parent::_setDirty();
-		$this->Grid()->_setDirty();
+		parent::_setDirty( $bool );
+		if( $bool ){
+			$this->Grid()->dirtyColumn();
+		}
+		return( $bool );
 	}
 
-	public function publish( $force = false ){
+	public function Publish( $force = false ){
 		return( $this->Grid()->Publish( false ) );
 	}
 
@@ -352,6 +383,7 @@ class Column extends PersistableContainer
 		return( $return );
 	}
 
+	public function validatePersistData( $data ){ return( $this->validate( $data ) ); }
 	public function validate( $data ){
 		if( is_null( $data ) ){
 			if( !$this->isNullable() ){
@@ -426,20 +458,10 @@ class Column extends PersistableContainer
 		// a new object and have nothing to actually fetch.
 		// TODO: Loaded primary keys should be read only
 		if( $this->isReadOnly() ){
-			$this->throwException( $this->_getObjName().' is Read Only' );
+			$this->throwException( $this->_getObjName().' is read only' );
 		}
 		$return = false;
 		$data = $this->validate( $data );
-
-		// Necessary to directly access the member variable, since there's a chance
-		// we're already in a getData() call doing just-in-time population and don't
-		// want to fall into an infinite loop.
-		if(
-			$this->isLoaded()
-			&& !$this->isDirty()
-		){
-			$this->setOriginalData( $this->_data );
-		}
 
 		if( $data == $this->getData( true ) ){
 			// If we're setting a null value, even though it's identical to what's
