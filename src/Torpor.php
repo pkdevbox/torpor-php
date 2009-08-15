@@ -587,7 +587,7 @@ class Torpor {
 		// of the unique constraints [primary or otherwise] on the target table, such that definitive
 		// identification is assured)
 		foreach( array_keys( $this->_getGrids() ) as $gridName ){
-			$references = $this->_getReferences( $gridName );
+			$references = &$this->_getReferences( $gridName );
 			if( is_array( $references ) && count( $references ) > 0 ){
 				foreach( $references as $targetGrid => $columnPairs ){
 					$alias = false;
@@ -600,7 +600,7 @@ class Torpor {
 					// TODO: Keep the exceptions, because the intialize routines are the place to check for them.
 					// Otherwise, complete replace this with the canReference routines.
 					foreach( $columnPairs as $columnName => $targetColumnName ){
-						$columns = $this->_getColumns( $targetGrid );
+						$columns = &$this->_getColumns( $targetGrid );
 						if( !is_array( $columns ) || !isset( $columns{ $targetColumnName } ) ){
 							$this->throwException( 'Unknown reference column "'.$targetColumnName.'" in key reference from '.$gridName.' on column '.$columnName );
 						}
@@ -655,42 +655,42 @@ class Torpor {
 
 	// TODO: Need a good way to return deep array references in order
 	// to avoid a lot of copying overhead.
-	private function _getInitX( $x, $gridName = null ){
+	private function &_getInitX( $x, $gridName = null ){
 		$this->checkInitialized();
 		if( $gridName ){
 			$gridName = $this->gridKeyName( $gridName );
-			return(
-				(
-					isset( $this->_config{ $x }{ $gridName } )
-					? $this->_config{ $x }{ $gridName }
-					: null
-				)
-			);
+			if( isset( $this->_config{ $x }{ $gridName } ) ){
+				return $this->_config{ $x }{ $gridName };
+			} else {
+				$x = null;
+				return $x;
+			}
 		}
-		return( $this->_config{ $x } );
+		return $this->_config{ $x };
 	}
-	protected function _getColumns( $grid = null ){ return( $this->_getInitX( self::ARKEY_COLUMNS, $grid ) ); }
-	protected function _getDataTypeMap( $grid = null ){
-		$dataTypeMap = $this->_getInitX( self::ARKEY_DATATYPEMAP );
+	protected function &_getColumns( $grid = null ){ return $this->_getInitX( self::ARKEY_COLUMNS, $grid ); }
+	protected function &_getDataTypeMap( $grid = null ){
+		$return = null;
+		$dataTypeMap = &$this->_getInitX( self::ARKEY_DATATYPEMAP );
 		if( !empty( $grid ) ){
 			$grid = $this->gridKeyName( $grid );
 			if( isset( $dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $grid } ) ){
-				$dataTypeMap = $dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $grid };
+				$return = $dataTypeMap{ self::DEFAULT_GRID_CLASS }{ $grid };
 			} else {
-				$dataTypeMap = array();
+				$return = array();
 			}
 		} else {
-			$dataTypeMap = $dataTypeMap{ self::VALUE_GLOBAL };
+			$return = $dataTypeMap{ self::VALUE_GLOBAL };
 		}
-		return( $dataTypeMap );
+		return $return;
 	}
-	protected function _getGrids( $grid = null ){ return( $this->_getInitX( self::ARKEY_GRIDS, $grid ) ); }
-	protected function _getGridClasses( $grid = null ){ return( $this->_getInitX( self::ARKEY_GRID_CLASSES, $grid ) ); }
-	protected function _getGridCommands( $grid = null ){ return( $this->_getInitX( self::ARKEY_GRID_COMMANDS, $grid ) ); }
-	protected function _getKeys( $grid = null ){ return( $this->_getInitX( self::ARKEY_KEYS, $grid ) ); }
-	protected function _getOptions(){ return( $this->_getInitX( self::ARKEY_OPTIONS ) ); }
-	protected function _getReferences( $grid = null ){ return( $this->_getInitX( self::ARKEY_REFERENCES, $grid ) ); }
-	protected function _getUniqueKeys( $grid = null ){ return( $this->_getInitX( self::ARKEY_UNIQUEKEYS, $grid ) ); }
+	protected function &_getGrids( $grid = null ){ return $this->_getInitX( self::ARKEY_GRIDS, $grid ); }
+	protected function &_getGridClasses( $grid = null ){ return $this->_getInitX( self::ARKEY_GRID_CLASSES, $grid ); }
+	protected function &_getGridCommands( $grid = null ){ return $this->_getInitX( self::ARKEY_GRID_COMMANDS, $grid ); }
+	protected function &_getKeys( $grid = null ){ return $this->_getInitX( self::ARKEY_KEYS, $grid ); }
+	protected function &_getOptions(){ return $this->_getInitX( self::ARKEY_OPTIONS ); }
+	protected function &_getReferences( $grid = null ){ return $this->_getInitX( self::ARKEY_REFERENCES, $grid ); }
+	protected function &_getUniqueKeys( $grid = null ){ return $this->_getInitX( self::ARKEY_UNIQUEKEYS, $grid ); }
 
 	public function ReadDataStore( DataStore $dataStore = null ){
 		if( !is_null( $dataStore ) ){
@@ -713,10 +713,10 @@ class Torpor {
 			$this->throwException( 'Unknown grid "'.$gridName.'" requested in key collection fetch' );
 		}
 		$key_sets = array();
-		if( $temp_keys = $this->_getKeys( $gridName ) ){
+		if( $temp_keys = &$this->_getKeys( $gridName ) ){
 			$key_sets[] = $temp_keys;
 		}
-		if( $temp_keys = $this->_getUniqueKeys( $gridName ) ){
+		if( $temp_keys = &$this->_getUniqueKeys( $gridName ) ){
 			$key_sets = array_merge( $key_sets, $temp_keys );
 		}
 		return( ( count( $key_sets ) > 0 ? $key_sets : false ) );
@@ -808,7 +808,7 @@ class Torpor {
 		$sourceGridName = $this->gridKeyName( $sourceGridName );
 		$targetGridName = $this->gridKeyName( $targetGridName );
 		$returnKeys = array();
-		$sourceGridReferenceKeys = $this->_getReferences( $sourceGridName );
+		$sourceGridReferenceKeys = &$this->_getReferences( $sourceGridName );
 		if( $keyTypes <= self::NON_ALIAS_KEYS ){
 			if(
 				is_array( $sourceGridReferenceKeys )
@@ -873,7 +873,8 @@ class Torpor {
 
 	// Option interfaces
 	public function options( $optionName = null ){
-		$options = $this->_getOptions();
+		$return = null;
+		$options = &$this->_getOptions();
 		if( !is_null( $optionName ) ){
 			// WARNING: Magic number.  However, this is important since we need to
 			// know if a value has been provided, when that value may be null, and
@@ -882,9 +883,9 @@ class Torpor {
 				$setting = func_get_arg( 1 );
 				$this->_setOption( $optionName, $setting );
 			}
-			$options = $options{ $optionName };
+			$return = $options{ $optionName };
 		}
-		return( $options );
+		return( $return );
 	}
 	public function overwriteOnLoad(){ return( $this->options( self::OPTION_OVERWRITE_ON_LOAD ) ); }
 	public function linkUnpublishedReferenceColumns(){
@@ -922,8 +923,8 @@ class Torpor {
 			return( get_class( $columnName ) );
 		}
 		$columnName = $this->makeKeyName( $columnName );
-		$columns = $this->_getColumns( $gridName );
-		if( !$columns{ $columnName } ){
+		$columns = &$this->_getColumns( $gridName );
+		if( !isset( $columns{ $columnName } ) ){
 			$this->throwException( 'Unrecognized column "'.$columnName.'" for grid '.$gridName.' requested in columnClass' );
 		}
 		$className = $this->options( self::OPTION_COLUMN_CLASS );
@@ -949,7 +950,7 @@ class Torpor {
 	}
 
 	public function gridCommands( $gridName, $commandType = null ){
-		$commands = $this->_getGridCommands( $gridName );
+		$commands = &$this->_getGridCommands( $gridName );
 		if( !empty( $commandType ) && isset( $commands ) ){
 			$commands = ( isset( $commands{ $commandType } ) ? $commands{ $commandType } : null );
 		}
