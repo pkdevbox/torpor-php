@@ -83,9 +83,8 @@ class PersistenceCommand {
 	public function setPlaceholder( $placeholder ){ return( $this->_placeholder = $placeholder ); }
 
 	public function getCommandType(){ return( $this->_commandType ); }
-	public function setCommandType( $commandType ){ return( $this->_commandType = $commandType ); }
 
-	public function getParameters(){ return( $this->_parameters ); }
+	public function &getParameters(){ return $this->_parameters; }
 	public function addParameter( $parameterName, $placeholder = null ){
 		$paramterName = Torpor::makeKeyName( $parameterName );
 		if( empty( $parameterName ) ){ throw( new TorporException( 'Invalid parameterName' ) ); }

@@ -37,18 +37,19 @@ class User extends Grid
 $xmlConfig = <<<XML
 <?xml version='1.0'?>
 <trpr:TorporConfig version="0.1" xmlns:trpr="http://www.tricornersoftware.com/Products/Torpor/Config/0.1">
-	<Database/>
-	<Options/>
 	<Grids>
 		<Grid name="User" dataName="USERS" class="User">
 			<Columns>
-				<Column name="Id" dataName="USER_ID" type="unsigned" quotes="auto"/>
+				<Column name="Id" dataName="USER_ID" type="unsigned"/>
 				<Column name="ReferringUserId" dataName="REFERRING_USER_ID" type="unsigned"/>
 				<Column name="UserName" dataName="USER_NAME" type="varchar" length="255"/>
 				<Column name="Email" dataName="EMAIL_ADDRESS" type="varchar" length="255"/>
 				<Column name="PasswordHash" dataName="PASSWORD" type="varchar" class="PasswordHash" length="32"/>
 			</Columns>
 			<Keys>
+				<Foreign>
+					<Key column="ReferringUserId" referenceGrid="User" referenceGridAlias="ReferringUser" referenceColumn="Id"/>
+				</Foreign>
 				<Primary>
 					<Key column="Id"/>
 				</Primary>
@@ -58,9 +59,6 @@ $xmlConfig = <<<XML
 				<Unique>
 					<Key column="Email"/>
 				</Unique>
-				<Foreign>
-					<Key column="ReferringUserId" referenceGrid="User" referenceGridAlias="ReferringUser" referenceColumn="Id"/>
-				</Foreign>
 			</Keys>
 		</Grid>
 		<Grid name="Order" dataName="ORDERS">
@@ -73,6 +71,10 @@ $xmlConfig = <<<XML
 				<Column name="ShippingTypeId" dataName="SHIPPING_TYPE" type="unsigned"/>
 			</Columns>
 			<Keys>
+				<Foreign>
+					<Key column="UserId" referenceGrid="User" referenceColumn="Id"/>
+					<Key column="SellerId" referenceGrid="User" referenceGridAlias="Seller" referenceColumn="Id"/>
+				</Foreign>
 				<Primary>
 					<Key column="Id"/>
 				</Primary>
@@ -80,10 +82,6 @@ $xmlConfig = <<<XML
 					<Key column="UserId"/>
 					<Key column="Date"/>
 				</Unique>
-				<Foreign>
-					<Key column="UserId" referenceGrid="User" referenceColumn="Id"/>
-					<Key column="SellerId" referenceGrid="User" referenceGridAlias="Seller" referenceColumn="Id"/>
-				</Foreign>
 			</Keys>
 		</Grid>
 	</Grids>

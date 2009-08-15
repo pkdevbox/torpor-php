@@ -284,6 +284,58 @@ class MySQLDataStore implements DataStore {
 		// TODO: Look for limit offsets.
 	}
 
+	public function Execute( PersistenceCommand $command, $returnType = null ){
+		// TODO: Need to be able to determine the context of self with regard
+		// to read/write datastore, and do some gentle exploration of the command
+		// to determine where it fits in CRUD, appropriately throwing errors.
+		$grids = array_slice( func_get_args(), 2 );
+		$command = clone( $command );
+		for( $i = 0; $i < count( $grids ); $i++ ){
+			$final = ( $i == ( count( $grids ) - 1 ) ? true : false );
+			if( !( $grids[$i] instanceof Grid ) ){
+				throw( new TorporException( 'Non-grid argument passed to Execute' ) );
+			}
+			$command->setCommand( $this->parseCommand( $command, $grids[$i], $final ) );
+		}
+		$return = false;
+		$result = mysql_query( $command->getCommand(), $this->getConnection() );
+		if( is_resource( $result ) ){
+			$rowCount = mysql_num_rows( $result );
+			if( $rowCount == 0 ){
+				trigger_error( 'No rows returned from executed command', E_USER_WARNING );
+				return( $return );
+			}
+			if( $returnType instanceof Grid ){
+				if( mysql_num_rows( $result ) > 1 ){
+					trigger_error( 'Multiple rows returned, only using the first to populate '.$grid->_getObjName().' grid', E_USER_WARNING );
+				}
+				$return = $returnType->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
+			} elseif( $returnType instanceof GridSet ){
+				$return = 0;
+				while( $dataRow = mysql_fetch_assoc( $result ) ){
+					$returnType++;
+					$grid = $returnType->Torpor()->_newGrid( $returnType->gridType() );
+					$grid->LoadFromArray( $dataRow, true, true );
+					$returnType->add( $grid );
+				}
+			} else {
+				throw(
+					new TorporException(
+						'Unknown returnType requested (expected one of Grid or GridSet, got '.
+						( is_object( $returnType ) ? get_class( $returnType ) : gettype( $returnType ) ).')'
+					)
+				);
+			}
+		} else if( $result === true ){
+			if( is_object( $returnType ) ){
+				trigger_error( 'Expected return type passed, but no rows returned from command', E_USER_WARNING );
+			}
+			$return = true;
+		} else if( $result === false ){
+			throw( new TorporException( 'Command exectution failed: '.mysql_error( $this->getConnection() ) ) );
+		}
+		return( $return );
+	}
 
 	//***********************************
 	//*  Setting & Connection Routines  *
@@ -429,13 +481,14 @@ class MySQLDataStore implements DataStore {
 
 	// No support for generic bind variables using mysql interfaces; the mysqli
 	// implementation for 5.3.0 does; use that if you can.
-	public function parseCommand( PersistenceCommand $command, Grid $grid ){
+	public function parseCommand( PersistenceCommand $command, Grid $grid, $final = true ){
 		$commandText = $command->getCommand();
 		$placeholder = $command->getPlaceholder();
 		if( empty( $commandText ) ){
 			throw( new TorporException( 'Invalid command text (empty)' ) );
 		}
-		foreach( $command->getParameters() as $parameter ){
+		$parameters = &$command->getParameters();
+		foreach( $parameters as $index => $parameter ){
 			$parameterPlaceholder = null;
 			if( strpos( $parameter, Torpor::VALUE_SEPARATOR ) ){
 				// WARNING: Magic Number, splitting into at most 2 members, which allows for the possible
@@ -446,6 +499,7 @@ class MySQLDataStore implements DataStore {
 				list( $parameter, $parameterPlaceholder ) = explode( Torpor::VALUE_SEPARATOR, $parameter, 2 );
 			}
 			if( !$grid->hasColumn( $parameter ) ){
+				if( !$final ){ continue; }
 				throw( new TorporException( 'Unknown parameter "'.$parameter.'" (no matching column on '.$grid->_getObjName().' grid' ) );
 			}
 			if( !empty( $parameterPlaceholder ) ){
@@ -458,6 +512,7 @@ class MySQLDataStore implements DataStore {
 					$this->autoQuoteColumn( $grid->Column( $parameter ) ),
 					$commandText
 				);
+				if( !$final ){ unset( $parameters[ $index ] ); }
 			} else if( !empty( $placeholder ) ){
 				if( strpos( $commandText, $placeholder ) === false ){
 					throw( new TorporException( 'Placeholder "'.$placeholder.'" not found in '.$grid->_getObjName().' grid command: '.$commandText ) );
@@ -469,11 +524,12 @@ class MySQLDataStore implements DataStore {
 					strpos( $commandText, $placeholder ),
 					strlen( $placeholder )
 				);
+				if( !$final ){ unset( $parameters[ $index ] ); }
 			} else {
 				throw( new TorporException( 'Empty bind variable, cannot parse '.$parameter.' into '.$grid->_getObjName().' grid command: '.$commandText ) );
 			}
 		}
-		if( !empty( $placeholder ) && strpos( $commandText, $placeholder ) !== false ){
+		if( $final && !empty( $placeholder ) && strpos( $commandText, $placeholder ) !== false ){
 			throw( new TorporException( 'Un-parsed placeholders found in '.$grid->_getObjName().' grid command: '.$commandText ) );
 		}
 		return( $commandText );
