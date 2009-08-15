@@ -32,7 +32,7 @@ class GridSet extends PersistableContainer implements Iterator {
 	}
 
 	public function getSourceGrid( $gridName ){
-		$gridName = $this->Torpor()->gridKeyName( $gridName );
+		$gridName = $this->Torpor()->containerKeyName( $gridName );
 		$return = false;
 		$grids = $this->getSourceGrids();
 		if( isset( $grids{ $gridName } ) ){
@@ -169,7 +169,7 @@ class GridSet extends PersistableContainer implements Iterator {
 		return( $this->_type );
 	}
 	protected function setType( $gridType ){
-		$gridType = $this->Torpor()->gridKeyName( $gridType );
+		$gridType = $this->Torpor()->containerKeyName( $gridType );
 		if( empty( $gridType ) || !is_string( $gridType ) ){
 			$this->throwException( 'Invalid grid type (empty or not a string)' );
 		} else if( !$this->Torpor()->supportedGrid( $gridType ) ){

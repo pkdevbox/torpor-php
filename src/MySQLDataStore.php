@@ -284,7 +284,7 @@ class MySQLDataStore implements DataStore {
 		// TODO: Look for limit offsets.
 	}
 
-	public function Execute( PersistenceCommand $command, $returnType = null ){
+	public function Execute( PersistenceCommand $command, $returnAs = null ){
 		// TODO: Need to be able to determine the context of self with regard
 		// to read/write datastore, and do some gentle exploration of the command
 		// to determine where it fits in CRUD, appropriately throwing errors.
@@ -305,29 +305,29 @@ class MySQLDataStore implements DataStore {
 				trigger_error( 'No rows returned from executed command', E_USER_WARNING );
 				return( $return );
 			}
-			if( $returnType instanceof Grid ){
+			if( $returnAs instanceof Grid ){
 				if( mysql_num_rows( $result ) > 1 ){
 					trigger_error( 'Multiple rows returned, only using the first to populate '.$grid->_getObjName().' grid', E_USER_WARNING );
 				}
-				$return = $returnType->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
-			} elseif( $returnType instanceof GridSet ){
+				$return = $returnAs->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
+			} elseif( $returnAs instanceof GridSet ){
 				$return = 0;
 				while( $dataRow = mysql_fetch_assoc( $result ) ){
-					$returnType++;
-					$grid = $returnType->Torpor()->_newGrid( $returnType->gridType() );
+					$returnAs++;
+					$grid = $returnAs->Torpor()->_newGrid( $returnAs->gridType() );
 					$grid->LoadFromArray( $dataRow, true, true );
-					$returnType->add( $grid );
+					$returnAs->add( $grid );
 				}
 			} else {
 				throw(
 					new TorporException(
-						'Unknown returnType requested (expected one of Grid or GridSet, got '.
-						( is_object( $returnType ) ? get_class( $returnType ) : gettype( $returnType ) ).')'
+						'Unknown return type requested (expected one of Grid or GridSet, got '.
+						( is_object( $returnAs ) ? get_class( $returnAs ) : gettype( $returnAs ) ).')'
 					)
 				);
 			}
 		} else if( $result === true ){
-			if( is_object( $returnType ) ){
+			if( is_object( $returnAs ) ){
 				trigger_error( 'Expected return type passed, but no rows returned from command', E_USER_WARNING );
 			}
 			$return = true;

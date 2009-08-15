@@ -202,7 +202,7 @@ class Column extends PersistableContainer
 	public function getType(){ return( $this->_type ); }
 	public function setType( $type ){
 		if( !in_array( $type, $this->getValidTypes() ) ){
-			$this->throwException( $type.' is not a valid type' );
+			$this->throwException( '"'.$type.'" is not a valid type' );
 		}
 		// TODO: Need to validate existing contents during conversion, throw
 		// conversion warnings as necessary.

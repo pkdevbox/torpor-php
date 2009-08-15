@@ -8,6 +8,6 @@ interface DataStore {
 	public function LoadFromCriteria( Grid $grid, Criteria $criteria, $refresh = false );
 	// Sets have their own criteria.
 	public function LoadSet( GridSet $gridSet, $refresh = false );
-	public function Execute( PersistenceCommand $command, $returnType = null /*, $grid1, ... */ );
+	public function Execute( PersistenceCommand $command, $returnAs = null /*, $grid1, ... */ );
 }
 ?>
