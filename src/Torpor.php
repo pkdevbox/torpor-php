@@ -3,11 +3,12 @@
 // This should be redundant with lazy loading, but redunance
 // in some cases is better than broken in others.
 require_once( 'PersistableContainer.php' );
-require_once( 'Grid.php' );
-require_once( 'Column.php' );
 require_once( 'Criteria.php' );
-require_once( 'GridSet.php' );
+require_once( 'CriteriaSet.php' );
 require_once( 'PersistenceCommand.php' );
+require_once( 'Grid.php' );
+require_once( 'GridSet.php' );
+require_once( 'Column.php' );
 require_once( 'DataStore.php' );
 
 // TODO: phpdoc
@@ -61,6 +62,9 @@ class Torpor {
 
 	const OPTION_OVERWRITE_ON_LOAD  = 'OverwriteOnLoad';
 	const DEFAULT_OVERWRITE_ON_LOAD = false;
+
+	const OPTION_PERMIT_DDL = 'PermitDDL';
+	const DEFAULT_PERMIT_DDL = false;
 
 	const OPTION_PERPETUATE_AUTO_LINKS = 'PerpetuateAutoLinks';
 	const DEFAULT_PERPETUATE_AUTO_LINKS = false;
@@ -225,6 +229,7 @@ class Torpor {
 				self::OPTION_GRID_CLASS => self::DEFAULT_GRID_CLASS,
 				self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS => self::DEFAULT_LINK_UNPUBLISHED_REFERENCE_COLUMNS,
 				self::OPTION_OVERWRITE_ON_LOAD => self::DEFAULT_OVERWRITE_ON_LOAD,
+				self::OPTION_PERMIT_DDL => self::DEFAULT_PERMIT_DDL,
 				self::OPTION_PERPETUATE_AUTO_LINKS => self::DEFAULT_PERPETUATE_AUTO_LINKS,
 				self::OPTION_PUBLISH_ALL_FIELDS => self::DEFAULT_PUBLISH_ALL_FIELDS,
 				self::OPTION_PUBLISH_CASCADE => self::DEFAULT_PUBLISH_CASCADE,
@@ -279,6 +284,9 @@ class Torpor {
 						break;
 					case self::OPTION_OVERWRITE_ON_LOAD:
 						$options{ self::OPTION_OVERWRITE_ON_LOAD } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
+					case self::OPTION_PERMIT_DDL:
+						$options{ self::OPTION_PERMIT_DDL } = ( (string)$option == self::VALUE_TRUE ? true : false );
 						break;
 					case self::OPTION_PERPETUATE_AUTO_LINKS:
 						$options{ self::OPTION_PERPETUATE_AUTO_LINKS } = ( (string)$option == self::VALUE_TRUE ? true : false );
@@ -376,8 +384,11 @@ class Torpor {
 					}
 				}
 
-				$dataStore = new $className();
-				$dataStore->initialize( $settings );
+				$dataStore = call_user_func( array( $className, 'createInstance' ),  $this );
+				$dataStore->initialize(
+					( $storeType == 'write' || $writeXml === $readXml ? true : false ),
+					$settings
+				);
 				if( $storeType == 'read' ){
 					$this->_readDataStore = $dataStore;
 				}
@@ -887,9 +898,14 @@ class Torpor {
 		}
 		return( $return );
 	}
-	public function overwriteOnLoad(){ return( $this->options( self::OPTION_OVERWRITE_ON_LOAD ) ); }
 	public function linkUnpublishedReferenceColumns(){
 		return( $this->options( self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS ) );
+	}
+	public function overwriteOnLoad(){
+		return( $this->options( self::OPTION_OVERWRITE_ON_LOAD ) );
+	}
+	public function permitDDL(){
+		return( $this->options( self::OPTION_PERMIT_DDL ) );
 	}
 	public function perpetuateAutoLinks(){
 		return( $this->options( self::OPTION_PERPETUATE_AUTO_LINKS ) );

@@ -24,6 +24,7 @@
 						</xs:element>
 						<xs:element default="true" minOccurs="0" name="LinkUnpublishedReferenceColumns" type="xs:boolean"/>
 						<xs:element default="false" minOccurs="0" name="OverwriteOnLoad" type="xs:boolean"/>
+						<xs:element default="false" minOccurs="0" name="PermitDDL" type="xs:boolean"/>
 						<xs:element default="false" minOccurs="0" name="PerpetuateAutoLinks" type="xs:boolean"/>
 						<xs:element default="false" minOccurs="0" name="PublishAllFields" type="xs:boolean"/>
 						<xs:element default="true" minOccurs="0" name="PublishCascade" type="xs:boolean"/>
