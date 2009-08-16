@@ -1,4 +1,5 @@
-<?PHP // $Rev$
+<?PHP
+// $Rev$
 // TODO: phpdoc
 class Criteria {
 	// Modifier
@@ -26,10 +27,10 @@ class Criteria {
 	public function Criteria( $gridName = null, $columnName = null, $type = null ){
 		if( !empty( $gridName ) ){ $this->setGridName( $gridName ); }
 		if( !empty( $columnName ) ){ $this->setcolumnName( $columnName ); }
-		if( !empty( $type ){ $this->setType( $type ); }
+		if( !empty( $type ) ){ $this->setType( $type ); }
 		// WARNING: Magic Number 3
 		if( func_num_args() > 3 && !is_null( $this->getType() ) ){
-			// TODO: Need a better name thaN "processArgs" that should better
+			// TODO: Need a better name than "processArgs" that should better
 			// reflect the conditionals being passed in (and their potentially
 			// mixed flags and settings) and be publicly accessible.
 			// TYPE_BETWEEN takes 2-3 args: Low, High, Inclusive

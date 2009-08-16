@@ -13,10 +13,10 @@ class Grid extends PersistableContainer implements Iterator
 		if( !$this->hasColumn( $columnName ) ){
 			$this->throwException( $columnName.' is not a valid column on '.$this->_getObjName() );
 		}
-		$columns = $this->_getColumns();
+		$columns = &$this->_getColumns();
 		return( $columns{ $columnName } );
 	}
-	protected function _getColumns(){ return( $this->_columns ); }
+	protected function &_getColumns(){ return $this->_columns; }
 	protected function _getColumnNames(){ return( array_keys( $this->_getColumns() ) ); }
 
 	// TODO: WARNING: We're definitely starting to tread onto common column name territory here; do we need
@@ -66,7 +66,7 @@ class Grid extends PersistableContainer implements Iterator
 			} else {
 				$columnName = $this->Torpor()->makeKeyName( $columnName );
 			}
-			$columns = $this->_getColumns();
+			$columns = &$this->_getColumns();
 			$columns{ $columnName }->setGrid(); // Sets to null
 			unset( $columns{ $columnName } );
 			$return = true;
@@ -133,7 +133,8 @@ class Grid extends PersistableContainer implements Iterator
 	public function Reset(){
 		$return = false;
 		if( $this->isLoaded() && $this->isDirty() ){
-			foreach( $this->_getColumns() as $column ){
+			$columns = &$this->_getColumns();
+			foreach( $columns as $column ){
 				$column->Reset();
 			}
 			$this->_setDirty( false );
