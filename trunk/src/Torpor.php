@@ -61,7 +61,10 @@ class Torpor {
 	const DEFAULT_LINK_UNPUBLISHED_REFERENCE_COLUMNS = true;
 
 	const OPTION_OVERWRITE_ON_LOAD  = 'OverwriteOnLoad';
-	const DEFAULT_OVERWRITE_ON_LOAD = false;
+	const DEFAULT_OVERWRITE_ON_LOAD = true;
+
+	const OPTION_PAGE_SIZE = 'PageSize';
+	const DEFAULT_PAGE_SIZE = -1;
 
 	const OPTION_PERMIT_DDL = 'PermitDDL';
 	const DEFAULT_PERMIT_DDL = false;
@@ -229,6 +232,7 @@ class Torpor {
 				self::OPTION_GRID_CLASS => self::DEFAULT_GRID_CLASS,
 				self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS => self::DEFAULT_LINK_UNPUBLISHED_REFERENCE_COLUMNS,
 				self::OPTION_OVERWRITE_ON_LOAD => self::DEFAULT_OVERWRITE_ON_LOAD,
+				self::OPTION_PAGE_SIZE => self::DEFAULT_PAGE_SIZE,
 				self::OPTION_PERMIT_DDL => self::DEFAULT_PERMIT_DDL,
 				self::OPTION_PERPETUATE_AUTO_LINKS => self::DEFAULT_PERPETUATE_AUTO_LINKS,
 				self::OPTION_PUBLISH_ALL_FIELDS => self::DEFAULT_PUBLISH_ALL_FIELDS,
@@ -903,6 +907,9 @@ class Torpor {
 	}
 	public function overwriteOnLoad(){
 		return( $this->options( self::OPTION_OVERWRITE_ON_LOAD ) );
+	}
+	public function pageSize(){
+		return( $this->options( self::OPTION_PAGE_SIZE ) );
 	}
 	public function permitDDL(){
 		return( $this->options( self::OPTION_PERMIT_DDL ) );

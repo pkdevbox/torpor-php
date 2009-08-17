@@ -23,7 +23,14 @@
 							</xs:simpleType>
 						</xs:element>
 						<xs:element default="true" minOccurs="0" name="LinkUnpublishedReferenceColumns" type="xs:boolean"/>
-						<xs:element default="false" minOccurs="0" name="OverwriteOnLoad" type="xs:boolean"/>
+						<xs:element default="true" minOccurs="0" name="OverwriteOnLoad" type="xs:boolean"/>
+						<xs:element default="-1" minOccurs="0" name="PageSize">
+							<xs:simpleType>
+								<xs:restriction base="xs:integer">
+									<xs:minInclusive value="-1"/>
+								</xs:restriction>
+							</xs:simpleType>
+						</xs:element>
 						<xs:element default="false" minOccurs="0" name="PermitDDL" type="xs:boolean"/>
 						<xs:element default="false" minOccurs="0" name="PerpetuateAutoLinks" type="xs:boolean"/>
 						<xs:element default="false" minOccurs="0" name="PublishAllFields" type="xs:boolean"/>
