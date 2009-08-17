@@ -167,12 +167,26 @@ class Grid extends PersistableContainer implements Iterator
 		return( true );
 	}
 
+
+	public function LoadFromObject( stdClass $dataObject, $setLoaded = false, $fromDataStore = false ){
+		return( $this->LoadFromArray( (array)$dataObject, $setLoaded, $fromDataStore ) );
+	}
 	public function LoadFromArray( array $dataRow, $setLoaded = false, $fromDataStore = false ){
 		$return = false;
+		$overwrite = $this->Torpor()->overwriteOnLoad();
 		foreach( $dataRow as $key => $data ){
 			if( $this->hasColumn( $key ) ){
 				if( $setLoaded ){
-					$this->Column( $key )->setLoadData( $data, $fromDataStore );
+					if( $this->Column( $key )->hasData() ){
+						if( $overwrite ){
+							$this->Column( $key )->setLoadData( $data, $fromDataStore );
+						} else {
+							trigger_error( 'Skipping set data for '.$key.' on grid '.$this->_getObjName()
+								.' due to '.Torpor::OPTION_OVERWRITE_ON_LOAD.' = false', E_USER_WARNING );
+						}
+					} else {
+						$this->Column( $key )->setLoadData( $data, $fromDataStore );
+					}
 				} else {
 					$this->Column( $key )->setData(
 						(
