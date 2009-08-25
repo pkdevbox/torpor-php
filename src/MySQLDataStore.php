@@ -489,6 +489,8 @@ class MySQLDataStore implements DataStore {
 		$ddl = false;
 		$firstWord = strtoupper( preg_replace( '/^[\s\n]*([^\s]+)\s?.*$/s', '$1', $command->getCommand() ) );
 		switch( $firstWord ){
+			case 'PREPARE':
+			case 'EXECUTE':
 			case 'CALL':
 				trigger_error( 'Use of stored procedure prevents checking for write access/DDL; continuing at your peril...', E_USER_WARNING );
 			case 'SELECT':
