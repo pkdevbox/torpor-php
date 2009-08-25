@@ -363,6 +363,9 @@ class Torpor {
 						// Using just-in-time require_once calls in the event that lazy loading
 						// has not been enabled on this system.  Should be negligible with
 						// regard to performance.
+						case 'mssql':
+							require_once( ( $className = 'MSSQLDataStore' ).'.php' );
+							break;
 						case 'mysql':
 							require_once( ( $className = 'MySQLDataStore' ).'.php' );
 							break;
