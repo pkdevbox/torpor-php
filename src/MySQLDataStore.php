@@ -185,7 +185,7 @@ class MySQLDataStore implements DataStore {
 	}
 
 
-	public function LoadFromCriteria( Grid $grid, Criteria $criteria, $refresh = false ){
+	public function LoadFromCriteria( Grid $grid, CriteriaBase $criteria, $refresh = false ){
 	}
 
 	public function LoadSet( GridSet $gridSet, $refresh = false ){
@@ -208,12 +208,6 @@ class MySQLDataStore implements DataStore {
 			array_push( self::$_publishing, $grid );
 		}
 
-		// TODO:
-		// 1. Check if grid is new vs. existing
-		// 2. See if there are any defined commands corresponding
-		//    the the target action.  When parsing command, return errors
-		//    if the parameter name doesn't correllate to any of $grid's $columns
-		// 3. Execute 2 or dynamically create & execute SQL
 		if( $grid->isReadOnly() ){
 			throw( new TorporException( 'Cannot publish read only '.$grid->_getObjName().' grid' ) );
 		}
@@ -316,7 +310,7 @@ class MySQLDataStore implements DataStore {
 		if( $published ){
 			if( !$grid->canLoad() ){
 				// We've successfully published, but have no way of finding the record we inserted.
-				$this->throwException( 'Successful publish but no identifying criteria returned; '.$grid->_getObjName().' grid cannot continue' );
+				throw( new TorporException( 'Successful publish but no identifying criteria returned; '.$grid->_getObjName().' grid cannot continue' ) );
 			}
 			if( $grid->Torpor()->reloadAfterPublish() ){
 				// TODO: Need to reset the grid so the only values it contains are the known
@@ -457,12 +451,163 @@ class MySQLDataStore implements DataStore {
 	//************************************
 	//*  Utility and supporting methods  *
 	//************************************
-	protected function escape( $arg ){
+	public function escape( $arg, $quote = false, $quoteChar = '\'' ){
 		return(
-			preg_replace( '/`/', '\\`',
+			( $quote ? $quoteChar : '' ).preg_replace( '/`/', '\\`',
 				mysql_real_escape_string( $arg, $this->getConnection() )
-			)
+			).( $quote ? $quoteChar : '' )
 		);
+	}
+
+	public function ColumnNameToSql( $gridName, $columnName ){
+		return(
+			$this->escape( $this->getTorpor()->dataNameForGrid( $gridName ), true, '`' ).'.'
+			.$this->escape( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ), true, '`' )
+		);
+	}
+
+	public function CriteriaToSQL( CriteriaBase $criteria, $clause = 'WHERE' ){
+		$sql = '';
+		if( $criteria instanceof Criteria ){
+			if( !$criteria->validate() ){
+				print_r( $criteria );
+				throw( new TorporException( 'Criteria not valid, cannot continue' ) );
+			}
+			$gridName = $criteria->getGridName();
+			$columnName = $criteria->getColumnName();
+			if( !$this->getTorpor()->supportedGrid( $gridName ) ){
+				throw( new TorporException( 'Unsupported grid in Criteria: '.$gridName ) );
+			}
+			if( !isset( $this->getTorpor()->$gridName()->$columnName ) ){
+				throw( new TorporException( 'Unsupported column in Criteria: '.$columnName ) );
+			}
+			$sql.= $this->ColumnNameToSql( $gridName, $columnName );
+			switch( $criteria->getBaseType() ){
+				case Criteria::TYPE_BETWEEN:
+					list( $lowRange, $highRange ) = $criteria->getArguments();
+					if( $criteria->isColumnTarget() ){
+						$lowRange = $this->ColumnNameToSql( array_shift( $lowRange ), array_shift( $lowRange ) );
+						$highRange = $this->ColumnNameToSql( array_shift( $highRange ), array_shift( $highRange ) );
+					} else {
+						$lowRange = $this->escape( $lowRange, true );
+						$highRange = $this->escape( $highRange, true );
+					}
+					if( $criteria->isInclusive() ){
+						$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' BETWEEN '.$lowRange.' AND '.$highRange;
+					} else {
+						$sql = ( $criteria->isNegated() ? ' NOT' : '' ).'( '.$sql.' > '.$lowRange.' AND '.$sql.' < '.$highRange.' )';
+					}
+					break;
+				case Criteria::TYPE_CONTAINS:
+					list( $target ) = $criteria->getArguments();
+					if( $criteria->isColumnTarget() ){
+						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+					} else {
+						$target = '\'%'.$this->escape( $target ).'%\'';
+					}
+					if( $criteria->isCaseInsensitive() ){
+						$sql = ' UPPER( '.$sql.' )'.( $criteria->isNegated() ? ' NOT' : '' ).' LIKE UPPER( '.$target.' )';
+					} else {
+						$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' LIKE '.$target;
+					}
+					break;
+				case Criteria::TYPE_ENDSWITH:
+					list( $target ) = $criteria->getArguments();
+					if( $criteria->isColumnTarget() ){
+						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+					} else {
+						$target = '\'%'.$this->escape( $target ).'\'';
+					}
+					if( $criteria->isCaseInsensitive() ){
+						$sql = ' UPPER( '.$sql.' )'.( $criteria->isNegated() ? ' NOT' : '' ).' LIKE UPPER( '.$target.' )';
+					} else {
+						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target;
+					}
+					break;
+				case Criteria::TYPE_EQUALS:
+					list( $target ) = $criteria->getArguments();
+					if( $criteria->isColumnTarget() ){
+						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+					} else if( !is_null( $target ) ){
+						$target = $this->escape( $target, true );
+					}
+					if( is_null( $target ) ){
+						$sql.= ' IS'.( $criteria->isNegated() ? ' NOT' : '' ).' NULL';
+					} else {
+						if( $criteria->isCaseInsensitive() ){
+							$sql = ' UPPER( '.$sql.' ) '.( $criteria->isNegated() ? '!' : '' ).'= UPPER( '.$target.' )';
+						} else {
+							$sql.= ' '.( $criteria->isNegated() ? '!' : '' ).'= '.$target;
+						}
+					}
+					break;
+				case Criteria::TYPE_GREATERTHAN:
+					list( $target ) = $criteria->getArguments();
+					if( $criteria->isColumnTarget() ){
+						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+					} else {
+						$target = $this->escape( $target, true );
+					}
+					$sql = ( $criteria->isNegated() ? ' NOT ' : '' ).$sql.' >'.( $criteria->isInclusive() ? '=' : '' ).' '.$target;
+					break;
+				case Criteria::TYPE_IN:
+					$args = $criteria->getArguments();
+					$sqlArgs = array();
+					if( $critera->isColumnTarget() ){
+						foreach( $args as $arg ){
+							$sqlArgs[] = $this->ColumnNameToSql( array_shift( $arg ), array_shift( $arg ) );
+						}
+					} else {
+						foreach( $args as $arg ){
+							$sqlArgs[] = $this->escape( $arg, true );
+						}
+					}
+					if( !count( $sqlArgs ) ){
+						throw( new TorporException( 'Nothing in IN criteria, cannot continue' ) );
+					}
+					$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' IN ( '.( implode( ', ', $sqlArgs ) ).' )';
+					break;
+				case Criteria::TYPE_LESSTHAN:
+					list( $target ) = $criteria->getArguments();
+					if( $criteria->isColumnTarget() ){
+						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+					} else {
+						$target = $this->escape( $target, true );
+					}
+					$sql = ( $criteria->isNegateD() ? ' NOT ' : '' ).$sql.' <'.( $criteria->isInclusive() ? '=' : '' ).' '.$target;
+					break;
+				case Criteria::TYPE_PATTERN:
+					list( $regex ) = $criteria->getArguments();
+					$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'REGEXP '.$this->escape( str_replace( '\\', '\\\\', $regex ), true );
+					break;
+				case Criteria::TYPE_STARTSWITH:
+					list( $target ) = $criteria->getArguments();
+					if( $criteria->isColumnTarget() ){
+						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+					} else {
+						$target = '\''.$this->escape( $target ).'%\'';
+					}
+					if( $criteria->isCaseInsensitive() ){
+						$sql = ' UPPER( '.$sql.' ) '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE UPPER( '.$target.' )';
+					} else {
+						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target;
+					}
+					break;
+				case Criteria::TYPE_CUSTOM:
+				case Criteria::TYPE_IN_SET:
+					break;
+				default:
+					throw( new TorporException( 'Unsupported criteria requested: '.$criteria->getType() ) );
+					break;
+			}
+		} else if( $criteria instanceof CriteriaSet ){
+			$clauses = array();
+			foreach( $criteria as $criterion ){
+				$clauses[] = $this->CriteriaToSql( $criterion, '' );
+			}
+			$sql.= '( '.implode( ' '.$criteria->getType().' ', $clauses ).' )';
+		}
+		return( $clause.' '.$sql );
 	}
 
 	public function columnEqualsData( Column $column, $compare = false ){

@@ -31,12 +31,27 @@ class User extends Grid
 	// Also: marvelous for expansion and business logic.
 }
 
+class DoNothingDataStore implements DataStore {
+	public static function createInstance( Torpor $torpor ){ return( new DoNothingDataStore() ); }
+	public function initialize( $writeEnabled, array $settings ){}
+	public function Delete( Grid $grid ){}
+	public function Execute( PersistenceCommand $command, $returnAs = null /*, $grid1, ... */ ){}
+	public function Load( Grid $grid, $refresh = false ){}
+	public function LoadFromCriteria( Grid $grid, CriteriaBase $criteria, $refresh = false ){}
+	public function LoadSet( GridSet $gridSet, $refresh = false ){}
+	public function Publish( Grid $grid, $force = false ){}
+}
+
+
 // TODO: Default values for columns (and perhaps have the default value maintain an addressing
 // scheme such as 'userDefined:ApplicationName' which indicates where to get that default value.
 // TODO: Be able to mark grids as read-only
 $xmlConfig = <<<XML
 <?xml version='1.0'?>
 <trpr:TorporConfig version="0.1" xmlns:trpr="http://www.tricornersoftware.com/Products/Torpor/Config/0.1">
+	<Repository>
+		<DataStore type="DoNothing" class="DoNothingDataStore"/>
+	</Repository>
 	<Grids>
 		<Grid name="User" dataName="USERS" class="User">
 			<Columns>

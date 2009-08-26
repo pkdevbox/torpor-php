@@ -1,46 +1,60 @@
 <?PHP
 // $Rev$
 // TODO: phpdoc
-class Criteria {
-	// Modifier
+class CriteriaBase {};
+
+class Criteria extends CriteriaBase {
+	// Modifiers
 	const NOT = 'NOT_';
 	const CRITERIA = 'CRITERIA';
 	const COLUMN = '_COLUMN';
+
+	// Criteria Types
 	const TYPE_BETWEEN            = 'BETWEEN';
 	const TYPE_BETWEEN_COLUMN     = 'BETWEEN_COLUMN';
 	const TYPE_NOT_BETWEEN        = 'NOT_BETWEEN';
 	const TYPE_NOT_BETWEEN_COLUMN = 'NOT_BETWEEN_COLUMN';
+
 	const TYPE_CONTAINS            = 'CONTAINS';
 	const TYPE_CONTAINS_COLUMN     = 'CONTAINS_COLUMN';
 	const TYPE_NOT_CONTAINS        = 'NOT_CONTAINS';
 	const TYPE_NOT_CONTAINS_COLUMN = 'NOT_CONTAINS_COLUMN';
+
 	const TYPE_CUSTOM            = 'CUSTOM';
 	const TYPE_CUSTOM_COLUMN     = 'CUSTOM_COLUMN';
 	const TYPE_NOT_CUSTOM        = 'NOT_CUSTOM';
 	const TYPE_NOT_CUSTOM_COLUMN = 'NOT_CUSTOM_COLUMN';
+
 	const TYPE_ENDSWITH            = 'ENDSWITH';
 	const TYPE_ENDSWITH_COLUMN     = 'ENDSWITH_COLUMN';
 	const TYPE_NOT_ENDSWITH        = 'NOT_ENDSWITH';
 	const TYPE_NOT_ENDSWITH_COLUMN = 'NOT_ENDSWITH_COLUMN';
+
 	const TYPE_EQUALS            = 'EQUALS';
 	const TYPE_EQUALS_COLUMN     = 'EQUALS_COLUMN';
 	const TYPE_NOT_EQUALS        = 'NOT_EQUALS';
 	const TYPE_NOT_EQUALS_COLUMN = 'NOT_EQUALS_COLUMN';
-	const TYPE_GREATERTHAN            = 'GREATHERTHAN';
-	const TYPE_GREATERTHAN_COLUMN     = 'GREATHERTHAN_COLUMN';
-	const TYPE_NOT_GREATERTHAN        = 'NOT_GREATHERTHAN';
-	const TYPE_NOT_GREATERTHAN_COLUMN = 'NOT_GREATHERTHAN_COLUMN';
+
+	const TYPE_GREATERTHAN            = 'GREATERTHAN';
+	const TYPE_GREATERTHAN_COLUMN     = 'GREATERTHAN_COLUMN';
+	const TYPE_NOT_GREATERTHAN        = 'NOT_GREATERTHAN';
+	const TYPE_NOT_GREATERTHAN_COLUMN = 'NOT_GREATERTHAN_COLUMN';
+
 	const TYPE_IN            = 'IN';
 	const TYPE_IN_COLUMN     = 'IN_COLUMN';
 	const TYPE_NOT_IN        = 'NOT_IN';
 	const TYPE_NOT_IN_COLUMN = 'NOT_IN_COLUMN';
+
 	const TYPE_IN_SET     = 'IN_SET';
 	const TYPE_NOT_IN_SET = 'IN_SET';
+
 	const TYPE_LESSTHAN            = 'LESSTHAN';
 	const TYPE_LESSTHAN_COLUMN     = 'LESSTHAN_COLUMN';
 	const TYPE_NOT_LESSTHAN        = 'NOT_LESSTHAN';
 	const TYPE_NOT_LESSTHAN_COLUMN = 'NOT_LESSTHAN_COLUMN';
-	const TYPE_PATTERN     = 'PATTERN';
+
+	const TYPE_PATTERN = 'PATTERN';
+
 	const TYPE_STARTSWITH            = 'STARTSWITH';
 	const TYPE_STARTSWITH_COLUMN     = 'STARTSWITH_COLUMN';
 	const TYPE_NOT_STARTSWITH        = 'NOT_STARTSWITH';
@@ -59,43 +73,51 @@ class Criteria {
 	private $_args = array();
 	private $_columnArgs = array();
 
-	public function __construct( $gridName = null, $columnName = null, $type = null ){
-		if( !empty( $gridName ) ){ $this->setGridName( $gridName ); }
-		if( !empty( $columnName ) ){ $this->setcolumnName( $columnName ); }
-		// WARNING: Magic Number 3
-		$argCount = 3;
-
-		// This destroys any underscore separators
-		$objType = Torpor::makeKeyName( get_class( $this ) );
-		if( $objType != self::CRITERIA && strpos( $objType, self::CRITERIA ) === 0 ){
-			$newType = '';
-			$objNot = Torpor::makeKeyName( self::NOT );
-			$objColumn = Torpor::makeKeyName( self::COLUMN );
-			$objType = substr( $objType, strlen( self::CRITERIA ) );
-			if( strpos( $objType, $objNot ) === 0 ){
-				$this->setNegated();
-				$newType = self::NOT;
-				$objType = substr( $objType, strlen( $objNot ) );
-			}
-			if( $pos = strrpos( $objType, $objColumn ) ){
-				$this->setColumnTarget();
-				$objType = substr( $objType, 0, $pos );
-				$newType.= $objType.self::COLUMN;
-			} else {
-				$newType.= $objType;
-			}
-			if( !in_array( $newType, self::getValidTypes() ) ){
-				throw( new TorporException( 'Unrecognized type "'.$newType.'" (constructed from class name "'.get_class( $this ).'"' ) );
-			}
-			$this->_baseType = $objType;
-			$this->_type = $newType;
-			// WARNING: Magic Number 2
-			$argCount = 2;
-		} else {
-			if( !empty( $type ) ){ $this->setType( $type ); }
+	public function __construct( /* ( ( $gridName, $columnName ) | $columnObject ), $type (, ... ) */){
+		$args = func_get_args();
+		$container = array_shift( $args );
+		if( $container instanceof Column ){
+			$this->setGridName( Torpor::containerKeyName( $container->Grid() ) );
+			$this->setColumnName( Torpor::containerKeyName( $container ) );
+		} else if( $container && count( $args ) ){
+			$this->setGridName( $container );
+			$this->setColumnName( array_shift( $args ) );
 		}
-		if( func_num_args() > $argCount && !is_null( $this->getType() ) ){
-			$this->processArgs( array_slice( func_get_args(), $argCount ) );
+
+		$type = '';
+		if( get_class( $this ) != __CLASS__ ){
+			// This destroys any underscore separators
+			$objType = Torpor::makeKeyName( get_class( $this ) );
+			if( strpos( $objType, self::CRITERIA ) === 0 ){
+				$objType = substr( $objType, strlen( self::CRITERIA ) );
+				$typeKeyNames = array_map( array( 'Torpor', 'makeKeyName' ), self::getValidTypes() );
+				if( !in_array( $objType, $typeKeyNames ) ){
+					trigger_error( 'Unrecognized Criteria descendant "'.$objType.'", cannot auto-detect type from name', E_USER_WARNING );
+					$type = array_shift( $args );
+				} else {
+					$objNot = Torpor::makeKeyName( self::NOT );
+					$objColumn = Torpor::makeKeyName( self::COLUMN );
+					if( strpos( $objType, $objNot ) === 0 ){
+						$type.= self::NOT;
+						$objType = substr( $objType, strlen( $objNot ) );
+					}
+					if( $pos = strrpos( $objType, $objColumn ) ){
+						$type.= substr( $objType, 0, $pos ).self::COLUMN;
+					} else {
+						$type.= $objType;
+					}
+				}
+			} else {
+				$type = array_shift( $args );
+			}
+		} else {
+			$type = array_shift( $args );
+		}
+		if( !empty( $type ) ){
+			$this->setType( $type );
+		}
+		if( count( $args ) && !is_null( $this->getType() ) ){
+			$this->processArgs( $args );
 		}
 	}
 
@@ -125,13 +147,15 @@ class Criteria {
 		$baseType = $type;
 		if( strpos( $baseType, self::NOT ) === 0 ){
 			$this->setNegated();
-			$type = substr( $baseType, strlen( self::NOT ) );
+			$baseType = substr( $baseType, strlen( self::NOT ) );
 		} else {
-			$this->_not = false;
+			$this->setNegated( false );
 		}
 		if( $pos = strrpos( $baseType, self::COLUMN ) ){
 			$this->setColumnTarget();
-			$type = substr( $baseType, 0, $pos );
+			$baseType = substr( $baseType, 0, $pos );
+		} else {
+			$this->setColumnTarget( false );
 		}
 		$this->_baseType = $baseType;
 		return( $this->_type = $type ); // Set the original as well.
@@ -170,7 +194,7 @@ class Criteria {
 		if( $this->isColumnTarget() ){
 			$arguments = &$this->_columnArgs;
 		} else {
-			$arguments = &$this->args;
+			$arguments = &$this->_args;
 		}
 		return $arguments;
 	}
@@ -251,7 +275,7 @@ class Criteria {
 				if( $preppedArgCount != 1 ){ throw( $argCountException ); }
 				$set = array_shift( $preppedArgs );
 				if( !( $set instanceof GridSet ) ){
-					throw( new TorporException( 'Argument for '.$this->getType().' type must be an instance of GridSet' ) );
+					throw( new TorporException( 'Argument for '.$this->getType().' criteria type must be an instance of GridSet' ) );
 				}
 				$this->addArgument( $set );
 				break;
@@ -264,6 +288,56 @@ class Criteria {
 				throw( new TorporException( 'Type invalid or not set' ) );
 				break;
 		}
+	}
+
+	public function validate(){
+		$return = true;
+		if(
+			!$this->getGridName()
+			|| !$this->getColumnName()
+			|| !$this->getType()
+			|| !$this->getBaseType()
+		){
+			var_dump( 'X' );
+			$return = false;
+		}
+		if( $return ){
+			$argCount = count( $this->getArguments() );
+			$argTarget = 0;
+			switch( $this->getBaseType() ){
+				case self::TYPE_BETWEEN:
+					$argTarget = 2;
+					break;
+				case self::TYPE_CONTAINS:
+				case self::TYPE_ENDSWITH:
+				case self::TYPE_EQUALS:
+				case self::TYPE_GREATERTHAN:
+				case self::TYPE_LESSTHAN:
+				case self::TYPE_PATTERN:
+				case self::TYPE_STARTSWITH:
+					$argTarget = 1;
+					break;
+				case self::TYPE_IN_SET:
+					$argTarget = 1;
+					$args = &$this->getArguments();
+					if( !( $args[0] instanceof GridSet ) ){
+						throw( new TorporException( 'Argument for '.$this->getType().' criteria type must be an instance of GridSet' ) );
+					}
+					break;
+				case self::TYPE_CUSTOM:
+				case self::TYPE_IN:
+					$argTarget = -1;
+					break;
+			}
+			if( $argCount < abs( $argTarget ) ){
+				var_dump( 'Y' );
+				$return = false;
+			}
+			if( $argTarget > 0 && $argCount > $argTarget ){
+				trigger_error( 'Too many arguments for '.$this->getType().' criteria type, only the first '.$argTarget.' will be used', E_USER_WARNING );
+			}
+		}
+		return( $return );
 	}
 
 	public static function getValidBaseTypes(){
