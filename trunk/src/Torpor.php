@@ -97,15 +97,16 @@ class Torpor {
 	const REGEX_KEYNAME = '[^A-Za-z0-9]';
 
 	// Internal use only
-	const ARKEY_DATATYPEMAP   = 'datatype_map';
-	const ARKEY_COLUMNS       = 'columns';
-	const ARKEY_GRIDS         = 'grids';
-	const ARKEY_GRID_CLASSES  = 'grid_classes';
-	const ARKEY_GRID_COMMANDS = 'grid_commands';
-	const ARKEY_KEYS          = 'keys';
-	const ARKEY_UNIQUEKEYS    = 'uniquekeys';
-	const ARKEY_REFERENCES    = 'references';
-	const ARKEY_OPTIONS       = 'options';
+	const ARKEY_DATATYPEMAP       = 'datatype_map';
+	const ARKEY_COLUMNS           = 'columns';
+	const ARKEY_GRIDS             = 'grids';
+	const ARKEY_GRID_CLASSES      = 'grid_classes';
+	const ARKEY_GRID_COMMANDS     = 'grid_commands';
+	const ARKEY_KEYS              = 'keys';
+	const ARKEY_UNIQUEKEYS        = 'uniquekeys';
+	const ARKEY_REFERENCES        = 'references';
+	const ARKEY_REFERENCE_ALIASES = 'reference_aliases';
+	const ARKEY_OPTIONS           = 'options';
 
 	const COMMON_OPERATION_LENGTH = 3;
 	const OPERATION_ADD = 'add';
@@ -191,8 +192,6 @@ class Torpor {
 		}
 
 		$xml = '';
-		// TODO: Load files (from names) directly into SimpleXML via provided loading
-		// routines, rather than slurping contents into memory first.
 		if( !empty( $config ) ){
 			if( is_resource( $config ) ){
 				$xml = stream_get_contents( $config );
@@ -205,6 +204,7 @@ class Torpor {
 					// Looks like a URI
 					$config = fopen( $config, 'r' );
 					$xml = stream_get_contents( $config );
+					fclose( $config );
 				} else if( file_exists( $config ) && is_readable( $config ) ){
 					$xml = simplexml_load_file( $config );
 				} else if( $configFile = $this->getFileInPath( $config ) ){
@@ -266,6 +266,7 @@ class Torpor {
 		$keys = array();
 		$uniqueKeys = array();
 		$references = array();
+		$referenceAliases = array();
 
 		if( isset( $xmlObj->Options ) ){
 			foreach( $xmlObj->Options->children() as $option ){
@@ -538,6 +539,13 @@ class Torpor {
 						}
 						if( $xmlKey->attributes()->referenceGridAlias ){
 							$alias = $this->makeKeyName( (string)$xmlKey->attributes()->referenceGridAlias );
+							if( !isset( $referenceAliases{ $gridName } ) ){
+								$referenceAliases{ $gridName } = array();
+							}
+							if( isset( $referenceAliases{ $gridName }{ $alias } ) ){
+								$this->throwException( 'Duplicate referenceGridAlias "'.$alias.'"' );
+							}
+							$referenceAliases{ $gridName }{ $alias } = $targetGrid;
 							$targetGrid.= self::VALUE_SEPARATOR.$alias;
 						}
 						$columnName = $this->makeKeyName( (string)$xmlKey->attributes()->column );
@@ -569,15 +577,16 @@ class Torpor {
 		// TODO: Where/how to cache this, as identified by the resource initially fed to
 		// us (in order to rapidly reload on successive iterations)?
 		$this->_config = array(
-			self::ARKEY_COLUMNS       => $columns,
-			self::ARKEY_DATATYPEMAP   => $dataTypeMap,
-			self::ARKEY_GRIDS         => $grids,
-			self::ARKEY_GRID_CLASSES  => $gridClasses,
-			self::ARKEY_GRID_COMMANDS => $gridCommands,
-			self::ARKEY_KEYS          => $keys,
-			self::ARKEY_OPTIONS       => $options,
-			self::ARKEY_REFERENCES    => $references,
-			self::ARKEY_UNIQUEKEYS    => $uniqueKeys
+			self::ARKEY_COLUMNS           => $columns,
+			self::ARKEY_DATATYPEMAP       => $dataTypeMap,
+			self::ARKEY_GRIDS             => $grids,
+			self::ARKEY_GRID_CLASSES      => $gridClasses,
+			self::ARKEY_GRID_COMMANDS     => $gridCommands,
+			self::ARKEY_KEYS              => $keys,
+			self::ARKEY_OPTIONS           => $options,
+			self::ARKEY_REFERENCES        => $references,
+			self::ARKEY_REFERENCE_ALIASES => $referenceAliases,
+			self::ARKEY_UNIQUEKEYS        => $uniqueKeys
 		);
 		$this->setInitialized();
 
@@ -708,6 +717,7 @@ class Torpor {
 	protected function &_getKeys( $grid = null ){ return $this->_getInitX( self::ARKEY_KEYS, $grid ); }
 	protected function &_getOptions(){ return $this->_getInitX( self::ARKEY_OPTIONS ); }
 	protected function &_getReferences( $grid = null ){ return $this->_getInitX( self::ARKEY_REFERENCES, $grid ); }
+	protected function &_getReferenceAliases( $grid = null ){ return $this->_getInitX( self::ARKEY_REFERENCE_ALIASES, $grid ); }
 	protected function &_getUniqueKeys( $grid = null ){ return $this->_getInitX( self::ARKEY_UNIQUEKEYS, $grid ); }
 
 	public function ReadDataStore( DataStore $dataStore = null ){
@@ -880,6 +890,7 @@ class Torpor {
 		}
 		return( ( count( $returnKeys ) > 0 ? $returnKeys : false ) );
 	}
+
 	public function aliasReferenceKeysBetween( $sourceGridName, $targetGridName, $specificAlias = false ){
 		$referenceKeys = $this->referenceKeysBetween( $sourceGridName, $targetGridName, self::ALIAS_KEYS_ONLY );
 		if( $specificAlias ){
@@ -891,12 +902,30 @@ class Torpor {
 		}
 		return( $referenceKeys );
 	}
+
 	public function aliasReferenceNames( $sourceGridName, $targetGridName ){
 		$references = $this->aliasReferenceKeysBetween( $sourceGridName, $targetGridName );
 		if( is_array( $references ) ){
 			$references = array_keys( $references );
 		}
 		return( $references );
+	}
+
+	public function referenceAliases( $sourceGridName = null ){
+		return( $this->_getReferenceAliases( $sourceGridName ) );
+	}
+
+	public function referenceAliasGrid( $sourceGridName, $referenceAlias ){
+		if( empty( $sourceGridName ) ){
+			$this->throwException( 'sourceGridName cannot be empty' );
+		}
+		$referenceAlias = $this->containerKeyName( $referenceAlias );
+		$referenceAliases = $this->_getReferenceAliases( $sourceGridName );
+		$return = null;
+		if( isset( $referenceAliases{ $referenceAlias } ) ){
+			$return = $referenceAliases{ $referenceAlias };
+		}
+		return( $return );
 	}
 
 	// Option interfaces
@@ -1027,11 +1056,30 @@ class Torpor {
 		return( $return );
 	}
 
-	public function supportedGrid( $gridName ){
+	public function supportedGrid( $gridName, $checkAliases = false ){
 		$this->checkInitialized();
 		$gridName = $this->makeKeyName( $gridName );
-		return( in_array( $gridName, array_keys( $this->_getGrids() ) ) );
+		$return = false;
+		if( in_array( $gridName, array_keys( $this->_getGrids() ) ) ){
+			$return = true;
+		} else if( $checkAliases ){
+			$referenceAliases = &$this->_getReferenceAliases();
+			foreach( $referenceAliases as $baseGrid => $aliases ){
+				if( in_array( $gridName, array_keys( $aliases ) ) ){
+					// This evaluates to non-zero and is thus true, but can
+					// be differentiated by virtue of being a negative int
+					// (rather than bool) to indicate that while the grid
+					// appears to be supported, it is only through an alias -
+					// and not a specifically known alias at that, so caveat
+					// emptor.
+					$return = -1;
+					break;
+				}
+			}
+		}
+		return( $return );
 	}
+
 	protected function checkSupportedGrid( $gridName ){
 		if( !$this->supportedGrid( $gridName ) ){
 			$this->throwException( 'Unknown or unsupported grid "'.$gridName.'" requested' );

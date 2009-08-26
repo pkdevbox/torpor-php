@@ -475,8 +475,26 @@ class MySQLDataStore implements DataStore {
 			}
 			$gridName = $criteria->getGridName();
 			$columnName = $criteria->getColumnName();
-			if( !$this->getTorpor()->supportedGrid( $gridName ) ){
+			$gridAlias = false;
+			if( !( $gridAlias = $this->getTorpor()->supportedGrid( $gridName, true ) ) ){
 				throw( new TorporException( 'Unsupported grid in Criteria: '.$gridName ) );
+			}
+			// This indicates that while gridName is supported, it exists only as a
+			// referenceGridAlias inside a relationship.
+			if( $gridAlias < 0 ){
+				// TODO: Need to take a few moments and think this through.  We need
+				// to validate that the requested column name exists, but it may exist
+				// only on a reference grid - which means we need to find the source
+				// grid(s) to which the reference name corresponds, and check all of
+				// those (easy if there's 1).  If there are no matches in any, throw.
+				// If there are matches in more than one, trigger a warning but proceed
+				// anyway.
+				// This same level of introspection needs to be extended to ALL column
+				// references, which means this will need to be abstracted to a helper
+				// method.  Not only that, but the whole process can be GREATLY simplified
+				// in the event that we know the target grid for loading, since we can
+				// shortcut all reference aliases to those branching directly off of
+				// that known grid.
 			}
 			if( !isset( $this->getTorpor()->$gridName()->$columnName ) ){
 				throw( new TorporException( 'Unsupported column in Criteria: '.$columnName ) );
@@ -495,7 +513,7 @@ class MySQLDataStore implements DataStore {
 					if( $criteria->isInclusive() ){
 						$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' BETWEEN '.$lowRange.' AND '.$highRange;
 					} else {
-						$sql = ( $criteria->isNegated() ? ' NOT' : '' ).'( '.$sql.' > '.$lowRange.' AND '.$sql.' < '.$highRange.' )';
+						$sql = ( $criteria->isNegated() ? 'NOT ' : '' ).'( '.$sql.' > '.$lowRange.' AND '.$sql.' < '.$highRange.' )';
 					}
 					break;
 				case Criteria::TYPE_CONTAINS:
@@ -506,7 +524,7 @@ class MySQLDataStore implements DataStore {
 						$target = '\'%'.$this->escape( $target ).'%\'';
 					}
 					if( $criteria->isCaseInsensitive() ){
-						$sql = ' UPPER( '.$sql.' )'.( $criteria->isNegated() ? ' NOT' : '' ).' LIKE UPPER( '.$target.' )';
+						$sql = 'UPPER( '.$sql.' )'.( $criteria->isNegated() ? ' NOT' : '' ).' LIKE UPPER( '.$target.' )';
 					} else {
 						$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' LIKE '.$target;
 					}
@@ -519,7 +537,7 @@ class MySQLDataStore implements DataStore {
 						$target = '\'%'.$this->escape( $target ).'\'';
 					}
 					if( $criteria->isCaseInsensitive() ){
-						$sql = ' UPPER( '.$sql.' )'.( $criteria->isNegated() ? ' NOT' : '' ).' LIKE UPPER( '.$target.' )';
+						$sql = 'UPPER( '.$sql.' )'.( $criteria->isNegated() ? ' NOT' : '' ).' LIKE UPPER( '.$target.' )';
 					} else {
 						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target;
 					}
@@ -535,7 +553,7 @@ class MySQLDataStore implements DataStore {
 						$sql.= ' IS'.( $criteria->isNegated() ? ' NOT' : '' ).' NULL';
 					} else {
 						if( $criteria->isCaseInsensitive() ){
-							$sql = ' UPPER( '.$sql.' ) '.( $criteria->isNegated() ? '!' : '' ).'= UPPER( '.$target.' )';
+							$sql = 'UPPER( '.$sql.' ) '.( $criteria->isNegated() ? '!' : '' ).'= UPPER( '.$target.' )';
 						} else {
 							$sql.= ' '.( $criteria->isNegated() ? '!' : '' ).'= '.$target;
 						}
@@ -588,7 +606,7 @@ class MySQLDataStore implements DataStore {
 						$target = '\''.$this->escape( $target ).'%\'';
 					}
 					if( $criteria->isCaseInsensitive() ){
-						$sql = ' UPPER( '.$sql.' ) '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE UPPER( '.$target.' )';
+						$sql = 'UPPER( '.$sql.' ) '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE UPPER( '.$target.' )';
 					} else {
 						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target;
 					}
@@ -607,7 +625,7 @@ class MySQLDataStore implements DataStore {
 			}
 			$sql.= '( '.implode( ' '.$criteria->getType().' ', $clauses ).' )';
 		}
-		return( $clause.' '.$sql );
+		return( ( !empty( $clause ) ? $clause.' ' : '' ).$sql );
 	}
 
 	public function columnEqualsData( Column $column, $compare = false ){
