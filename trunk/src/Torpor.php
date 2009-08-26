@@ -743,6 +743,16 @@ class Torpor {
 	public function dataNameForGrid( $gridName ){
 		return( $this->_getGrids( $gridName ) );
 	}
+
+	public function dataNameForColumn( $gridName, $columnName ){
+		$columns = &$this->_getColumns( $gridName );
+		$columnName = self::containerKeyName( $columnName );
+		if( !isset( $columns{ $columnName } ) ){
+			$this->throwException( 'Unrecognized column "'.$columnName.'" requested' );
+		}
+		return( (string)$columns{ $columnName }->attributes()->dataName );
+	}
+
 	public function primaryKeyForGrid( $gridName ){ return( $this->_getKeys( $gridName ) ); }
 	public function allKeysForGrid( $gridName ){ return( $this->_getAllGridKeys( $gridName ) ); }
 	protected function _setOption( $optionName, $setting ){
