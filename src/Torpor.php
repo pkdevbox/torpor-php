@@ -804,24 +804,26 @@ class Torpor {
 			}
 			// Retrieve all reference keys between source and target
 			$referenceKeys = $this->referenceKeysBetween( $sourceGridName, $targetGridName );
-			foreach( $referenceKeys as $sourceColumnName => $targetColumnName ){
-				if(
-					is_array( $targetColumnName )
-				){
-					// $sourceColumnName is actual an Alias name, look deeper into the relationship
-					if( !$specificAlias || $specificAlias == $sourceColumnName ){
-						foreach( $targetColumnName as $aliasedSourceColumnName => $aliasedTargetColumnName ){
-							foreach( $filled_keys as $index => $keySet ){
-								if( isset( $keySet{ $aliasedTargetColumnName } ) ){
-									$filled_keys[ $index ]{ $aliasedTargetColumnName } = true;
+			if( is_array( $referenceKeys ) ){
+				foreach( $referenceKeys as $sourceColumnName => $targetColumnName ){
+					if(
+						is_array( $targetColumnName )
+					){
+						// $sourceColumnName is actual an Alias name, look deeper into the relationship
+						if( !$specificAlias || $specificAlias == $sourceColumnName ){
+							foreach( $targetColumnName as $aliasedSourceColumnName => $aliasedTargetColumnName ){
+								foreach( $filled_keys as $index => $keySet ){
+									if( isset( $keySet{ $aliasedTargetColumnName } ) ){
+										$filled_keys[ $index ]{ $aliasedTargetColumnName } = true;
+									}
 								}
 							}
 						}
-					}
-				} else if( !$specificAlias || $specificAlias == self::VALUE_NONE ){
-					foreach( $filled_keys as $index => $keyset ){
-						if( isset( $filled_keys[ $index ]{ $targetColumnName } ) ){
-							$filled_keys[ $index ]{ $targetColumnName } = true;
+					} else if( !$specificAlias || $specificAlias == self::VALUE_NONE ){
+						foreach( $filled_keys as $index => $keyset ){
+							if( isset( $filled_keys[ $index ]{ $targetColumnName } ) ){
+								$filled_keys[ $index ]{ $targetColumnName } = true;
+							}
 						}
 					}
 				}
@@ -836,6 +838,7 @@ class Torpor {
 		}
 		return( $return );
 	}
+
 	public function canBeReferencedBy( $targetGridName, $sourceGridName, $specificAlias = false ){
 		return( $this->canReference( $sourceGridName, $targetGridName, $specificAlias ) );
 	}
@@ -919,6 +922,7 @@ class Torpor {
 		if( empty( $sourceGridName ) ){
 			$this->throwException( 'sourceGridName cannot be empty' );
 		}
+		$sourceGridName = $this->containerKeyName( $sourceGridName );
 		$referenceAlias = $this->containerKeyName( $referenceAlias );
 		$referenceAliases = $this->_getReferenceAliases( $sourceGridName );
 		$return = null;
