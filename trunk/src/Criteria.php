@@ -77,8 +77,8 @@ class Criteria extends CriteriaBase {
 		$args = func_get_args();
 		$container = array_shift( $args );
 		if( $container instanceof Column ){
-			$this->setGridName( Torpor::containerKeyName( $container->Grid() ) );
-			$this->setColumnName( Torpor::containerKeyName( $container ) );
+			$this->setGridName( $container->Grid() );
+			$this->setColumnName( $container );
 		} else if( $container && count( $args ) ){
 			$this->setGridName( $container );
 			$this->setColumnName( array_shift( $args ) );
@@ -253,7 +253,7 @@ class Criteria extends CriteriaBase {
 				$preppedArgs[] = false; // Default for "case insensitive"
 				list( $targetValue, $caseInsensitive ) = $preppedArgs;
 				$this->addArgument( $targetValue );
-				$this->setCaseInsensitive( true );
+				$this->setCaseInsensitive( $caseInsensitive );
 				break;
 			case self::TYPE_GREATERTHAN:
 			case self::TYPE_LESSTHAN:
@@ -298,7 +298,6 @@ class Criteria extends CriteriaBase {
 			|| !$this->getType()
 			|| !$this->getBaseType()
 		){
-			var_dump( 'X' );
 			$return = false;
 		}
 		if( $return ){
@@ -325,12 +324,16 @@ class Criteria extends CriteriaBase {
 					}
 					break;
 				case self::TYPE_CUSTOM:
+					$argTarget = 0;
+					if( strlen( trim( $this->getCustom() ) ) == 0 ){
+						$return = false;
+					}
+					break;
 				case self::TYPE_IN:
 					$argTarget = -1;
 					break;
 			}
 			if( $argCount < abs( $argTarget ) ){
-				var_dump( 'Y' );
 				$return = false;
 			}
 			if( $argTarget > 0 && $argCount > $argTarget ){

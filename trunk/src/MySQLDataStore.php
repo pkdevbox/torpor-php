@@ -186,6 +186,9 @@ class MySQLDataStore implements DataStore {
 
 
 	public function LoadFromCriteria( Grid $grid, CriteriaBase $criteria, $refresh = false ){
+		if( !$grid->isLoaded() || $referesh ){
+			$sql = $this->CriteriaToSQL( $grid, $criteria );
+		}
 	}
 
 	public function LoadSet( GridSet $gridSet, $refresh = false ){
@@ -459,53 +462,78 @@ class MySQLDataStore implements DataStore {
 		);
 	}
 
-	public function ColumnNameToSql( $gridName, $columnName ){
+	public function ColumnNameToSql( $sourceGridName, $gridName, $columnName, $validateReference = true ){
+		$gridName = $this->getTorpor()->containerKeyName( $gridName );
+		$gridAlias = $gridName;
+		// TODO: Will likely need to abstract these routines, for use in assembling
+		// join criteria if not finding a navigable path between 2 grids in any
+		// general context.  We have one advantage here that sourceGridName, in the
+		// use of MySQLDataStore, should not ever be an alias (but this is something
+		// which must be considered in a more generic implementation).
+		if( $validateReference ){
+			if( $this->getTorpor()->referenceAliasGrid( $sourceGridName, $gridName ) ){
+				$gridName = $this->getTorpor()->referenceAliasGrid( $sourceGridName, $gridName );
+			}
+			if(
+				!$this->getTorpor()->canReference( $sourceGridName, $gridName, ( $gridName == $gridAlias ? false : $gridAlias ) )
+				&& !$this->getTorpor()->canBeReferencedBy( $sourceGridName, $gridName )
+			){
+				throw( new TorporException( 'No reference path between '.$this->getTorpor()->containerKeyName( $sourceGridName ).' and '.$gridAlias ) );
+			}
+		}
+		if( !isset( $this->getTorpor()->$gridName()->$columnName ) ){
+			throw( new TorporException( 'Unsupported column in Criteria: '.$columnName ) );
+		}
 		return(
-			$this->escape( $this->getTorpor()->dataNameForGrid( $gridName ), true, '`' ).'.'
+			$this->escape( $gridAlias, true, '`' ).'.'
 			.$this->escape( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ), true, '`' )
 		);
 	}
 
-	public function CriteriaToSQL( CriteriaBase $criteria, $clause = 'WHERE' ){
+	public function CriteriaToSQL( $sourceGridName, CriteriaBase $criteria ){
+		$sourceGridName = $this->getTorpor()->containerKeyName( $sourceGridName );
+		$escapedSourceGridName = $this->escape( $sourceGridName, true, '`' );
+		$declarations = array();
+		foreach( $this->getTorpor()->$sourceGridName() as $columnName ){
+			$declarations[] = $escapedSourceGridName.'.'
+				.$this->escape( $this->getTorpor()->dataNameForColumn( $sourceGridName, $columnName ), true, '`' )
+				.' AS '.$this->escape( $columnName, true, '`' );
+		}
+		return(
+			'SELECT '.implode( ', ', $declarations )
+			.' FROM '.$this->CriteriaToJoinClause( $sourceGridName, $criteria ).' '
+			.$this->CriteriaToConditions( $sourceGridName, $criteria )
+		);
+	}
+
+	public function CriteriaToConditions( $sourceGridName, CriteriaBase $criteria, $clause = 'WHERE' ){
+		$sourceGridName = $this->getTorpor()->containerKeyName( $sourceGridName );
+		if( !$this->getTorpor()->supportedGrid( $sourceGridName ) ){
+			throw( new TorporException( 'Unrecognized grid "'.$sourceGridName.'" requested' ) );
+		}
 		$sql = '';
 		if( $criteria instanceof Criteria ){
 			if( !$criteria->validate() ){
 				print_r( $criteria );
 				throw( new TorporException( 'Criteria not valid, cannot continue' ) );
 			}
-			$gridName = $criteria->getGridName();
-			$columnName = $criteria->getColumnName();
-			$gridAlias = false;
-			if( !( $gridAlias = $this->getTorpor()->supportedGrid( $gridName, true ) ) ){
-				throw( new TorporException( 'Unsupported grid in Criteria: '.$gridName ) );
-			}
-			// This indicates that while gridName is supported, it exists only as a
-			// referenceGridAlias inside a relationship.
-			if( $gridAlias < 0 ){
-				// TODO: Need to take a few moments and think this through.  We need
-				// to validate that the requested column name exists, but it may exist
-				// only on a reference grid - which means we need to find the source
-				// grid(s) to which the reference name corresponds, and check all of
-				// those (easy if there's 1).  If there are no matches in any, throw.
-				// If there are matches in more than one, trigger a warning but proceed
-				// anyway.
-				// This same level of introspection needs to be extended to ALL column
-				// references, which means this will need to be abstracted to a helper
-				// method.  Not only that, but the whole process can be GREATLY simplified
-				// in the event that we know the target grid for loading, since we can
-				// shortcut all reference aliases to those branching directly off of
-				// that known grid.
-			}
-			if( !isset( $this->getTorpor()->$gridName()->$columnName ) ){
-				throw( new TorporException( 'Unsupported column in Criteria: '.$columnName ) );
-			}
-			$sql.= $this->ColumnNameToSql( $gridName, $columnName );
+
+			$sql.= $this->ColumnNameToSql(
+				$sourceGridName,
+				$criteria->getGridName(),
+				$criteria->getColumnName(),
+				(
+					$criteria->getGridName() == $this->getTorpor()->makeKeyName( $sourceGridName )
+					? false
+					: true
+				)
+			);
 			switch( $criteria->getBaseType() ){
 				case Criteria::TYPE_BETWEEN:
 					list( $lowRange, $highRange ) = $criteria->getArguments();
 					if( $criteria->isColumnTarget() ){
-						$lowRange = $this->ColumnNameToSql( array_shift( $lowRange ), array_shift( $lowRange ) );
-						$highRange = $this->ColumnNameToSql( array_shift( $highRange ), array_shift( $highRange ) );
+						$lowRange = $this->ColumnNameToSql( $sourceGridName, array_shift( $lowRange ), array_shift( $lowRange ) );
+						$highRange = $this->ColumnNameToSql( $sourceGridName, array_shift( $highRange ), array_shift( $highRange ) );
 					} else {
 						$lowRange = $this->escape( $lowRange, true );
 						$highRange = $this->escape( $highRange, true );
@@ -519,50 +547,41 @@ class MySQLDataStore implements DataStore {
 				case Criteria::TYPE_CONTAINS:
 					list( $target ) = $criteria->getArguments();
 					if( $criteria->isColumnTarget() ){
-						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+						$target = 'CONCAT( \'%\', '.$this->ColumnNameToSql( $sourceGridName, array_shift( $target ), array_shift( $target ) ).', \'%\' )';
 					} else {
 						$target = '\'%'.$this->escape( $target ).'%\'';
 					}
-					if( $criteria->isCaseInsensitive() ){
-						$sql = 'UPPER( '.$sql.' )'.( $criteria->isNegated() ? ' NOT' : '' ).' LIKE UPPER( '.$target.' )';
-					} else {
-						$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' LIKE '.$target;
-					}
+					$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' LIKE '.$target
+						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' );
 					break;
 				case Criteria::TYPE_ENDSWITH:
 					list( $target ) = $criteria->getArguments();
 					if( $criteria->isColumnTarget() ){
-						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+						$target = 'CONCAT( \'%\', '.$this->ColumnNameToSql( $sourceGridName, array_shift( $target ), array_shift( $target ) ).' )';
 					} else {
 						$target = '\'%'.$this->escape( $target ).'\'';
 					}
-					if( $criteria->isCaseInsensitive() ){
-						$sql = 'UPPER( '.$sql.' )'.( $criteria->isNegated() ? ' NOT' : '' ).' LIKE UPPER( '.$target.' )';
-					} else {
-						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target;
-					}
+					$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target
+						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' );
 					break;
 				case Criteria::TYPE_EQUALS:
 					list( $target ) = $criteria->getArguments();
 					if( $criteria->isColumnTarget() ){
-						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+						$target = $this->ColumnNameToSql( $sourceGridName, array_shift( $target ), array_shift( $target ) );
 					} else if( !is_null( $target ) ){
 						$target = $this->escape( $target, true );
 					}
 					if( is_null( $target ) ){
 						$sql.= ' IS'.( $criteria->isNegated() ? ' NOT' : '' ).' NULL';
 					} else {
-						if( $criteria->isCaseInsensitive() ){
-							$sql = 'UPPER( '.$sql.' ) '.( $criteria->isNegated() ? '!' : '' ).'= UPPER( '.$target.' )';
-						} else {
-							$sql.= ' '.( $criteria->isNegated() ? '!' : '' ).'= '.$target;
-						}
+						$sql.= ' '.( $criteria->isNegated() ? '!' : '' ).'= '.$target
+							.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' );
 					}
 					break;
 				case Criteria::TYPE_GREATERTHAN:
 					list( $target ) = $criteria->getArguments();
 					if( $criteria->isColumnTarget() ){
-						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+						$target = $this->ColumnNameToSql( $sourceGridName, array_shift( $target ), array_shift( $target ) );
 					} else {
 						$target = $this->escape( $target, true );
 					}
@@ -573,7 +592,7 @@ class MySQLDataStore implements DataStore {
 					$sqlArgs = array();
 					if( $critera->isColumnTarget() ){
 						foreach( $args as $arg ){
-							$sqlArgs[] = $this->ColumnNameToSql( array_shift( $arg ), array_shift( $arg ) );
+							$sqlArgs[] = $this->ColumnNameToSql( $sourceGridName, array_shift( $arg ), array_shift( $arg ) );
 						}
 					} else {
 						foreach( $args as $arg ){
@@ -588,7 +607,7 @@ class MySQLDataStore implements DataStore {
 				case Criteria::TYPE_LESSTHAN:
 					list( $target ) = $criteria->getArguments();
 					if( $criteria->isColumnTarget() ){
-						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+						$target = $this->ColumnNameToSql( $sourceGridName, array_shift( $target ), array_shift( $target ) );
 					} else {
 						$target = $this->escape( $target, true );
 					}
@@ -601,18 +620,30 @@ class MySQLDataStore implements DataStore {
 				case Criteria::TYPE_STARTSWITH:
 					list( $target ) = $criteria->getArguments();
 					if( $criteria->isColumnTarget() ){
-						$target = $this->ColumnNameToSql( array_shift( $target ), array_shift( $target ) );
+						$target = 'CONCAT( '.$this->ColumnNameToSql( $sourceGridName, array_shift( $target ), array_shift( $target ) ).', \'%\' )';
 					} else {
 						$target = '\''.$this->escape( $target ).'%\'';
 					}
-					if( $criteria->isCaseInsensitive() ){
-						$sql = 'UPPER( '.$sql.' ) '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE UPPER( '.$target.' )';
-					} else {
-						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target;
-					}
+					$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target
+						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' );
 					break;
 				case Criteria::TYPE_CUSTOM:
+					trigger_error( 'Custom un-parsed SQL passed to database', E_USER_NOTICE );
+					if( $criteria->isNegated() ){
+						trigger_error( 'Ignoring criteria negation for '.$criteria->getType().' criteria', E_USER_WARNING );
+					}
+					if( $criteria->isColumnTarget() ){
+						trigger_error( 'Ignoring column target setting for '.$criteria->getType().' criteria', E_USER_WARNING );
+					}
+					if( count( $criteria->getArguments() ) > 0 ){
+						trigger_error( 'Ignoring arguments for '.$criteria->getType().' criteria', E_USER_WARNING );
+					}
+					$sql = $criteria->getCustom();
+					break;
 				case Criteria::TYPE_IN_SET:
+					// TODO: Extract/Create the SQL used to populate a GridSet,
+					// and use that as a sub-select inclusion/exclusion, eg. $grid.$column [NOT] IN ( SELECT ... )
+					// Need to specify which column of the SET pertains to this column...
 					break;
 				default:
 					throw( new TorporException( 'Unsupported criteria requested: '.$criteria->getType() ) );
@@ -621,11 +652,110 @@ class MySQLDataStore implements DataStore {
 		} else if( $criteria instanceof CriteriaSet ){
 			$clauses = array();
 			foreach( $criteria as $criterion ){
-				$clauses[] = $this->CriteriaToSql( $criterion, '' );
+				$clauses[] = $this->CriteriaToConditions( $sourceGridName, $criterion, '' );
 			}
 			$sql.= '( '.implode( ' '.$criteria->getType().' ', $clauses ).' )';
 		}
 		return( ( !empty( $clause ) ? $clause.' ' : '' ).$sql );
+	}
+
+	public function CriteriaToJoinClause( $sourceGridName, CriteriaBase $criteria ){
+		$sourceGridName = $this->getTorpor()->containerKeyName( $sourceGridName );
+		// 1. Get a complete list of all table/column combinations by all criteria
+		//    inside of CriteriaBase, by flattening any nesting.
+		// 2. Validate references between here and there
+		// 3. Find Key relationships.
+		//    3.1 For this references that, left join
+		//    3.2 For that references this, left OUTER join
+
+		$sql = $this->escape( $this->getTorpor()->dataNameForGrid( $sourceGridName ), true, '`' )
+			.' AS '.$this->escape( $sourceGridName, true, '`' );
+
+		// Flatten all criteria
+		$allCriteria = array();
+		if( $criteria instanceof CriteriaSet ){
+			$incomingCriteria = $criteria->getCriteria();
+			while( $criterion = array_shift( $incomingCriteria ) ){
+				if( $criterion instanceof CriteriaSet ){
+					$incomingCriteria = array_merge( $criterion->getCriteria(), $incomingCriteria );
+					continue;
+				} else if( $criterion instanceof Criteria ){
+					$allCriteria[] = $criterion;
+				}
+			}
+		} else {
+			$allCriteria[] = $criteria;
+		}
+
+		$allReferencedGrids = array();
+		foreach( $allCriteria as $criterion ){
+			$allReferencedGrids[] = $criterion->getGridName();
+			if( $criterion->isColumnTarget() ){
+				foreach( $criterion->getArguments() as $gridColumnDefinition ){
+					$allReferenceGrids[] = array_shift( $gridColumnDefinition );
+				}
+			}
+		}
+
+		$allReferencedGrids = array_unique( $allReferencedGrids );
+		foreach( $allReferencedGrids as $referencedGrid ){
+			if( $referencedGrid == $sourceGridName ){ continue; }
+			$referenceKeys = array();
+			$referenceAlias = $referencedGrid;
+			$outerJoin = false;
+			if( $this->getTorpor()->referenceAliasGrid( $sourceGridName, $referencedGrid ) ){
+				$referencedGrid = $this->getTorpor()->referenceAliasGrid( $sourceGridName, $referencedGrid );
+			}
+			if(
+				$this->getTorpor()->canReference(
+					$sourceGridName,
+					$referencedGrid,
+					( $referenceAlias == $referencedGrid ? false : $referenceAlias )
+				)
+			){
+				$referenceKeys = (
+					$referenceAlias == $referencedGrid
+					? $this->getTorpor()->referenceKeysBetween( $sourceGridName, $referencedGrid )
+					: $this->getTorpor()->aliasReferenceKeysBetween( $sourceGridName, $referencedGrid, $referenceAlias )
+				);
+			} else if( $this->getTorpor()->canBeReferencedBy( $sourceGridName, $referencedGrid ) ){
+				$outerJoin = true;
+				$tempReferenceKeys = $this->getTorpor()->referenceKeysBetween( $referencedGrid, $sourceGridName, Torpor::NON_ALIAS_KEYS );
+				if( !is_array( $tempReferenceKeys ) || count( $tempReferenceKeys ) < 1 ){
+					trigger_error( 'No direct keys found, falling back to alias keys from '.$referencedGrid.' to '.$sourceGridName, E_USER_WARNING );
+					$tempReferenceKeys = $this->getTorpor()->referenceKeysBetween( $referencedGrid, $sourceGridName );
+					if( count( $tempReferenceKeys ) > 1 ){
+						throw( new TorporException( 'Multiple alias relationships found from '.$referencedGrid.' to '.$sourceGridName.', cannot continue under ambiguous criteria' ) );
+					}
+					foreach( $tempReferenceKeys as $alias => $keys ){
+						$referenceKeys = array_flip( $keys );
+						if( count( $referenceKeys ) != count( $keys ) ){
+							throw( new TorporException( 'Duplicate referenceColumn in alias keys' ) );
+						}
+						break;
+					}
+				}
+			} else {
+				throw( new TorporException( 'No reference path between '.$sourceGridName.' and '.$referenceAlias ) );
+			}
+			if( !is_array( $referenceKeys ) || count( $referenceKeys ) < 1 ){
+				throw( new TorporException( 'No reference keys found between '.$sourceGridName.' and '.$referenceAlias ) );
+			}
+			$onConditions = array();
+			foreach( $referenceKeys as $columnName => $referencedColumnName ){
+				$onConditions[] = $this->escape( $referenceAlias, true, '`' ).'.'
+					.$this->escape( $this->getTorpor()->dataNameForColumn( $referencedGrid, $referencedColumnName ), true, '`' ).' = '
+					.$this->escape( $sourceGridName, true, '`' ).'.'
+					.$this->escape( $this->getTorpor()->dataNameForColumn( $sourceGridName, $columnName ), true, '`' );
+			}
+			
+			$sql.= ' LEFT '.( $outerJoin ? 'OUTER ' : '' ).'JOIN '
+				.$this->escape( $this->getTorpor()->dataNameForGrid( $referencedGrid ), true, '`' )
+				.' AS '.$this->escape( $referenceAlias, true, '`' )
+				.' ON '.implode( ' AND ', $onConditions );
+		}
+
+		return( $sql );
 	}
 
 	public function columnEqualsData( Column $column, $compare = false ){
