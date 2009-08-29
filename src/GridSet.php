@@ -6,11 +6,22 @@ class GridSet extends PersistableContainer implements Iterator {
 	const ADJECTIVE_FIRST = 'first';
 	const ADJECTIVE_NEXT  = 'next';
 
+	const ORDER_ASCENDING  = 'ASCENDING';
+	const ORDER_DESCENDING = 'DESCENDING';
+	const ORDER_RANDOM     = 'RANDOM';
+
 	private $_type = null;
 	private $_grids = array();
+
+	private $_totalGridCount = -1;
+	private $_pageSize = -1;
+	private $_gridOffset = 0;
+	private $_sort = array();
+
 	private $_sourceGrids = array();
 	private $_sourceGridAlias = false;
 	private $_sourceCriteria = null;
+
 
 	public function GridSet(
 		Torpor $torpor,
@@ -29,6 +40,80 @@ class GridSet extends PersistableContainer implements Iterator {
 				$this->setSourceCriteria( $sourceContent );
 			}
 		}
+		$this->setPageSize( $this->Torpor()->pageSize() );
+	}
+
+	public function getPageSize(){ return( $this->_pageSize ); }
+	public function setPageSize( $pageSize ){ return( $this->_pageSize = max( (int)$pageSize, -1 ) ); }
+
+	public function getPageOffset(){
+		return(
+			(
+				$this->getPageSize() > 0
+				? floor( $this->getGridOffset() / $this->getPageSize() )
+				: 0
+			)
+		);
+	}
+	public function setPageOffset( $pageOffset ){
+		return(
+			$this->setGridOffset( ( $this->getPageSize() >= 0 ? max( (int)$pageOffset, 0 ) * $this->getPageSize() : 0 ) )
+		);
+	}
+
+	public function getGridOffset(){ return( $this->_gridOffset ); }
+	public function setGridOffset( $gridOffset ){ return( $this->_gridOffset = max( (int)$gridOffset, 0 ) ); }
+
+	public function getNumberOfPages(){
+		$pageCount = -1;
+		if( $this->getPageSize() < 0 ){
+			$pageCount = 1;
+		} else {
+			if( $this->isLoaded() ){
+				$pageCount = ceil( $this->getTotalGridCount() / $this->getPageSize() );
+			} else if( $this->getGridCount() > 0 ){
+				$pageCount = ceil( $this->getGridCount() / $this->getPageSize() );
+			}
+		}
+		return( $pageCount );
+	}
+
+	public function resetSort(){
+		$this->_sort = array();
+		return( true );
+	}
+
+	public function sortBy( $gridName, $columnName = null, $order = self::ORDER_ASCENDING ){
+		$gridType = $this->gridType();
+		if( $gridName instanceof Column ){
+			list( $gridName, $columnName ) = array( $gridName->Grid(), $gridName );
+			if( in_array( $columnName, self::getValidSortOrders() ) ){
+				$order = $columnName;
+			}
+		} else if(
+			!$this->Torpor()->supportedGrid( $gridName )
+			&& !is_null( $gridType )
+			&& isset( $this->Torpor()->$gridType()->$gridName )
+		){
+			if( in_array( $columnName, self::getValidSortOrders() ) ){
+				$order = $columnName;
+			}
+			list( $gridName, $columnName ) = array( $gridType, $gridName );
+		}
+		$gridName = $this->Torpor()->containerKeyName( $gridName );
+		$columnName = $this->Torpor()->containerKeyName( $columnName );
+		if( empty( $gridName ) || empty( $columnName ) ){
+			$this->throwException( 'Invalid grid ("'.$gridName.'") or column ("'.$columnName.'")' );
+		}
+		if( !in_array( $order, self::getValidSortOrders() ) ){
+			$this->throwException( 'Unrecognized sort order "'.$order.'" requested' );
+		}
+		$this->_sort[] = array( $gridName, $columnName, $order );
+		return( $this );
+	}
+
+	public function getSortOrder(){
+		return( $this->_sort );
 	}
 
 	public function getSourceGrid( $gridName ){
@@ -56,16 +141,13 @@ class GridSet extends PersistableContainer implements Iterator {
 			$alias = $this->Torpor()->makeKeyName( $alias );
 		}
 		if(
-			!$this->gridType()
-			|| (
-				$this->gridType()
-				&& $this->Torpor()->canReference( $this->gridType(), $grid, $alias )
-			)
+			!is_null( $this->gridType() )
+			|| ( $this->Torpor()->canReference( $this->gridType(), $grid, $alias ) )
 		){
 			$existingGrid = $this->getGrid( ( $alias ? $alias : $grid ) );
 			if( $existingGrid !== $grid ){
 				$this->_sourceGrids{ ( $alias ? $alias : $grid->_getObjName() ) } = $grid;
-				if( $this->gridCount() > 0 && $cascadeMap ){
+				if( $this->getGridCount() > 0 && $cascadeMap ){
 					$this->mapAll( $grid, $alias );
 				}
 			}
@@ -79,16 +161,85 @@ class GridSet extends PersistableContainer implements Iterator {
 		return( true );
 	}
 
-	public function setSourceCriteria( Criteria $criteria ){
+	public function setSourceCriteria( CriteriaBase $criteria ){
 		if(
 			!is_null( $this->getSourceCriteria() )
 			&& $this->getSourceCriteria() !== $criteria
-			&& $this->gridCount() > 0
+			&& $this->getGridCount() > 0
 		){
 			$this->throwExcetion( 'Cannot set new source criteria; grids already added to set.' );
 		}
 		$this->_sourceCriteria = $criteria;
 		return( true );
+	}
+
+	public function canLoad(){
+		return( !is_null( $this->gridType() ) );
+	}
+
+	public function Load( $refresh = false, $reset = false ){
+		if( !$this->canLoad() && $refresh ){
+			$this->throwException( 'Cannot load '.$this->gridType().' grid set: insufficient criteria (need type, and 1 or more of source grid or criteria)' );
+		}
+		$return = $this->isLoaded();
+		if( $this->canLoad() && ( !$this->isLoaded() || $refresh ) ){
+			if(
+				( $this->isLoaded() || $this->getGridCount() > 0 )
+				&& $reset
+			){
+				trigger_error( 'Truncating existing record list for '.$this->gridType().' grid set in Load', E_USER_WARNING );
+				// TODO: Determine the reference counts for objects?:
+				// If this is the only place where these are referenced, the objects should be
+				// destroyed and unset prior to truncating this array, otherwise they'll hang
+				// around taking up memory.
+				$this->_grids = array();
+				$this->_setLoaded( false );
+			}
+			$return = $this->_setLoaded( $this->Torpor()->Load( $this, $refresh ) );
+		}
+		return( $return );
+	}
+
+
+	public function LoadNextPage(){
+		if( !$this->isLoaded() ){
+			return( $this->Load() );
+		}
+		$return = false;
+		if( $this->getPageSize() >= 0 ){
+			if( $this->getGridOffset() < ( $this->getPageSize() * $this->getNumberOfPages() ) ){
+				$this->setGridOffset( $this->getGridOffset() + $this->getPageSize() );
+				$currentCount = $this->getGridCount();
+				if( $this->Load( true ) && $this->getGridCount() > $currentCount ){
+					$return = true;
+				}
+			}
+		}
+		return( $return );
+	}
+
+	public function setLoaded( $bool = true ){ return( $this->_setLoaded( $bool ) ); }
+
+	public function Publish( $force = false ){
+		$publishCount = 0;
+		for( $i = 0; $i < $this->getGridCount(); $i++ ){
+			if( $this->_grids[$i]->Publish( $force ) ){
+				$publishCount++;
+			}
+		}
+		return( $publishCount );
+	}
+
+	// TODO: Need an option to pass the delete into the data store
+	// to delete everything (not just currently loaded)?
+	public function Delete(){
+		$deleteCount = 0;
+		for( $i = 0; $i < $this->getGridCount(); $i++ ){
+			if( $this->_grids[$i]->Delete() ){
+				$deleteCount++;
+			}
+		}
+		return( $deleteCount );
 	}
 
 	// TODO: This needs a lot of explicit documentation as to the behaviors, and when to attempt which
@@ -106,10 +257,10 @@ class GridSet extends PersistableContainer implements Iterator {
 		return( $this->mapAll( $criteria ) );
 	}
 	protected function mapAll( $content, $alias = false ){
-		if( $this->gridCount() > 0 ){
+		if( $this->getGridCount() > 0 ){
 			// Using old-style (!foreach) iteration in order to avoid reseting internal
 			// iteration pointers.
-			for( $i = 0; $i < $this->gridCount(); $i++ ){
+			for( $i = 0; $i < $this->getGridCount(); $i++ ){
 				$this->mapContent( $this->_grids[$i], $content, $alias );
 			}
 		}
@@ -140,6 +291,9 @@ class GridSet extends PersistableContainer implements Iterator {
 	// exact same object, no other de-deplication is being done; that's up to the
 	// caching engine).
 	public function add( Grid $grid, $setGridCriteria = true ){
+		return( $this->addGrid( $grid, $setGridCriteria ) );
+	}
+	public function addGrid( Grid $grid, $setGridCriteria = true ){
 		if( !is_null( $this->gridType() ) && !$this->checkNoun( $grid->_getObjName() ) ){
 			$this->throwException( 'Grid type mismatch, "'.$grid->_getObjName().'" cannot be added to collection of type '.$this->gridType() );
 		}
@@ -162,7 +316,7 @@ class GridSet extends PersistableContainer implements Iterator {
 	public function type(){ return( $this->gridType() ); }
 	public function recordType(){ return( $this->gridType() ); }
 	public function gridType(){
-		if( is_null( $this->_type ) && $this->gridCount() > 0 ){
+		if( is_null( $this->_type ) && $this->getGridCount() > 0 ){
 			// First one in determines what we can hold.
 			$this->setType( $this->_grids[0]->_getObjName() );
 		}
@@ -196,21 +350,27 @@ class GridSet extends PersistableContainer implements Iterator {
 		return( $pass );
 	}
 
-	// TODO: just-in-time loading & bulk population.
 	// These are essentially facades and aliases to the built-in iterator
 	// interfaces which we've already abstracted on top of $_grids, but are
 	// provided fo convenience and ease of documentation.
-	public function getFirst(){
+	public function getFirstGrid(){
 		$this->rewind();
 		return( $this->current() );
 	}
-	public function getCurrent(){ return( $this->current() ); }
-	public function getNext(){ return( $this->next() ); }
+	public function getCurrentGrid(){ return( $this->current() ); }
+	public function getNextGrid(){ return( $this->next() ); }
+	public function getGrid( $offset ){
+		return( ( isset( $this->_grids[ (int)$offset ] ) ? $this->_grids[ (int)$offset ] : null ) );
+	}
 
-	public function recordCount(){ return( $this->gridCount() ); }
-	public function gridCount(){ return( count( $this->_grids ) ); } 
+	public function setTotalGridCount( $count ){
+		return( $this->_totalGridCount = (int)$count );
+	}
 
-	// TODO: add publish methods.
+	public function getTotalRecordCount(){ return( $this->getTotalGridCount() ); }
+	public function getTotalGridCount(){ return( $this->getGridCount( true ) ); }
+	public function getRecordCount(){ return( $this->getGridCount() ); }
+	public function getGridCount( $total = false ){ return( ( $total ? $this->_totalGridCount : count( $this->_grids ) ) ); }
 
 	// Used so we can have descriptive names, such as add<Grid>, etc.
 	public function __call( $function, $arguments ){
@@ -228,12 +388,12 @@ class GridSet extends PersistableContainer implements Iterator {
 				if( count( $arguments ) > 1 ){
 					$return = 0;
 					foreach( $arguments as $grid ){
-						if( $this->add( $grid ) ){
+						if( $this->addGrid( $grid ) ){
 							$return++;
 						}
 					}
 				} else {
-					$return = $this->add( array_shift( $arguments ) );
+					$return = $this->addGrid( array_shift( $arguments ) );
 				}
 				break;
 			case Torpor::OPERATION_GET:
@@ -252,13 +412,13 @@ class GridSet extends PersistableContainer implements Iterator {
 				}
 				switch( $adjective ){
 					case self::ADJECTIVE_FIRST:
-						$return = $this->getFirst();
+						$return = $this->getFirstGrid();
 						break;
 					case self::ADJECTIVE_NEXT:
-						$return = $this->getNext();
+						$return = $this->getNextGrid();
 						break;
 					default:
-						$return = $this->getCurrent();
+						$return = $this->getCurrentGrid();
 						break;
 				}
 				break;
@@ -284,8 +444,28 @@ class GridSet extends PersistableContainer implements Iterator {
 		return( $return );
 	}
 
+	public static function getValidSortOrders(){
+		return(
+			array(
+				self::ORDER_ASCENDING,
+				self::ORDER_DESCENDING,
+				self::ORDER_RANDOM
+			)
+		);
+	}
+
+
 	// Iterator interface implementation for accessing grids
-	public function rewind(){ reset( $this->_grids ); }
+	public function rewind(){
+		if(
+			!$this->isLoaded()
+			&& $this->getGridCount() == 0
+			&& $this->canLoad()
+		){
+			$this->Load();
+		}
+		reset( $this->_grids );
+	}
 	public function current(){ return( current( $this->_grids ) ); }
 	public function key(){ return( key( $this->_grids ) ); }
 	public function next(){ return( next( $this->_grids ) ); }

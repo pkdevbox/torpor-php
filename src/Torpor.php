@@ -75,8 +75,8 @@ class Torpor {
 	const OPTION_PUBLISH_ALL_FIELDS = 'PublishAllFields';
 	const DEFAULT_PUBLISH_ALL_FIELDS = false;
 
-	const OPTION_PUBLISH_CASCADE = 'PublishCascade';
-	const DEFAULT_PUBLISH_CASCADE = true;
+	const OPTION_PUBLISH_DEPENDENCIES = 'PublishDependencies';
+	const DEFAULT_PUBLISH_DEPENDENCIES = true;
 
 	const OPTION_RELOAD_AFTER_PUBLISH = 'ReloadAfterPublish';
 	const DEFAULT_RELOAD_AFTER_PUBLISH = true;
@@ -236,7 +236,7 @@ class Torpor {
 				self::OPTION_PERMIT_DDL => self::DEFAULT_PERMIT_DDL,
 				self::OPTION_PERPETUATE_AUTO_LINKS => self::DEFAULT_PERPETUATE_AUTO_LINKS,
 				self::OPTION_PUBLISH_ALL_FIELDS => self::DEFAULT_PUBLISH_ALL_FIELDS,
-				self::OPTION_PUBLISH_CASCADE => self::DEFAULT_PUBLISH_CASCADE,
+				self::OPTION_PUBLISH_DEPENDENCIES => self::DEFAULT_PUBLISH_DEPENDENCIES,
 				self::OPTION_RELOAD_AFTER_PUBLISH => self::DEFAULT_RELOAD_AFTER_PUBLISH
 			)
 		);
@@ -299,8 +299,8 @@ class Torpor {
 					case self::OPTION_PUBLISH_ALL_FIELDS:
 						$options{ self::OPTION_PUBLISH_ALL_FIELDS } = ( (string)$option == self::VALUE_TRUE ? true : false );
 						break;
-					case self::OPTION_PUBLISH_CASCADE:
-						$options{ self::OPTION_CASCADE } = ( (string)$option == self::VALUE_TRUE ? true : false );
+					case self::OPTION_PUBLISH_DEPENDENCIES:
+						$options{ self::OPTION_DEPENDENCIES } = ( (string)$option == self::VALUE_TRUE ? true : false );
 						break;
 					case self::OPTION_RELOAD_AFTER_PUBLISH:
 						$options{ self::OPTION_RELOAD_AFTER_PUBLISH } = ( (string)$option == self::VALUE_TRUE ? true : false );
@@ -382,6 +382,9 @@ class Torpor {
 							break;
 						case 'oracle':
 							require_once( ( $className = 'OracleDataStore' ).'.php' );
+							break;
+						case 'postgres':
+							require_once( ( $className = 'PostgresDataStore' ).'.php' );
 							break;
 						case 'sqlite':
 							require_once( ( $className = 'SQLiteDataStore' ).'.php' );
@@ -966,8 +969,8 @@ class Torpor {
 	public function publishAllFields(){
 		return( $this->options( self::OPTION_PUBLISH_ALL_FIELDS ) );
 	}
-	public function publishCascade(){
-		return( $this->options( self::OPTION_PUBLISH_CASCADE ) );
+	public function publishDependencies(){
+		return( $this->options( self::OPTION_PUBLISH_DEPENDENCIES ) );
 	}
 	public function reloadAfterPublish(){
 		return( $this->options( self::OPTION_RELOAD_AFTER_PUBLISH ) );
@@ -1033,7 +1036,7 @@ class Torpor {
 		return( $this->WriteDataStore()->Publish( $grid, $force ) );
 	}
 
-	public function Load( $grid, $refresh = false ){
+	public function Load( PersistableContainer $grid, $refresh = false ){
 		if( !is_object( $this->ReadDataStore() ) ){
 			$this->throwException( 'No read data store defined, cannot load grid '.$grid->_getObjName() );
 		}

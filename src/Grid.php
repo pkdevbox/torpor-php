@@ -324,12 +324,31 @@ class Grid extends PersistableContainer implements Iterator
 				}
 				return( true );
 			} else if( stripos( $function, Torpor::OPERATION_MOD_FROM ) && $this->Torpor()->can( $function ) ){
+				// This handles both NEW x FROM and GET x FROM patterns
 				return( $this->Torpor()->$function( $this ) );
-			} else {
-				$torporCall = $function.Torpor::OPERATION_MOD_FROM.$this->_getObjName();
-				if( $this->Torpor()->can( $torporCall ) ){
-					return( $this->Torpor()->$torporCall( $this ) );
+			} else if( $this->Torpor()->can( $torporCall = $function.Torpor::OPERATION_MOD_FROM.$this->_getObjName() ) ){
+				return( $this->Torpor()->$torporCall( $this ) );
+			} else if( $operation == Torpor::OPERATION_NEW ){
+				// The only time we should make it here is when we're attempting to create
+				// a new grid which we reference directly (rather than which references us),
+				// essentially shortcutting the process and inverting the mapping for the sake
+				// of convenience.  This is potentially dangerous, but has appropriate
+				// precedent in 3rd-normal databases.
+				$gridType = $noun;
+				if(
+					!$this->Torpor()->supportedGrid( $noun )
+					&& !is_null( $this->Torpor()->referenceAliasGrid( $this, $noun ) )
+				){
+					$gridType = $this->Torpor()->referenceAliasGrid( $this, $noun );
 				}
+				if( !$this->Torpor()->canReference( $this, $gridType, $noun ) ){
+					$this->throwException( 'No reference path from '.$this->_getObjName().' to '.$gridType.' as '.$noun );
+				}
+				$newCommand = Torpor::OPERATION_NEW.$gridType;
+				$targetGrid = $this->Torpor()->$newCommand();
+				$setCommand = Torpor::OPERATION_SET.$noun;
+				$this->$setCommand( $targetGrid );
+				return( $targetGrid );
 			}
 			$this->throwException( $noun.' does not exist as a member or method of this class' );
 		}

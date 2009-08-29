@@ -1,6 +1,7 @@
 <?PHP
 // $Rev$
 class PersistenceCommand {
+	const TYPE_DELETE  = 'DELETE';
 	const TYPE_LOAD    = 'LOAD';
 	const TYPE_PUBLISH = 'PUBLISH';
 	const CONTEXT_NEW      = 'NEW';
@@ -32,6 +33,7 @@ class PersistenceCommand {
 	public function setType( $type, $context = null ){
 		$return = false;
 		switch( $type ){
+			case self::TYPE_DELETE:
 			case self::TYPE_LOAD:
 				$this->setContext( null );
 			case self::TYPE_PUBLISH:
