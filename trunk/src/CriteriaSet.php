@@ -40,6 +40,7 @@ class CriteriaSet extends CriteriaBase implements Iterator {
 	public function count(){ return( count( $this->_criteria ) ); }
 
 	// "criteria" has been used in the singular (over "criterion") for > 50 years.  Deal with it.
+	public function add( CriteriaBase $criteria ){ return( $this->addCriteria( $criteria ) ); }
 	public function addCriterion( CriteriaBase $criteria ){ return( $this->addCriteria( $criteria ) ); }
 	public function addCriteria( CriteriaBase $criteria ){
 		if( in_array( $criteria, $this->_criteria, true ) ){ return( false ); }

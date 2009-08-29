@@ -15,6 +15,9 @@ class MySQLDataStore implements DataStore {
 
 	protected function MySQLDataStore(){}
 
+	//*********************************
+	//*  DataStore Interface Methods  *
+	//*********************************
 	public static function createInstance( Torpor $torpor ){
 		$dataStore = new MySQLDataStore();
 		$dataStore->setTorpor( $torpor );
@@ -50,24 +53,50 @@ class MySQLDataStore implements DataStore {
 
 	// No support for generic bind variables using mysql interfaces; the mysqli
 	// implementation for 5.3.0 does; use that if you can.
-	// TODO: Should custom commands be supported for Delete()?
 	public function Delete( Grid $grid ){
 		$return = false;
 		$clauses = $this->makeClauses( $grid );
 		if( !$grid->canLoad() || count( $clauses ) < 1 ){
-			throw( new TorporException( 'Cannot publish '.$grid->_getObjName().' grid: no identifying criteria' ) );
+			throw( new TorporException( 'Cannot delete '.$grid->_getObjName().' grid: no identifying criteria' ) );
 		}
-		$sql = 'DELETE FROM '.$this->gridTableName( $grid )
-			.' WHERE '.implode( ' AND ', $clauses )
-			.' LIMIT 1';
-		if( !mysql_query( $sql, $this->getConnection() ) ){
-			throw( new TorporException( $grid->_getObjName().' delete failed: '.mysql_error( $this->getConnection() ) ) );
+		// TODO: Test DELETE commands.
+		$commands = array();
+		if( $gridCommands = $grid->Torpor()->gridCommands( $grid, PersistenceCommand::TYPE_DELETE ) ){
+			foreach( $gridCommands as $command ){
+				$this->checkCommandType( $command );
+				$commands[] = $command;
+			}
+		}
+		if( count( $commands ) > 0 ){
+			foreach( $commands as $command ){
+				$result = mysql_query( $this->parseCommand( $command, $grid ), $this->getConnection() );
+				if( $result === true ){
+					if( ( $affected = mysql_affected_rows( $this->getConnection() ) ) != 1 ){
+						trigger_error( 'Successful delete command execution affected '.$affected.' rows, expected 1', E_USER_WARNING );
+						if( $affected >= 1 ){
+							$grid->UnLoad( false );
+							$return = true;
+						}
+					}
+				} else if( $result === false ){
+					throw( new TorporException( $grid->_getObjName().' delete command failed: '.mysql_error( $this->getConnection() ) ) );
+				} else {
+					throw( new TorporException( 'Boolean return expected from '.$grid->_getObjName().' delete command, got '.gettype( $result ) ) );
+				}
+			}
 		} else {
-			if( mysql_affected_rows( $this->getConnection() ) !== 1 ){
-				trigger_error( 'No '.$grid->_getObjName().' records deleted', E_USER_WARNING );
+			$sql = 'DELETE FROM '.$this->gridTableName( $grid )
+				.' WHERE '.implode( ' AND ', $clauses )
+				.' LIMIT 1';
+			if( !mysql_query( $sql, $this->getConnection() ) ){
+				throw( new TorporException( $grid->_getObjName().' delete failed: '.mysql_error( $this->getConnection() ) ) );
 			} else {
-				$grid->UnLoad( false );
-				$return = true;
+				if( mysql_affected_rows( $this->getConnection() ) != 1 ){
+					trigger_error( 'No '.$grid->_getObjName().' records deleted', E_USER_WARNING );
+				} else {
+					$grid->UnLoad( false );
+					$return = true;
+				}
 			}
 		}
 		return( $return );
@@ -99,11 +128,12 @@ class MySQLDataStore implements DataStore {
 				$return = $returnAs->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
 			} elseif( $returnAs instanceof GridSet ){
 				$return = 0;
+				$newCommand = Torpor::OPERATION_NEW.$returnAs->gridType();
 				while( $dataRow = mysql_fetch_assoc( $result ) ){
 					$returnAs++;
-					$grid = $returnAs->Torpor()->_newGrid( $returnAs->gridType() );
+					$grid = $returnAs->Torpor()->$newCommand();
 					$grid->LoadFromArray( $dataRow, true, true );
-					$returnAs->add( $grid );
+					$returnAs->addGrid( $grid );
 				}
 			} else {
 				throw(
@@ -165,34 +195,142 @@ class MySQLDataStore implements DataStore {
 				if( count( $clauses ) < 1 ){
 					throw( new TorporException( 'Cannot publish '.$grid->_getObjName().' grid: no identifying criteria' ) );
 				}
-				$sql = 'SELECT '.implode( ', ', $declarations )
+				// TODO: Pass an "expected" value to LoadGridFromQuery, which it will check
+				// against FOUND_ROWS() and produce appropriate warnings?  Or handle all
+				// of that locally?
+				$this->LoadGridFromQuery(
+					$grid,
+					'SELECT SQL_CALC_FOUND_ROWS '.implode( ', ', $declarations )
 					.' FROM '.$this->gridTableName( $grid )
-					.' WHERE '.implode( ' AND ', $clauses );
-				$result = mysql_query( $sql, $this->getConnection() );
-				if( $result === false ){
-					throw( new TorpoException( 'Load of '.$grid->_getObjName().' grid failed: '.mysql_error( $this->_getConnection() ) ) );
-				} else if( is_resource( $result ) ){
-					$rowCount = mysql_num_rows( $result );
-					if( $rowCount == 1 ){
-						$grid->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
-					} else if( $rowCount > 1 ){
-						throw( new TorporException( 'Wrong number of results returned in '.$grid->_getObjName().' load (got '.$rowCount.', expected 1)' ) );
-					}
-				}
+					.' WHERE '.implode( ' AND ', $clauses )
+					.' LIMIT 1',
+					1
+				);
 			}
 		}
 		return( $grid->isLoaded() );
 	}
 
-
 	public function LoadFromCriteria( Grid $grid, CriteriaBase $criteria, $refresh = false ){
-		if( !$grid->isLoaded() || $referesh ){
+		if( !$grid->isLoaded() || $refresh ){
 			$sql = $this->CriteriaToSQL( $grid, $criteria );
+			if( !preg_match( '/limit\s\+\d(\s*,\s*\d)?\s*$/is', $sql ) ){
+				$sql.= ' LIMIT 1';
+			}
+			$this->LoadGridFromQuery( $grid, $sql, 1 );
 		}
+		return( $grid->isLoaded() );
 	}
 
 	public function LoadSet( GridSet $gridSet, $refresh = false ){
-		// TODO: Look for limit offsets.
+		$return = false;
+		if( !$gridSet->canLoad() ){
+			return( $return );
+		}
+		if( $gridSet->isLoaded() && !$refresh ){
+			return( $gridSet->isLoaded() );
+		}
+		$gridType =  $gridSet->gridType();
+		$finalCriteriaSet = new CriteriaAndSet();
+		foreach( $gridSet->getSourceGrids() as $alias => $targetGrid ){
+			$targetGridName = $this->getTorpor()->containerKeyName( $targetGrid );
+			if(
+				!$this->getTorpor()->canReference(
+					$gridType,
+					$targetGridName,
+					(
+						$alias == $targetGridName
+						? false
+						: $alias
+					)
+				)
+			){
+				$this->getTorpor()->throwException( 'No reference path between '.$gridType.' and '.$targetGridName.' (as '.$alias.')' );
+			}
+			$keys = array();
+			if( $alias != $targetGridName ){
+				$keys = $this->getTorpor()->aliasReferenceKeysBetween( $gridType, $targetGridName, $alias );
+			} else {
+				$keys = $this->getTorpor()->referenceKeysBetween( $gridType, $targetGridName, Torpor::NON_ALIAS_KEYS );
+			}
+			if( !is_array( $keys ) || count( $keys ) < 1 ){
+				$this->getTorpor()->throwException( 'Insufficient keys found between '.$gridType.' and '.$targetGridName.' (as '.$alias.')' );
+			}
+			foreach( $keys as $sourceKeyName => $referenceKeyName ){
+				if( !$targetGrid->Column( $referenceKeyName )->hasData() ){
+					if( !$targetGrid->isLoaded() && $targetGrid->canLoad() ){ $targetGrid->Load(); }
+					if( !$targetGrid->Column( $referenceKeyName )->hasData() ){
+						$this->getTorpor()->throwException( 'Cannot establish mapping between '.$gridType.' and '.$targetGridName.'.'.$referenceKeyName.' (no data)' );
+					}
+				}
+				$finalCriteriaSet->addCriteria(
+					new CriteriaEquals(
+						$alias,
+						$referenceKeyName,
+						$targetGrid->Column( $referenceKeyName )->getPersistData()
+					)
+				);
+			}
+		}
+
+		if( ( $criteria = $gridSet->getSourceCriteria() ) instanceof CriteriaBase ){
+			$finalCriteriaSet->addCriteria( $criteria );
+		}
+
+		$sql = '';
+		if( count( $finalCriteriaSet->getCriteria() ) >= 1 ){
+			$sql = $this->CriteriaToSQL( $gridType, $finalCriteriaSet );
+		} else {
+			$escapedGridName = $this->escape( $gridType, true, '`' );
+			foreach( $this->getTorpor()->$gridType() as $columnName ){
+				$declarations[] = $escapedGridName.'.'
+					.$this->escape( $gridSet->Torpor()->dataNameForColumn( $gridType, $columnName ), true, '`' )
+					.' AS '.$this->escape( $columnName, true, '`' );
+			}
+			$sql = 'SELECT SQL_CALC_FOUND_ROWS '.implode( ', ', $declarations )
+				.' FROM '.$this->escape( $gridSet->Torpor()->dataNameForGrid( $gridType ), true, '`' )
+				.' AS '.$this->escape( $gridType, true, '`' );
+		}
+
+		// TODO: break out the SQL construction for a grid set for use
+		// in the IN SET and NOT IN SET criteria
+		if( count( $sortOrder = $gridSet->getSortOrder() ) > 0 ){
+			$orderBy = array();
+			foreach( $sortOrder as $sortSpec ){
+				list( $gridName, $columnName, $order ) = $sortSpec;
+				$orderBy[] = $this->escape( $gridName, true, '`' )
+					.'.'.$this->escape( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ), true, '`' )
+					.' '.( $order == GridSet::ORDER_DESCENDING ? 'DESC' : 'ASC' );
+			}
+			$sql.= ' ORDER BY '.implode( ', ', $orderBy );
+		}
+
+		if( $gridSet->getPageSize() >= 0 ){
+			$sql.= ' LIMIT '
+				.( $gridSet->getGridOffset() >= 0 ? $gridSet->getGridOffset().',' : '' )
+				.( $gridSet->getPageSize() );
+		}
+
+		$result = mysql_query( $sql, $this->getConnection() );
+		if( $result === false ){
+			$this->getTorpor()->throwException( 'Load of '.$gridType.' grid set failed: '.mysql_error( $this->getConnection() ) );
+		} else if( $result === true ){
+			$this->getTorpor()->throwException( 'Load command for '.$gridType.' grid set executed successfully but did not produce a result set (even a zero row result set)' );
+		} else if( is_resource( $result ) ){
+			if( mysql_num_rows( $result ) > 0 ){
+				$newCommand = Torpor::OPERATION_NEW.$gridType;
+				while( $dataRow = mysql_fetch_assoc( $result ) ){
+					$loadedGrid = $this->getTorpor()->$newCommand();
+					$loadedGrid->LoadFromArray( $dataRow, true, true );
+					$gridSet->addGrid( $loadedGrid, false );
+				}
+				$gridSet->setTotalGridCount( $this->getFoundRows() );
+				$return = $gridSet->setLoaded();
+			}
+		} else {
+			$this->getTorpor()->throwException( 'Cannot handle mysql_query() return type: '.gettype( $resul ) );
+		}
+		return( $return );
 	}
 
 	public function Publish( Grid $grid, $force = false ){
@@ -215,7 +353,7 @@ class MySQLDataStore implements DataStore {
 			throw( new TorporException( 'Cannot publish read only '.$grid->_getObjName().' grid' ) );
 		}
 		if( !$grid->canPublish() ){
-			if( $grid->Torpor()->publishCascade() ){
+			if( $grid->Torpor()->publishDependencies() ){
 				$grid->publishDependencies( $force );
 			}
 			if( !$grid->canPublish() ){
@@ -454,6 +592,35 @@ class MySQLDataStore implements DataStore {
 	//************************************
 	//*  Utility and supporting methods  *
 	//************************************
+	public function LoadGridFromQuery( Grid $grid, $sql, $expectedRows = -1 ){
+		$result = mysql_query( $sql, $this->getConnection() );
+		if( $result === false ){
+			throw( new TorpoException( 'Load of '.$grid->_getObjName().' grid failed: '.mysql_error( $this->getConnection() ) ) );
+		} else if( is_resource( $result ) ){
+			if( ( $rowCount = mysql_num_rows( $result ) ) >= 1 ){
+				$grid->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
+				if(
+					$expectedRows > 0
+					&& (
+						( $foundRows = $this->getFoundRows() ) !== $expectedRows
+						|| $rowCount !== $expectedRows
+					)
+				){
+					trigger_error(
+						'Wrong number of results returned in '.$grid->_getObjName()
+						.' load (expected '.$expectedRows.', got '.$foundRows
+						.'; only '.min( $expectedRows, $rowCount ).' will be used)', E_USER_WARNING
+					);
+				}
+			}
+		}
+	}
+
+	public function getFoundRows(){
+		$row = mysql_fetch_array( mysql_query( 'SELECT FOUND_ROWS()', $this->getConnection() ) );
+		return( array_shift( $row ) );
+	}
+
 	public function escape( $arg, $quote = false, $quoteChar = '\'' ){
 		return(
 			( $quote ? $quoteChar : '' ).preg_replace( '/`/', '\\`',
@@ -500,7 +667,7 @@ class MySQLDataStore implements DataStore {
 				.' AS '.$this->escape( $columnName, true, '`' );
 		}
 		return(
-			'SELECT '.implode( ', ', $declarations )
+			'SELECT SQL_CALC_FOUND_ROWS '.implode( ', ', $declarations )
 			.' FROM '.$this->CriteriaToJoinClause( $sourceGridName, $criteria ).' '
 			.$this->CriteriaToConditions( $sourceGridName, $criteria )
 		);
@@ -514,7 +681,6 @@ class MySQLDataStore implements DataStore {
 		$sql = '';
 		if( $criteria instanceof Criteria ){
 			if( !$criteria->validate() ){
-				print_r( $criteria );
 				throw( new TorporException( 'Criteria not valid, cannot continue' ) );
 			}
 
@@ -551,6 +717,8 @@ class MySQLDataStore implements DataStore {
 					} else {
 						$target = '\'%'.$this->escape( $target ).'%\'';
 					}
+					// TODO: Case sensitivity assumes latin1 character set.  This needs to be adapted
+					// to the character set of the target field(s)!
 					$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' LIKE '.$target
 						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' );
 					break;

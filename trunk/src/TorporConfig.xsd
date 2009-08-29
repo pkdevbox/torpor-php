@@ -34,7 +34,7 @@
 						<xs:element default="false" minOccurs="0" name="PermitDDL" type="xs:boolean"/>
 						<xs:element default="false" minOccurs="0" name="PerpetuateAutoLinks" type="xs:boolean"/>
 						<xs:element default="false" minOccurs="0" name="PublishAllFields" type="xs:boolean"/>
-						<xs:element default="true" minOccurs="0" name="PublishCascade" type="xs:boolean"/>
+						<xs:element default="true" minOccurs="0" name="PublishDependencies" type="xs:boolean"/>
 						<xs:element default="true" minOccurs="0" name="ReloadAfterPublish" type="xs:boolean"/>
 						<xs:element minOccurs="0" name="DataTypeMap">
 							<xs:complexType>
@@ -60,6 +60,7 @@
 														<xs:enumeration value="float"/>
 														<xs:enumeration value="integer"/>
 														<xs:enumeration value="text"/>
+														<xs:enumeration value="time"/>
 														<xs:enumeration value="unsigned"/>
 														<xs:enumeration value="varchar"/>
 														<xs:enumeration value="none"/>
@@ -202,6 +203,7 @@
 																	<xs:enumeration value="float"/>
 																	<xs:enumeration value="integer"/>
 																	<xs:enumeration value="text"/>
+																	<xs:enumeration value="time"/>
 																	<xs:enumeration value="unsigned"/>
 																	<xs:enumeration value="varchar"/>
 																</xs:restriction>
@@ -234,8 +236,9 @@
 														<xs:attribute name="type" use="required">
 															<xs:simpleType>
 																<xs:restriction base="xs:string">
-																	<xs:enumeration value="publish"/>
+																	<xs:enumeration value="delete"/>
 																	<xs:enumeration value="load"/>
+																	<xs:enumeration value="publish"/>
 																</xs:restriction>
 															</xs:simpleType>
 														</xs:attribute>
@@ -270,6 +273,7 @@
 																	<xs:enumeration value="float"/>
 																	<xs:enumeration value="integer"/>
 																	<xs:enumeration value="text"/>
+																	<xs:enumeration value="time"/>
 																	<xs:enumeration value="unsigned"/>
 																	<xs:enumeration value="varchar"/>
 																	<xs:enumeration value="none"/>
