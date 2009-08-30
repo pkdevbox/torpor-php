@@ -195,7 +195,7 @@ class GridSet extends PersistableContainer implements Iterator {
 				$this->_grids = array();
 				$this->_setLoaded( false );
 			}
-			$return = $this->_setLoaded( $this->Torpor()->Load( $this, $refresh ) );
+			$return = $this->Torpor()->Load( $this, $refresh );
 		}
 		return( $return );
 	}
@@ -223,7 +223,7 @@ class GridSet extends PersistableContainer implements Iterator {
 	public function Publish( $force = false ){
 		$publishCount = 0;
 		for( $i = 0; $i < $this->getGridCount(); $i++ ){
-			if( $this->_grids[$i]->Publish( $force ) ){
+			if( $this->getGrid( $i )->Publish( $force ) ){
 				$publishCount++;
 			}
 		}
@@ -235,7 +235,7 @@ class GridSet extends PersistableContainer implements Iterator {
 	public function Delete(){
 		$deleteCount = 0;
 		for( $i = 0; $i < $this->getGridCount(); $i++ ){
-			if( $this->_grids[$i]->Delete() ){
+			if( $this->getGrid( $i )->Delete() ){
 				$deleteCount++;
 			}
 		}

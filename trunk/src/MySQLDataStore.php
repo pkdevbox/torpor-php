@@ -12,6 +12,7 @@ class MySQLDataStore implements DataStore {
 	private $_writable = false;
 
 	public static $_publishing = array();
+	public static $_parsing = array();
 
 	protected function MySQLDataStore(){}
 
@@ -200,7 +201,7 @@ class MySQLDataStore implements DataStore {
 				// of that locally?
 				$this->LoadGridFromQuery(
 					$grid,
-					'SELECT SQL_CALC_FOUND_ROWS '.implode( ', ', $declarations )
+					'SELECT SQL_CALC_FOUND_ROWS DISTINCT '.implode( ', ', $declarations )
 					.' FROM '.$this->gridTableName( $grid )
 					.' WHERE '.implode( ' AND ', $clauses )
 					.' LIMIT 1',
@@ -287,7 +288,7 @@ class MySQLDataStore implements DataStore {
 					.$this->escape( $gridSet->Torpor()->dataNameForColumn( $gridType, $columnName ), true, '`' )
 					.' AS '.$this->escape( $columnName, true, '`' );
 			}
-			$sql = 'SELECT SQL_CALC_FOUND_ROWS '.implode( ', ', $declarations )
+			$sql = 'SELECT SQL_CALC_FOUND_ROWS DISTINCT '.implode( ', ', $declarations )
 				.' FROM '.$this->escape( $gridSet->Torpor()->dataNameForGrid( $gridType ), true, '`' )
 				.' AS '.$this->escape( $gridType, true, '`' );
 		}
@@ -648,7 +649,7 @@ class MySQLDataStore implements DataStore {
 				throw( new TorporException( 'No reference path between '.$this->getTorpor()->containerKeyName( $sourceGridName ).' and '.$gridAlias ) );
 			}
 		}
-		if( !isset( $this->getTorpor()->$gridName()->$columnName ) ){
+		if( !$this->getTorpor()->$gridName()->hasColumn( $columnName ) ){
 			throw( new TorporException( 'Unsupported column in Criteria: '.$columnName ) );
 		}
 		return(
@@ -667,13 +668,14 @@ class MySQLDataStore implements DataStore {
 				.' AS '.$this->escape( $columnName, true, '`' );
 		}
 		return(
-			'SELECT SQL_CALC_FOUND_ROWS '.implode( ', ', $declarations )
+			'SELECT SQL_CALC_FOUND_ROWS DISTINCT '.implode( ', ', $declarations )
 			.' FROM '.$this->CriteriaToJoinClause( $sourceGridName, $criteria ).' '
 			.$this->CriteriaToConditions( $sourceGridName, $criteria )
 		);
 	}
 
 	public function CriteriaToConditions( $sourceGridName, CriteriaBase $criteria, $clause = 'WHERE' ){
+		// TODO: Check for recursion
 		$sourceGridName = $this->getTorpor()->containerKeyName( $sourceGridName );
 		if( !$this->getTorpor()->supportedGrid( $sourceGridName ) ){
 			throw( new TorporException( 'Unrecognized grid "'.$sourceGridName.'" requested' ) );
@@ -812,6 +814,11 @@ class MySQLDataStore implements DataStore {
 					// TODO: Extract/Create the SQL used to populate a GridSet,
 					// and use that as a sub-select inclusion/exclusion, eg. $grid.$column [NOT] IN ( SELECT ... )
 					// Need to specify which column of the SET pertains to this column...
+					// 1. gridSet->getType() must be equal to Criteria->getGrid (accounting for alias) type
+					// 2. isInclusive() requires that the SQL be calculated for the grid w/o limit - otherwise
+					//    use the loaded portion of gridSet only.
+					// 3. Special handling for an empty criteria gridSet w/o pagination:
+					//    Implicitly convert to a left outer join and use (NOT) IS NULL here?
 					break;
 				default:
 					throw( new TorporException( 'Unsupported criteria requested: '.$criteria->getType() ) );

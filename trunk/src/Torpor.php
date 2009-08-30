@@ -8,6 +8,7 @@ require_once( 'CriteriaSet.php' );
 require_once( 'PersistenceCommand.php' );
 require_once( 'Grid.php' );
 require_once( 'GridSet.php' );
+require_once( 'GridColumnCollection.php' );
 require_once( 'Column.php' );
 require_once( 'DataStore.php' );
 
@@ -1338,7 +1339,7 @@ class Torpor {
 			default:
 				if( $this->supportedGrid( $function ) ){
 					$columns = array_keys( $this->_getColumns( $function ) );
-					$return = (object)array_combine( $columns, $columns );
+					$return = new GridColumnNameCollection( array_combine( $columns, $columns ) );
 				} else {
 					$this->throwException( 'Unrecognized function "'.$function.'" requested on '.get_class( $this ) );
 				}
