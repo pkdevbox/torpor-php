@@ -272,11 +272,17 @@ class Criteria extends CriteriaBase {
 				}
 				break;
 			case self::TYPE_IN_SET:
-				if( $preppedArgCount != 1 ){ throw( $argCountException ); }
-				$set = array_shift( $preppedArgs );
+				if( $preppedArgCount > 2 ){ throw( $argCountException ); }
+				$preppedArgs[] = false; // Default for "inclusive"
+				// "inclusive" for gridSet has special meaning.  If set
+				// to true, it will be used by the data store to compute
+				// the entire possible affected set and not just the loaded
+				// portion (or calculated page offset) of the target gridSet
+				list( $set, $inclusive ) = array_shift( $preppedArgs );
 				if( !( $set instanceof GridSet ) ){
 					throw( new TorporException( 'Argument for '.$this->getType().' criteria type must be an instance of GridSet' ) );
 				}
+				$this->setInclusive( $inclusive );
 				$this->addArgument( $set );
 				break;
 			case self::TYPE_PATTERN:

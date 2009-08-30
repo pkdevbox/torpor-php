@@ -223,7 +223,7 @@ class Grid extends PersistableContainer implements Iterator
 	}
 
 	public function dumpObject( $all = true, $load = true ){
-		return( (object)$this->dumpArray( $all, $load ) );
+		return( new GridColumnValueCollection( $this->dumpArray( $all, $load ) ) );
 	}
 
 	public function canPublish(){ return( $this->validate() ); }
