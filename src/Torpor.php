@@ -10,6 +10,7 @@ require_once( 'Grid.php' );
 require_once( 'GridSet.php' );
 require_once( 'GridColumnCollection.php' );
 require_once( 'Column.php' );
+require_once( 'Cache.php' );
 require_once( 'DataStore.php' );
 
 // TODO: phpdoc
@@ -133,6 +134,7 @@ class Torpor {
 	const ALIAS_KEYS_ONLY = 3;
 
 	private static $instance;
+	private $_cache;
 	private $_readDataStore;
 	private $_writeDataStore;
 	private $_config = array();
@@ -317,6 +319,25 @@ class Torpor {
 		}
 
 		if( isset( $xmlObj->Repository ) ){
+			if( isset( $xmlObj->Repository->Cache ) ){
+				$cacheXml = $xmlObj->Repository->Cache;
+				$cacheClass = (string)$cacheXml->attributes()->class;
+				if( !class_exists( $cacheClass ) ){
+					$this->throwException( 'Cache class "'.$cacheClass.'" is not defined' );
+				}
+				$settings = array();
+				foreach( $cacheXml->Parameter as $parameterXml ){
+					$settings{ (string)$parameterXml->attributes()->name } = (
+						isset( $parameterXml->attributes()->value )
+						? (string)$parameterXml->attributes()->value
+						: (string)$parameterXml
+					);
+				}
+				$cache = call_user_func( array( $cacheClass, 'createInstance' ), $this );
+				$cache->initialize( $settings );
+				$this->Cache( $cache );
+			}
+
 			$readDataStore = null;
 			$writeDataStore = null;
 			$readXml = null;
@@ -402,10 +423,10 @@ class Torpor {
 					$settings
 				);
 				if( $storeType == 'read' ){
-					$this->_readDataStore = $dataStore;
+					$this->ReadDataStore( $dataStore );
 				}
 				if( $storeType == 'write' || $writeXml === $readXml ){
-					$this->_writeDataStore = $dataStore;
+					$this->WriteDataStore( $dataStore );
 				}
 			}
 		}
@@ -723,6 +744,14 @@ class Torpor {
 	protected function &_getReferences( $grid = null ){ return $this->_getInitX( self::ARKEY_REFERENCES, $grid ); }
 	protected function &_getReferenceAliases( $grid = null ){ return $this->_getInitX( self::ARKEY_REFERENCE_ALIASES, $grid ); }
 	protected function &_getUniqueKeys( $grid = null ){ return $this->_getInitX( self::ARKEY_UNIQUEKEYS, $grid ); }
+
+	public function isCacheEnabled(){ return( is_object( $this->Cache() ) ); }
+	public function Cache( Cache $cache = null ){
+		if( !is_null( $cache ) ){
+			$this->_cache = $cache;
+		}
+		return( $this->_cache );
+	}
 
 	public function ReadDataStore( DataStore $dataStore = null ){
 		if( !is_null( $dataStore ) ){
@@ -1223,7 +1252,9 @@ class Torpor {
 			}
 			$this->cachePrototype( $grid );
 		}
-		return( clone $this->cachedPrototype( $gridName ) );
+		$grid = clone( $this->cachedPrototype( $gridName ) );
+		$grid->OnNew();
+		return( $grid );
 	}
 
 	// Works by finding the relationship between the target and source, verifying that

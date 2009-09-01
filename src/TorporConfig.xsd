@@ -77,30 +77,28 @@
 			</xs:element>
 			<xs:element minOccurs="0" name="Repository">
 				<xs:complexType>
-					<xs:choice>
-						<xs:element name="DataStore">
+					<xs:sequence minOccurs="1">
+						<xs:element minOccurs="0" name="Cache">
 							<xs:complexType>
 								<xs:sequence minOccurs="0">
 									<xs:element maxOccurs="unbounded" minOccurs="0" name="Parameter">
 										<xs:complexType mixed="true">
 											<xs:attribute name="name" type="xs:string" use="required"/>
 											<xs:attribute name="value" type="xs:string"/>
-											<xs:attribute default="false" name="encrypted" type="xs:boolean"/>
 										</xs:complexType>
 									</xs:element>
 								</xs:sequence>
-								<xs:attribute name="class">
+								<xs:attribute name="class" use="required">
 									<xs:simpleType>
 										<xs:restriction base="xs:string">
 											<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
 										</xs:restriction>
 									</xs:simpleType>
 								</xs:attribute>
-								<xs:attribute name="type" type="xs:string" use="required"/>
 							</xs:complexType>
 						</xs:element>
-						<xs:sequence>
-							<xs:element name="ReadDataStore">
+						<xs:choice>
+							<xs:element name="DataStore">
 								<xs:complexType>
 									<xs:sequence minOccurs="0">
 										<xs:element maxOccurs="unbounded" minOccurs="0" name="Parameter">
@@ -121,29 +119,52 @@
 									<xs:attribute name="type" type="xs:string" use="required"/>
 								</xs:complexType>
 							</xs:element>
-							<xs:element name="WriteDataStore">
-								<xs:complexType>
-									<xs:sequence minOccurs="0">
-										<xs:element maxOccurs="unbounded" minOccurs="0" name="Parameter">
-											<xs:complexType mixed="true">
-												<xs:attribute name="name" type="xs:string" use="required"/>
-												<xs:attribute name="value" type="xs:string"/>
-												<xs:attribute default="false" name="encrypted" type="xs:boolean"/>
-											</xs:complexType>
-										</xs:element>
-									</xs:sequence>
-									<xs:attribute name="type" type="xs:string" use="required"/>
-									<xs:attribute name="class">
-										<xs:simpleType>
-											<xs:restriction base="xs:string">
-												<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
-											</xs:restriction>
-										</xs:simpleType>
-									</xs:attribute>
-								</xs:complexType>
-							</xs:element>
-						</xs:sequence>
-					</xs:choice>
+							<xs:sequence>
+								<xs:element name="ReadDataStore">
+									<xs:complexType>
+										<xs:sequence minOccurs="0">
+											<xs:element maxOccurs="unbounded" minOccurs="0" name="Parameter">
+												<xs:complexType mixed="true">
+													<xs:attribute name="name" type="xs:string" use="required"/>
+													<xs:attribute name="value" type="xs:string"/>
+													<xs:attribute default="false" name="encrypted" type="xs:boolean"/>
+												</xs:complexType>
+											</xs:element>
+										</xs:sequence>
+										<xs:attribute name="class">
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:attribute>
+										<xs:attribute name="type" type="xs:string" use="required"/>
+									</xs:complexType>
+								</xs:element>
+								<xs:element name="WriteDataStore">
+									<xs:complexType>
+										<xs:sequence minOccurs="0">
+											<xs:element maxOccurs="unbounded" minOccurs="0" name="Parameter">
+												<xs:complexType mixed="true">
+													<xs:attribute name="name" type="xs:string" use="required"/>
+													<xs:attribute name="value" type="xs:string"/>
+													<xs:attribute default="false" name="encrypted" type="xs:boolean"/>
+												</xs:complexType>
+											</xs:element>
+										</xs:sequence>
+										<xs:attribute name="type" type="xs:string" use="required"/>
+										<xs:attribute name="class">
+											<xs:simpleType>
+												<xs:restriction base="xs:string">
+													<xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*"/>
+												</xs:restriction>
+											</xs:simpleType>
+										</xs:attribute>
+									</xs:complexType>
+								</xs:element>
+							</xs:sequence>
+						</xs:choice>
+					</xs:sequence>
 				</xs:complexType>
 			</xs:element>
 			<xs:element name="Grids">
