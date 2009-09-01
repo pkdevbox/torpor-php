@@ -45,8 +45,8 @@ class Criteria extends CriteriaBase {
 	const TYPE_NOT_IN        = 'NOT_IN';
 	const TYPE_NOT_IN_COLUMN = 'NOT_IN_COLUMN';
 
-	const TYPE_IN_SET     = 'IN_SET';
-	const TYPE_NOT_IN_SET = 'IN_SET';
+	const TYPE_IN_SET     = 'INSET';
+	const TYPE_NOT_IN_SET = 'INSET';
 
 	const TYPE_LESSTHAN            = 'LESSTHAN';
 	const TYPE_LESSTHAN_COLUMN     = 'LESSTHAN_COLUMN';
@@ -161,11 +161,13 @@ class Criteria extends CriteriaBase {
 		return( $this->_type = $type ); // Set the original as well.
 	}
 
+	public function isExclusive(){ return( !$this->isInclusive() ); }
+	public function setExclusive( $bool = true ){ return( !$this->setInclusive( !$bool ) ); }
 	public function isInclusive(){ return( $this->_inclusive ); }
 	public function setInclusive( $bool = true ){ return( $this->_inclusive = ( $bool ? true : false ) ); }
 
 	public function isCaseSensitive(){ return( !$this->isCaseInsensitive() ); }
-	public function setCaseSensitive( $bool = true ){ return( $this->setCaseInsensitive( !$bool ) ); }
+	public function setCaseSensitive( $bool = true ){ return( !$this->setCaseInsensitive( !$bool ) ); }
 	public function isCaseInsensitive(){ return( $this->_caseInsensitive ); }
 	public function setCaseInsensitive( $bool = true ){ return( $this->_caseInsensitive = ( $bool ? true : false ) ); }
 
@@ -278,7 +280,7 @@ class Criteria extends CriteriaBase {
 				// to true, it will be used by the data store to compute
 				// the entire possible affected set and not just the loaded
 				// portion (or calculated page offset) of the target gridSet
-				list( $set, $inclusive ) = array_shift( $preppedArgs );
+				list( $set, $inclusive ) = $preppedArgs;
 				if( !( $set instanceof GridSet ) ){
 					throw( new TorporException( 'Argument for '.$this->getType().' criteria type must be an instance of GridSet' ) );
 				}

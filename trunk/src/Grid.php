@@ -8,6 +8,8 @@ class Grid extends PersistableContainer implements Iterator
 	private $_deleted = false;
 	private $_columns = array();
 
+	public function OnNew(){ return( true ); }
+
 	public function _getColumn( $columnName ){
 		$columnName = $this->Torpor()->makeKeyName( $columnName );
 		if( !$this->hasColumn( $columnName ) ){
@@ -24,12 +26,14 @@ class Grid extends PersistableContainer implements Iterator
 	public function isReadOnly(){ return( $this->_readOnly ); }
 	public function setReadOnly( $bool = true ){ return( $this->_readOnly = ( $bool ? true : false ) ); }
 
+	public function OnBeforeDelete(){ return( true ); }
 	public function Delete(){
 		if( $this->isReadOnly() ){
 			$this->throwExceotion( $this->_getObjName().' is marked read only, cannot delete' );
 		}
 		return( $this->Torpor()->Delete( $this ) );
 	}
+	public function OnDelete(){ return( true ); }
 
 	public function ColumnNames(){ return( $this->_getColumnNames() ); }
 	public function hasColumn( $columnName ){
@@ -156,6 +160,7 @@ class Grid extends PersistableContainer implements Iterator
 		}
 		return( $this->isLoaded() );
 	}
+	public function OnLoad(){ return( true ); }
 
 	public function UnLoad( $preserveKeys = true ){
 		$keys = ( $preserveKeys ? $this->KeyColumnNames() : array() );
@@ -248,6 +253,8 @@ class Grid extends PersistableContainer implements Iterator
 		return( $this->canPublish() );
 	}
 
+	public function OnBeforePublish(){ return( true ); }
+	public function Save( $force = false ){ return( $this->Publish( $force ) ); }
 	public function Persist( $force = false ){ return( $this->Publish( $force ) ); }
 	public function Publish( $force = false ){
 		if( $this->isReadOnly() ){
@@ -255,6 +262,7 @@ class Grid extends PersistableContainer implements Iterator
 		}
 		return( $this->Torpor()->Publish( $this, $force ) );
 	}
+	public function OnPublish(){ return( true ); }
 
 	// Abstract all getter & setter methods.
 	public function __call( $function, $arguments ){
@@ -432,5 +440,32 @@ class Grid extends PersistableContainer implements Iterator
 	public function key(){ return( key( $this->_columns ) ); }
 	public function next(){ return( next( $this->_columns ) ); }
 	public function valid(){ return( $this->current() !== false ); }
+}
+
+class DebugGrid extends Grid {
+
+	public function OnNew(){
+		trigger_error( 'New '.$this->_getObjName().' created', E_USER_NOTICE );
+	}
+
+	public function OnLoad(){
+		trigger_error( 'Just loaded '.$this->_getObjName(), E_USER_NOTICE );
+	}
+
+	public function OnBeforePublish(){
+		trigger_error( 'About to publish '.$this->_getObjName(), E_USER_NOTICE );
+	}
+
+	public function OnPublish(){
+		trigger_error( 'Just published '.$this->_getObjName(), E_USER_NOTICE );
+	}
+
+	public function OnBeforeDelete(){
+		trigger_error( 'About to delete '.$this->_getObjName(), E_USER_NOTICE );
+	}
+
+	public function OnDelete(){
+		trigger_error( 'Just deleted '.$this->_getObjName(), E_USER_NOTICE );
+	}
 }
 ?>
