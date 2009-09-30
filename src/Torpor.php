@@ -74,14 +74,20 @@ class Torpor {
 	const OPTION_PERPETUATE_AUTO_LINKS = 'PerpetuateAutoLinks';
 	const DEFAULT_PERPETUATE_AUTO_LINKS = false;
 
-	const OPTION_PUBLISH_ALL_FIELDS = 'PublishAllFields';
-	const DEFAULT_PUBLISH_ALL_FIELDS = false;
+	const OPTION_PUBLISH_ALL_COLUMNS = 'PublishAllColumns';
+	const DEFAULT_PUBLISH_ALL_COLUMNS = false;
 
 	const OPTION_PUBLISH_DEPENDENCIES = 'PublishDependencies';
 	const DEFAULT_PUBLISH_DEPENDENCIES = true;
 
 	const OPTION_RELOAD_AFTER_PUBLISH = 'ReloadAfterPublish';
 	const DEFAULT_RELOAD_AFTER_PUBLISH = true;
+
+	const OPTION_TYPED_GRID_CLASSES = 'TypedGridClasses';
+	const DEFAULT_TYPED_GRID_CLASSES = false;
+
+	const OPTION_TYPED_GRID_CLASSES_PREFIX = 'TypedGridClassesPrefix';
+	const DEFAULT_TYPED_GRID_CLASSES_PREFIX = '';
 
 	const DATA_STORE_CLASS = 'DataStore';
 
@@ -195,32 +201,30 @@ class Torpor {
 		}
 
 		$xml = '';
-		if( !empty( $config ) ){
-			if( is_resource( $config ) ){
+		if( empty( $config ) ){
+			$config = $this->getFileInPath( self::DEFAULT_CONFIG_FILE );
+		}
+		if( is_resource( $config ) ){
+			$xml = stream_get_contents( $config );
+		} else if( $config instanceof DOMNode ){
+			$xml = simplexml_import_dom( $config );
+		} else if( $config instanceof SimpleXMLElement ){
+			$xml = $config;
+		} else if( is_string( $config ) ){
+			if( preg_match( '/^[a-z]+:\/{2,3}[a-zA-Z0-9_\.]$/', $config ) ){
+				// Looks like a URI
+				$config = fopen( $config, 'r' );
 				$xml = stream_get_contents( $config );
-			} else if( $config instanceof DOMNode ){
-				$xml = simplexml_import_dom( $config );
-			} else if( $config instanceof SimpleXMLElement ){
+				fclose( $config );
+			} else if( file_exists( $config ) && is_readable( $config ) ){
+				$xml = simplexml_load_file( $config );
+			} else if( $configFile = $this->getFileInPath( $config ) ){
+				$xml = simplexml_load_file( $configFile );
+			} else {
 				$xml = $config;
-			} else if( is_string( $config ) ){
-				if( preg_match( '/^[a-z]+:\/{2,3}[a-zA-Z0-9_\.]$/', $config ) ){
-					// Looks like a URI
-					$config = fopen( $config, 'r' );
-					$xml = stream_get_contents( $config );
-					fclose( $config );
-				} else if( file_exists( $config ) && is_readable( $config ) ){
-					$xml = simplexml_load_file( $config );
-				} else if( $configFile = $this->getFileInPath( $config ) ){
-					$xml = simplexml_load_file( $configFile );
-				} else {
-					$xml = $config;
-				}
-			}
-		} else {
-			if( $defaultConfig = $this->getFileInPath( self::DEFAULT_CONFIG_FILE ) ){
-				$config = file_get_contents( $defaultConfig );
 			}
 		}
+
 		if( empty( $xml ) ){
 			$instance->throwException( 'No configuration found, cannot initialize' );
 		}
@@ -238,9 +242,11 @@ class Torpor {
 				self::OPTION_PAGE_SIZE => self::DEFAULT_PAGE_SIZE,
 				self::OPTION_PERMIT_DDL => self::DEFAULT_PERMIT_DDL,
 				self::OPTION_PERPETUATE_AUTO_LINKS => self::DEFAULT_PERPETUATE_AUTO_LINKS,
-				self::OPTION_PUBLISH_ALL_FIELDS => self::DEFAULT_PUBLISH_ALL_FIELDS,
+				self::OPTION_PUBLISH_ALL_COLUMNS => self::DEFAULT_PUBLISH_ALL_COLUMNS,
 				self::OPTION_PUBLISH_DEPENDENCIES => self::DEFAULT_PUBLISH_DEPENDENCIES,
-				self::OPTION_RELOAD_AFTER_PUBLISH => self::DEFAULT_RELOAD_AFTER_PUBLISH
+				self::OPTION_RELOAD_AFTER_PUBLISH => self::DEFAULT_RELOAD_AFTER_PUBLISH,
+				self::OPTION_TYPED_GRID_CLASSES => self::DEFAULT_TYPED_GRID_CLASSES,
+				self::OPTION_TYPED_GRID_CLASSES_PREFIX => self::DEFAULT_TYPED_GRID_CLASSES_PREFIX
 			)
 		);
 	}
@@ -299,14 +305,20 @@ class Torpor {
 					case self::OPTION_PERPETUATE_AUTO_LINKS:
 						$options{ self::OPTION_PERPETUATE_AUTO_LINKS } = ( (string)$option == self::VALUE_TRUE ? true : false );
 						break;
-					case self::OPTION_PUBLISH_ALL_FIELDS:
-						$options{ self::OPTION_PUBLISH_ALL_FIELDS } = ( (string)$option == self::VALUE_TRUE ? true : false );
+					case self::OPTION_PUBLISH_ALL_COLUMNS:
+						$options{ self::OPTION_PUBLISH_ALL_COLUMNS } = ( (string)$option == self::VALUE_TRUE ? true : false );
 						break;
 					case self::OPTION_PUBLISH_DEPENDENCIES:
 						$options{ self::OPTION_DEPENDENCIES } = ( (string)$option == self::VALUE_TRUE ? true : false );
 						break;
 					case self::OPTION_RELOAD_AFTER_PUBLISH:
 						$options{ self::OPTION_RELOAD_AFTER_PUBLISH } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
+					case self::OPTION_TYPED_GRID_CLASSES:
+						$options{ self::OPTION_TYPED_GRID_CLASSES } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
+					case self::OPTION_TYPED_GRID_CLASSES_PREFIX:
+						$options{ self::OPTION_TYPED_GRID_CLASSES_PREFIX } = (string)$option;
 						break;
 					case 'DataTypeMap':
 						$dataTypeMap{ self::VALUE_GLOBAL } = $this->parseDataTypeMap( $option );
@@ -386,6 +398,9 @@ class Torpor {
 						// Using just-in-time require_once calls in the event that lazy loading
 						// has not been enabled on this system.  Should be negligible with
 						// regard to performance.
+						case 'custom':
+							$this->throwException( 'Custom data store requested but no class set' );
+							break;
 						case 'mssql':
 							require_once( ( $className = 'MSSQLDataStore' ).'.php' );
 							break;
@@ -402,6 +417,7 @@ class Torpor {
 						case 'odbc':
 							require_once( ( $className = 'ODBCDataStore' ).'.php' );
 							break;
+						case 'oci':
 						case 'oracle':
 							require_once( ( $className = 'OracleDataStore' ).'.php' );
 							break;
@@ -449,8 +465,11 @@ class Torpor {
 			if( $className = (string)$gridXml->attributes()->class ){
 				if( $className == self::VALUE_NONE ){
 					$className = self::DEFAULT_GRID_CLASS;
-				} else {
 				}
+				$gridClasses{ $gridName } = $className;
+			} else if( $options{ self::OPTION_TYPED_GRID_CLASSES } ){
+				$className = $options{ self::OPTION_TYPED_GRID_CLASSES_PREFIX }.$gridName;
+				$this->typedGridClassCreate( $className, false );
 				$gridClasses{ $gridName } = $className;
 			}
 
@@ -462,7 +481,13 @@ class Torpor {
 				if( isset( $columns{ $gridName }{ $columnName } ) ){
 					$this->throwException( 'Duplicate column name '.$columnName.' on grid '.$gridName );
 				}
-				if( (string)$columnXml->attributes()->class ){
+				if(
+					isset( $columnXml->attributes()->class )
+					|| strtoupper( (string)$columnXml->attributes()->type ) == Column::TYPE_CLASS
+				){
+					if( !isset( $columnXml->attributes()->class ) ){
+						$this->throwException( 'Column attribute "class" must be defined for type '.Column::TYPE_CLASS );
+					}
 					$className = (string)$columnXml->attributes()->class;
 					if( $className != self::VALUE_NONE ){
 						$this->checkColumnClass( $className );
@@ -623,14 +648,7 @@ class Torpor {
 			throw( $e );
 		}
 
-		// TODO: Now that we have all tables scanned, make sure that all foreign references
-		// correspond to known table types.
-		// TODO: retun should only be true if:
-		// 1. We have 1 or more grid containing 1 or more columns
-		// 2. We have a data store properly instantiated.
-		$return = true;
-
-		return( $return );
+		return( true );
 	}
 
 	protected function initializeKeys(){
@@ -996,8 +1014,8 @@ class Torpor {
 	public function perpetuateAutoLinks(){
 		return( $this->options( self::OPTION_PERPETUATE_AUTO_LINKS ) );
 	}
-	public function publishAllFields(){
-		return( $this->options( self::OPTION_PUBLISH_ALL_FIELDS ) );
+	public function publishAllColumns(){
+		return( $this->options( self::OPTION_PUBLISH_ALL_COLUMNS ) );
 	}
 	public function publishDependencies(){
 		return( $this->options( self::OPTION_PUBLISH_DEPENDENCIES ) );
@@ -1006,6 +1024,14 @@ class Torpor {
 		return( $this->options( self::OPTION_RELOAD_AFTER_PUBLISH ) );
 	}
 
+	public function typedGridClasses(){
+		return( $this->options( self::OPTION_TYPED_GRID_CLASSES ) );
+	}
+	public function typedGridClassesPrefix(){
+		return( $this->options( self::OPTION_TYPED_GRID_CLASSES_PREFIX ) );
+	}
+
+	public function gridClasses( $gridName = null ){ return( $this->_getGridClasses( $gridName ) ); }
 	public function gridClass( $gridName ){
 		if( is_object( $gridName ) ){
 			// What're you asking me for?
@@ -1095,7 +1121,7 @@ class Torpor {
 
 	public function supportedGrid( $gridName, $checkAliases = false ){
 		$this->checkInitialized();
-		$gridName = $this->makeKeyName( $gridName );
+		$gridName = $this->containerKeyName( $gridName );
 		$return = false;
 		if( in_array( $gridName, array_keys( $this->_getGrids() ) ) ){
 			$return = true;
@@ -1236,7 +1262,7 @@ class Torpor {
 		return( $this->_newGridSet( $gridName, $criteria ) );
 	}
 
-	public function _newGrid( $gridName ){
+	public function _newGrid( $gridName, $className = null ){
 		$this->checkSupportedGrid( $gridName );
 		$gridName = $this->containerKeyName( $gridName );
 		// TODO: provide cloning of prototypes, and add special notes
@@ -1244,16 +1270,27 @@ class Torpor {
 		// necessity of overriding this (and still calling parent::__clone)
 		// on object inheriting Grid which contain their own references.
 		if( !$this->cachedPrototype( $gridName ) ){
-			$class = $this->gridClass( $gridName );
-			$grid = new $class( $this, $gridName );
-			foreach( $this->_getColumns( $gridName ) as $columnName => $columnXml ){
-				$class = $this->columnClass( $gridName, $columnName );
-				$grid->addColumn( new $class( $this, $columnName, $columnXml, $grid ) );
-			}
+			$class = ( !is_null( $className ) ? $className : $this->gridClass( $gridName ) );
+			$grid = new $class();
+			$grid->_setTorpor( $this );
+			$grid->_setObjName( $gridName );
+			$this->_newGridColumns( $grid );
 			$this->cachePrototype( $grid );
 		}
 		$grid = clone( $this->cachedPrototype( $gridName ) );
 		$grid->OnNew();
+		return( $grid );
+	}
+
+	public function _newGridColumns( $grid ){
+		$this->checkSupportedGrid( $grid );
+		$gridName = $this->containerKeyName( $grid );
+		foreach( $this->_getColumns( $gridName ) as $columnName => $columnXml ){
+			if( !$grid->hasColumn( $columnName ) ){
+				$class = $this->columnClass( $gridName, $columnName );
+				$grid->addColumn( new $class( $this, $columnName, $columnXml, $grid ) );
+			}
+		}
 		return( $grid );
 	}
 
@@ -1427,6 +1464,25 @@ class Torpor {
 	//***********************
 	//*  Utility Functions  *
 	//***********************
+	public static function typedGridClassCheck( $className ){
+		$torpor = ( isset( $this ) ? $this : Torpor::getInstance() );
+		return( $torpor->typedGridClassCreate( $className ) );
+	}
+	public static function typedGridClassCreate( $className, $checkInitialization = true, $extends = 'TypedGrid' ){
+		$return = !( $checkInitialization );
+		if( $checkInitialization ){
+			$torpor = ( isset( $this ) ? $this : Torpor::getInstance() );
+			$gridName = substr( $className, strlen( $torpor->typedGridClassesPrefix() ) );
+			$return = ( $torpor->supportedGrid( $gridName ) && $torpor->typedGridClasses() );
+		}
+		if( $return ){
+			if( !class_exists( $className ) ){
+				eval( 'class '.$className.' extends '.$extends.' {}' );
+			}
+		}
+		return( $return );
+	}
+
 	public static function throwException( $msg = 'An unkown error has occurred' ){
 		throw( new TorporException( $msg ) );
 	}

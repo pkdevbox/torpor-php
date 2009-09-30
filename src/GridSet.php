@@ -144,7 +144,7 @@ class GridSet extends PersistableContainer implements Iterator {
 			!is_null( $this->gridType() )
 			|| ( $this->Torpor()->canReference( $this->gridType(), $grid, $alias ) )
 		){
-			$existingGrid = $this->getGrid( ( $alias ? $alias : $grid ) );
+			$existingGrid = $this->getSourceGrid( ( $alias ? $alias : $grid ) );
 			if( $existingGrid !== $grid ){
 				$this->_sourceGrids{ ( $alias ? $alias : $grid->_getObjName() ) } = $grid;
 				if( $this->getGridCount() > 0 && $cascadeMap ){

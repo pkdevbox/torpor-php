@@ -33,9 +33,17 @@
 						</xs:element>
 						<xs:element default="false" minOccurs="0" name="PermitDDL" type="xs:boolean"/>
 						<xs:element default="false" minOccurs="0" name="PerpetuateAutoLinks" type="xs:boolean"/>
-						<xs:element default="false" minOccurs="0" name="PublishAllFields" type="xs:boolean"/>
+						<xs:element default="false" minOccurs="0" name="PublishAllColumns" type="xs:boolean"/>
 						<xs:element default="true" minOccurs="0" name="PublishDependencies" type="xs:boolean"/>
 						<xs:element default="true" minOccurs="0" name="ReloadAfterPublish" type="xs:boolean"/>
+						<xs:element default="true" minOccurs="0" name="TypedGridClasses" type="xs:boolean"/>
+						<xs:element default="" minOccurs="0" name="TypedGridClassesPrefix">
+							<xs:simpleType>
+								<xs:restriction base="xs:string">
+									<xs:pattern value="([a-zA-Z_][a-zA-Z0-9_]*)?"/>
+								</xs:restriction>
+							</xs:simpleType>
+						</xs:element>
 						<xs:element minOccurs="0" name="DataTypeMap">
 							<xs:complexType>
 								<xs:sequence>
@@ -63,7 +71,6 @@
 														<xs:enumeration value="time"/>
 														<xs:enumeration value="unsigned"/>
 														<xs:enumeration value="varchar"/>
-														<xs:enumeration value="none"/>
 													</xs:restriction>
 												</xs:simpleType>
 											</xs:attribute>
@@ -170,7 +177,7 @@
 			<xs:element name="Grids">
 				<xs:complexType>
 					<xs:sequence>
-						<xs:element name="Grid" maxOccurs="unbounded">
+						<xs:element name="Grid" maxOccurs="unbounded" minOccurs="1">
 							<xs:complexType>
 								<xs:sequence>
 									<xs:element name="Columns" minOccurs="0">
@@ -204,13 +211,7 @@
 															</xs:simpleType>
 														</xs:attribute>
 														<xs:attribute default="true" name="nullable" type="xs:boolean"/>
-														<xs:attribute name="precision">
-															<xs:simpleType>
-																<xs:restriction base="xs:integer">
-																	<xs:minInclusive value="0"/>
-																</xs:restriction>
-															</xs:simpleType>
-														</xs:attribute>
+														<xs:attribute default="0" name="precision" type="xs:integer"/>
 														<xs:attribute default="false" name="readOnly" type="xs:boolean"/>
 														<xs:attribute name="type" use="required">
 															<xs:simpleType>
@@ -297,7 +298,6 @@
 																	<xs:enumeration value="time"/>
 																	<xs:enumeration value="unsigned"/>
 																	<xs:enumeration value="varchar"/>
-																	<xs:enumeration value="none"/>
 																</xs:restriction>
 															</xs:simpleType>
 														</xs:attribute>
@@ -363,6 +363,9 @@
 										</xs:restriction>
 									</xs:simpleType>
 								</xs:attribute>
+								<xs:attribute name="dataName" type="xs:string" use="required"/>
+								<xs:attribute name="name" type="xs:string"/>
+								<xs:attribute default="false" name="readOnly" type="xs:boolean"/>
 								<xs:attribute default="data" name="type">
 									<xs:simpleType>
 										<xs:restriction base="xs:string">
@@ -371,9 +374,6 @@
 										</xs:restriction>
 									</xs:simpleType>
 								</xs:attribute>
-								<xs:attribute name="dataName" type="xs:string" use="required"/>
-								<xs:attribute name="name" type="xs:string"/>
-								<xs:attribute default="false" name="readOnly" type="xs:boolean"/>
 							</xs:complexType>
 						</xs:element>
 					</xs:sequence>
