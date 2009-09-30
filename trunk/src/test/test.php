@@ -43,8 +43,6 @@ class DoNothingDataStore implements DataStore {
 }
 
 
-// TODO: Default values for columns (and perhaps have the default value maintain an addressing
-// scheme such as 'userDefined:ApplicationName' which indicates where to get that default value.
 // TODO: Be able to mark grids as read-only
 $xmlConfig = <<<XML
 <?xml version='1.0'?>
@@ -119,8 +117,10 @@ $user = Torpor::getInstance()->newUser();
 print_r( $user->columnNames() );
 $user->setId( 12345 );
 $user->setUserName( 'george' );
-if( !$user->setPasswordHash( 'george' ) ){
-	var_dump( $user->Torpor()->nextError() );
+try {
+	$user->setPasswordHash( 'george' );
+} catch( TorporException $e ){
+	print_r( 'Encountered exception: '.$e->getMessage()."\n" );
 }
 $user->setPasswordHash( 'something other than george' );
 var_dump( $user->getId() );
@@ -183,12 +183,13 @@ foreach( $orderSet as $order ){
 }
 
 $order = Torpor()->newOrder();
+
 // One-to-one fetch
 $userThree = $order->getUser();
 
 var_dump( get_class( Torpor()->newUser() ) );
 
-var_dump( Torpor()->USER()->USERNAME );
+var_dump( Torpor()->User()->UserName );
 
 var_dump( Torpor()->primaryKeyForGrid( Torpor()->User ) );
 var_dump( get_class( Torpor()->getUserById( 98765 ) ) );

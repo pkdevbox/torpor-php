@@ -29,8 +29,9 @@ class Column extends PersistableContainer
 	const TYPE_VARCHAR          = 'VARCHAR';
 
 	// Utilities
-	const REGEX_DATE = '\d{4}([,\.\-\/]?\d{2}){2}';
-	const REGEX_TIME = '[01][0-9]([,:\-][0-5][0-9]){2}';
+	// TODO: Test this regex!!
+	const REGEX_DATE = '\d{4}[,\.\-\/]?(0[1-9]|1[0-2])[,\.\-\/]?(0[1-9]|[12][0-9]|3[01])';
+	const REGEX_TIME = '([01][0-9]|2[0-3])([,:\-][0-5][0-9]){2}';
 
 	const ATTRIBUTE_GENERATED_ON_PUBLISH = 'generatedOnPublish';
 
@@ -211,8 +212,13 @@ class Column extends PersistableContainer
 
 	public function getEncoding(){ return( $this->_encoding ); }
 	public function setEncoding( $encoding ){
-		// TODO: Not yet supported, need an encoding scheme.
-		$this->_encoding = $encoding;
+		if( !function_exists( 'mb_list_encodings' ) ){
+			trigger_error( 'Multibyte String extension not available, encoding value ignored', E_USER_WARNING );
+		} else if( !in_array( $encoding, mb_list_encodings() ) ){
+			trigger_error( 'Requested encoding "'.$encoding.'" not recognized, will be ignored', E_USER_WARNING );
+		} else {
+			$this->_encoding = $encoding;
+		}
 	}
 
 	public function getMaxLength(){ return( $this->_length ); }
@@ -392,7 +398,10 @@ class Column extends PersistableContainer
 		} else {
 			switch( $this->getType() ){
 				case self::TYPE_BINARY:
-					// TODO: Need binary save maxLength checking.
+					if( $this->getMaxLength() >= 0 && strlen( $data ) > $this->getMaxLength() ){
+						trigger_error( 'Binary data truncated', E_USER_WARNING );
+						$data = substr( $data, 0, $this->getMaxLength() );
+					}
 					break;
 				case self::TYPE_BOOL:
 					$data = ( $data && strtolower( $data ) !== Torpor::VALUE_FALSE ? true : false );
@@ -437,10 +446,17 @@ class Column extends PersistableContainer
 				case self::TYPE_CHAR:
 				case self::TYPE_TEXT:
 				case self::TYPE_VARCHAR:
-					// TODO: Warning should be based on character encoding and data type and be binary safe.
-					if( strlen( $data ) > $this->getMaxLength() ){
-						trigger_error( 'Character data truncated', E_USER_WARNING );
-						$data = substr( $data, 0, $this->getMaxLength() );
+					if( !is_null( $this->getEncoding() ) && function_exists( 'mb_convert_encoding' ) ){
+						$data = mb_convert_encoding( $data, $this->getEncoding(), mb_detect_encoding( $data ) );
+						if( $this->getMaxLength() >= 0 && mb_strlen( $data, $this->getEncoding() ) > $this->getMaxLength() ){
+							trigger_error( 'Character data truncated', E_USER_WARNING );
+							$data = mb_substr( $data, 0, $this->getMaxLength(), $this->getEncoding() );
+						}
+					} else {
+						if( $this->getMaxLength() >= 0 && strlen( $data ) > $this->getMaxLength() ){
+							trigger_error( 'Character data truncated', E_USER_WARNING );
+							$data = substr( $data, 0, $this->getMaxLength() );
+						}
 					}
 					break;
 				default:

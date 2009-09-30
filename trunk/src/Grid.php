@@ -29,7 +29,7 @@ class Grid extends PersistableContainer implements Iterator
 	public function OnBeforeDelete(){ return( true ); }
 	public function Delete(){
 		if( $this->isReadOnly() ){
-			$this->throwExceotion( $this->_getObjName().' is marked read only, cannot delete' );
+			$this->throwException( $this->_getObjName().' is marked read only, cannot delete' );
 		}
 		return( $this->Torpor()->Delete( $this ) );
 	}
@@ -152,11 +152,11 @@ class Grid extends PersistableContainer implements Iterator
 			if( !$this->isLoaded() || $refresh ){
 				$this->Torpor()->Load( $this, $refresh );
 				if( !$this->isLoaded() ){
-					$this->throwException( 'Load of '.$this->_getObjName().' failed' );
+					// $this->throwException( 'Load of '.$this->_getObjName().' failed' );
 				}
 			}
 		} else {
-			$this->throwException( 'Cannot load '.$this->_getObjName().': no identifying criteria' );
+			trigger_error( 'Cannot load '.$this->_getObjName().': no identifying criteria', E_USER_WARNING );
 		}
 		return( $this->isLoaded() );
 	}
@@ -221,7 +221,7 @@ class Grid extends PersistableContainer implements Iterator
 		$returnArray = array();
 		foreach( $this->Columns() as $columnName => $columnObj ){
 			if( $all || $columnObj->hasData() ){
-				$returnArray{ $columnName } = ( $load || $column->hasData() ? $columnObj->getData() : null );
+				$returnArray{ $columnName } = ( $load || $columnObj->hasData() ? $columnObj->getData() : null );
 			}
 		}
 		return( $returnArray );
@@ -231,8 +231,7 @@ class Grid extends PersistableContainer implements Iterator
 		return( new GridColumnValueCollection( $this->dumpArray( $all, $load ) ) );
 	}
 
-	public function canPublish(){ return( $this->validate() ); }
-	public function validate(){
+	public function canPublish(){
 		$return = true;
 		foreach( $this->Columns() as $column ){
 			if( !$column->hasData() && !$column->isNullable() && !$column->isGeneratedOnPublish() ){
@@ -240,8 +239,10 @@ class Grid extends PersistableContainer implements Iterator
 				break;
 			}
 		}
-		return( $return );
+		return( $return && $this->validate() );
 	}
+	public function validate(){ return( true ); }
+
 	public function publishDependencies( $force = false ){
 		if( !$this->canPublish() ){
 			foreach( $this->Columns() as $column ){
@@ -443,29 +444,40 @@ class Grid extends PersistableContainer implements Iterator
 }
 
 class DebugGrid extends Grid {
+	public function OnNew()          { trigger_error( 'New '.$this->_getObjName().' created', E_USER_NOTICE ); }
+	public function OnLoad()         { trigger_error( 'Just loaded '.$this->_getObjName(), E_USER_NOTICE ); }
+	public function OnBeforePublish(){ trigger_error( 'About to publish '.$this->_getObjName(), E_USER_NOTICE ); }
+	public function OnPublish()      { trigger_error( 'Just published '.$this->_getObjName(), E_USER_NOTICE ); }
+	public function OnBeforeDelete() { trigger_error( 'About to delete '.$this->_getObjName(), E_USER_NOTICE ); }
+	public function OnDelete()       { trigger_error( 'Just deleted '.$this->_getObjName(), E_USER_NOTICE ); }
+}
 
-	public function OnNew(){
-		trigger_error( 'New '.$this->_getObjName().' created', E_USER_NOTICE );
-	}
+class TypedGrid extends Grid {
+	public function __construct(){
+		$args = func_get_args();
+		$torpor = null;
+		foreach( $args as $index => $arg ){
+			if( $arg instanceof Torpor ){
+				$torpor = $arg;
+				unset( $args[ $index ] );
+				break;
+			}
+		}
+		$this->_setTorpor( ( $torpor instanceof Torpor ? $torpor : Torpor::getInstance() ) );
+		$gridName = get_class( $this );
+		if( $prefix = $this->Torpor()->typedGridClassesPrefix() ){
+			$gridName = substr( $gridName, strlen( $prefix ) );
+		}
+		if( !$this->Torpor()->supportedGrid( $gridName ) ){
+			$this->throwException( 'Could not resolve grid type from class name "'.$gridName.'"' );
+		}
+		$this->_setObjName( $gridName );
+		// $gridPrototype = $this->Torpor()->_newGrid( $gridName, Torpor::DEFAULT_GRID_CLASS );
+		$this->Torpor()->_newGridColumns( $this );
 
-	public function OnLoad(){
-		trigger_error( 'Just loaded '.$this->_getObjName(), E_USER_NOTICE );
-	}
-
-	public function OnBeforePublish(){
-		trigger_error( 'About to publish '.$this->_getObjName(), E_USER_NOTICE );
-	}
-
-	public function OnPublish(){
-		trigger_error( 'Just published '.$this->_getObjName(), E_USER_NOTICE );
-	}
-
-	public function OnBeforeDelete(){
-		trigger_error( 'About to delete '.$this->_getObjName(), E_USER_NOTICE );
-	}
-
-	public function OnDelete(){
-		trigger_error( 'Just deleted '.$this->_getObjName(), E_USER_NOTICE );
+		// TODO: 
+		// Look at the remaining arguments, and see if they match the primary key length of this
+		// grid, populating in order.
 	}
 }
 ?>

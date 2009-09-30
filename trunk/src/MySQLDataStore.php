@@ -10,6 +10,7 @@ class MySQLDataStore implements DataStore {
 	private $_torpor = null;
 
 	private $_writable = false;
+	private $_affected_rows = 0;
 
 	public static $_publishing = array();
 	public static $_parsing = array();
@@ -71,9 +72,9 @@ class MySQLDataStore implements DataStore {
 		$grid->OnBeforeDelete();
 		if( count( $commands ) > 0 ){
 			foreach( $commands as $command ){
-				$result = mysql_query( $this->parseCommand( $command, $grid ), $this->getConnection() );
+				$result = $this->query( $this->parseCommand( $command, $grid ) );
 				if( $result === true ){
-					if( ( $affected = mysql_affected_rows( $this->getConnection() ) ) != 1 ){
+					if( ( $affected = $this->affected_rows() ) != 1 ){
 						trigger_error( 'Successful delete command execution affected '.$affected.' rows, expected 1', E_USER_WARNING );
 						if( $affected >= 1 ){
 							$grid->UnLoad( false );
@@ -81,7 +82,7 @@ class MySQLDataStore implements DataStore {
 						}
 					}
 				} else if( $result === false ){
-					$this->throwException( $grid->_getObjName().' delete command failed: '.mysql_error( $this->getConnection() ) );
+					$this->throwException( $grid->_getObjName().' delete command failed: '.$this->error() );
 				} else {
 					$this->throwException( 'Boolean return expected from '.$grid->_getObjName().' delete command, got '.gettype( $result ) );
 				}
@@ -90,10 +91,10 @@ class MySQLDataStore implements DataStore {
 			$sql = 'DELETE FROM '.$this->gridTableName( $grid )
 				.' WHERE '.implode( ' AND ', $clauses )
 				.' LIMIT 1';
-			if( !mysql_query( $sql, $this->getConnection() ) ){
-				$this->throwException( $grid->_getObjName().' delete failed: '.mysql_error( $this->getConnection() ) );
+			if( !$this->query( $sql ) ){
+				$this->throwException( $grid->_getObjName().' delete failed: '.$this->error() );
 			} else {
-				if( mysql_affected_rows( $this->getConnection() ) != 1 ){
+				if( $this->affected_rows() != 1 ){
 					trigger_error( 'No '.$grid->_getObjName().' records deleted', E_USER_WARNING );
 				} else {
 					if( $this->getTorpor()->isCacheEnabled() ){
@@ -122,24 +123,24 @@ class MySQLDataStore implements DataStore {
 			$command->setCommand( $this->parseCommand( $command, $grids[$i], $final ) );
 		}
 		$return = false;
-		$result = mysql_query( $command->getCommand(), $this->getConnection() );
+		$result = $this->query( $command->getCommand() );
 		if( is_resource( $result ) ){
-			$rowCount = mysql_num_rows( $result );
+			$rowCount = $this->num_rows( $result );
 			if( $rowCount == 0 ){
 				trigger_error( 'No rows returned from executed command', E_USER_WARNING );
 				return( $return );
 			}
 			if( $returnAs instanceof Grid ){
-				if( mysql_num_rows( $result ) > 1 ){
+				if( $this->num_rows( $result ) > 1 ){
 					trigger_error( 'Multiple rows returned, only using the first to populate '.$grid->_getObjName().' grid', E_USER_WARNING );
 				}
-				$return = $returnAs->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
+				$return = $returnAs->LoadFromArray( $this->fetch_assoc( $result ), true, true );
 				$this->cacheGrid( $return );
 				$return->OnLoad();
 			} elseif( $returnAs instanceof GridSet ){
 				$return = 0;
 				$newCommand = Torpor::OPERATION_NEW.$returnAs->gridType();
-				while( $dataRow = mysql_fetch_assoc( $result ) ){
+				while( $dataRow = $this->fetch_assoc( $result ) ){
 					$returnAs++;
 					$grid = $returnAs->Torpor()->$newCommand();
 					// TODO: Create a local LoadGridFromArray that calls LoadFromArray, cacheGrid, and OnLoad
@@ -160,7 +161,7 @@ class MySQLDataStore implements DataStore {
 			}
 			$return = true;
 		} else if( $result === false ){
-			$this->throwException( 'Command exectution failed: '.mysql_error( $this->getConnection() ) );
+			$this->throwException( 'Command exectution failed: '.$this->error() );
 		}
 		return( $return );
 	}
@@ -190,14 +191,14 @@ class MySQLDataStore implements DataStore {
 				// that, and an array of object references really isn't that expensive.
 				$command = array_shift( $commands );
 				$this->checkCommand( $grid->Torpor(), $command );
-				$result = mysql_query( $this->parseCommand( $command, $grid ), $this->getConnection() );
+				$result = $this->query( $this->parseCommand( $command, $grid ) );
 				if( is_resource( $result ) ){
-					$rowCount = mysql_num_rows( $result );
+					$rowCount = $this->num_rows( $result );
 					if( $rowCount > 0 ){
 						if( $rowCount > 1 ){
 							trigger_error( 'Too many results returned from command; only using first row', E_USER_WARNING );
 						}
-						$grid->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
+						$grid->LoadFromArray( $this->fetch_assoc( $result ), true, true );
 						$this->cacheGrid( $grid );
 						$grid->OnLoad();
 					}
@@ -205,7 +206,7 @@ class MySQLDataStore implements DataStore {
 					if( $result === true ){
 						$this->throwException( 'Load command for '.$grid->_getObjName().' grid executed successfully but did not return a result set (even an empty one)' );
 					} else {
-						$this->throwException( 'Load command for '.$grid->_getObjName().' grid failed: '.mysql_error( $this->getConnection() ) );
+						$this->throwException( 'Load command for '.$grid->_getObjName().' grid failed: '.$this->error() );
 					}
 				}
 			} else {
@@ -289,15 +290,15 @@ class MySQLDataStore implements DataStore {
 				.( $gridSet->getPageSize() );
 		}
 
-		$result = mysql_query( $sql, $this->getConnection() );
+		$result = $this->query( $sql );
 		if( $result === false ){
-			$this->throwException( 'Load of '.$gridType.' grid set failed: '.mysql_error( $this->getConnection() ) );
+			$this->throwException( 'Load of '.$gridType.' grid set failed: '.$this->error() );
 		} else if( $result === true ){
 			$this->throwException( 'Load command for '.$gridType.' grid set executed successfully but did not produce a result set (even a zero row result set)' );
 		} else if( is_resource( $result ) ){
-			if( mysql_num_rows( $result ) > 0 ){
+			if( $this->num_rows( $result ) > 0 ){
 				$newCommand = Torpor::OPERATION_NEW.$gridType;
-				while( $dataRow = mysql_fetch_assoc( $result ) ){
+				while( $dataRow = $this->fetch_assoc( $result ) ){
 					$loadedGrid = $this->getTorpor()->$newCommand();
 					$loadedGrid->LoadFromArray( $dataRow, true, true );
 					$this->cacheGrid( $loadedGrid );
@@ -308,7 +309,7 @@ class MySQLDataStore implements DataStore {
 				$return = $gridSet->setLoaded();
 			}
 		} else {
-			$this->throwException( 'Cannot handle mysql_query() return type: '.gettype( $resul ) );
+			$this->throwException( 'Cannot handle query return type: '.gettype( $resul ) );
 		}
 		return( $return );
 	}
@@ -355,17 +356,17 @@ class MySQLDataStore implements DataStore {
 		$grid->OnBeforePublish();
 		if( count( $commands ) > 0 ){
 			foreach( $commands as $command ){
-				$result = mysql_query( $this->parseCommand( $command, $grid ), $this->getConnection() );
+				$result = $this->query( $this->parseCommand( $command, $grid ) );
 				if( is_resource( $result ) ){
-					if( mysql_num_rows( $result ) > 1 ){
+					if( $this->num_rows( $result ) > 1 ){
 						trigger_error( 'Too many results returned from command; only using first row', E_USER_WARNING );
 					}
-					$grid->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
+					$grid->LoadFromArray( $this->fetch_assoc( $result ), true, true );
 					$this->cacheGrid( $grid );
 					$grid->OnLoad();
 				} else if( $result === true ){
 					if( $new ){
-						if( ( $affected = mysql_affected_rows( $this->getConnection() ) ) != 1 ){
+						if( ( $affected = $this->affected_rows() ) != 1 ){
 							trigger_error( 'Successful publish command execution affected '.$affected.' rows; insert success unknown', E_USER_WARNING );
 						} else {
 							$published = true;
@@ -375,7 +376,7 @@ class MySQLDataStore implements DataStore {
 						$published = true;
 					}
 				} else if( $result === false ){
-					$this->throwException( $grid->_getObjName().' publish command failed: '.mysql_error( $this->getConnection() ) );
+					$this->throwException( $grid->_getObjName().' publish command failed: '.$this->error() );
 				}
 			}
 		} else {
@@ -392,7 +393,7 @@ class MySQLDataStore implements DataStore {
 					$force
 					|| $grid->Column( $columnName )->isDirty()
 					|| $grid->Column( $columnName )->isLinked()
-					|| $grid->Torpor()->publishAllFields()
+					|| $grid->Torpor()->publishAllColumns()
 				){
 					$declarations[] = $this->columnEqualsData( $grid->Column( $columnName ) );
 				}
@@ -402,7 +403,7 @@ class MySQLDataStore implements DataStore {
 					$this->throwException( 'Cannot force publish '.$grid->_getObjName().' grid: no data members found' );
 				}
 			} else {
-				$sql.= ' '.implode( ',', $declarations );
+				$sql.= ' '.implode( ', ', $declarations );
 				if( $grid->isLoaded() || $grid->canLoad() ){
 					$clauses = $this->makeClauses( $grid );
 					if( count( $clauses ) < 1 ){
@@ -410,14 +411,14 @@ class MySQLDataStore implements DataStore {
 					}
 					$sql.= ' WHERE '.implode( ' AND ', $clauses );
 				}
-				if( mysql_query( $sql, $this->getConnection() ) ){
+				if( $this->query( $sql ) ){
 					// LAST_INSERT_ID() on BIGINT types fail on translation into PHP long, so this
 					// will be fetched manually rather than via mysql_insert_id().  Also, this paradigm
 					// is only supported for a single column, and will automatically fall to the first
 					// generatedOnPublish() column in the primary key for this grid.
 
 					if( $new ){
-						if( mysql_affected_rows( $this->getConnection() ) != 1 ){
+						if( $this->affected_rows() != 1 ){
 							$this->throwException( $grid->_getObjName().' insert failed' );
 						}
 						$published = true;
@@ -427,7 +428,7 @@ class MySQLDataStore implements DataStore {
 						$published = true;
 					}
 				} else {
-					$this->throwException( 'Publish failed: '.mysql_error( $this->getConnection() ) );
+					$this->throwException( 'Publish failed: '.$this->error() );
 				}
 			}
 		}
@@ -493,7 +494,7 @@ class MySQLDataStore implements DataStore {
 							$this->getConnection()
 						)
 					){
-						$this->throwException( 'Could not change users on MySQL connection: '.mysql_error( $this->getConnection() ) );
+						$this->throwException( 'Could not change users on MySQL connection: '.$this->error() );
 					}
 				}
 			}
@@ -526,7 +527,7 @@ class MySQLDataStore implements DataStore {
 		if( $database !== $this->getDatabase() ){
 			if( $this->isConnected() ){
 				if( !mysql_select_db( $database, $this->getConnection() ) ){
-					$this->throwException( 'Could not change database to '.$database.': '.mysql_error( $this->getConnection() ) );
+					$this->throwException( 'Could not change database to '.$database.': '.$this->error() );
 				}
 			}
 			$return = $this->_database = $database;
@@ -584,6 +585,30 @@ class MySQLDataStore implements DataStore {
 		}
 	}
 
+	public function query( $query, array $bindVariables = null ){
+		// $bindVariables not supported in MySQL.
+		$result = mysql_query( $query, $this->getConnection() );
+		$this->_affected_rows = mysql_affected_rows( $this->getConnection() );
+		$warning = mysql_query( 'SHOW WARNINGS', $this->getConnection() );
+		if( is_resource( $warning ) && $this->num_rows( $warning ) ){
+			while( $dataRow = $this->fetch_assoc( $warning ) ){
+				$string = implode( ' :: ', $dataRow );
+				if( $dataRow{ 'Level' } == 'Error' ){
+					$this->throwException( $string );
+				} else {
+					trigger_error( $string, E_USER_WARNING );
+				}
+			}
+		}
+		return( $result );
+	}
+	public function error( $resource = null ){ return( mysql_error( ( $resource ? $resource : $this->getConnection() ) ) ); }
+	public function affected_rows( $resource = null ){ return( ( is_resource( $resource ) ? mysql_affected_rows( $resource ) : $this->_affected_rows ) ); }
+	public function num_rows( $resource ){ return( mysql_num_rows( $resource ) ); }
+	public function fetch_row( $resource ){ return( mysql_fetch_row( $resource ) ); }
+	public function fetch_array( $resource ){ return( mysql_fetch_array( $resource ) ); }
+	public function fetch_assoc( $resource ){ return( mysql_fetch_assoc( $resource ) ); }
+
 	//************************************
 	//*  Utility and supporting methods  *
 	//************************************
@@ -594,12 +619,12 @@ class MySQLDataStore implements DataStore {
 	}
 
 	public function LoadGridFromQuery( Grid $grid, $sql, $expectedRows = -1 ){
-		$result = mysql_query( $sql, $this->getConnection() );
+		$result = $this->query( $sql );
 		if( $result === false ){
-			$this->throwException( 'Load of '.$grid->_getObjName().' grid failed: '.mysql_error( $this->getConnection() ) );
+			$this->throwException( 'Load of '.$grid->_getObjName().' grid failed: '.$this->error() );
 		} else if( is_resource( $result ) ){
-			if( ( $rowCount = mysql_num_rows( $result ) ) >= 1 ){
-				$grid->LoadFromArray( mysql_fetch_assoc( $result ), true, true );
+			if( ( $rowCount = $this->num_rows( $result ) ) >= 1 ){
+				$grid->LoadFromArray( $this->fetch_assoc( $result ), true, true );
 				if(
 					$expectedRows > 0
 					&& (
@@ -620,7 +645,7 @@ class MySQLDataStore implements DataStore {
 	}
 
 	public function getFoundRows(){
-		$row = mysql_fetch_array( mysql_query( 'SELECT FOUND_ROWS()', $this->getConnection() ) );
+		$row = $this->fetch_array( $this->query( 'SELECT FOUND_ROWS()' ) );
 		return( array_shift( $row ) );
 	}
 
@@ -1212,11 +1237,11 @@ class MySQLDataStore implements DataStore {
 			if( $foundKeyColumn ){
 				// Executing the query directly, since the mysql_insert_id() command casts the return
 				// value to c(long), and may truncate.
-				$result = mysql_query( 'SELECT LAST_INSERT_ID()', $this->getConnection() );
-				if( !$result || mysql_num_rows( $result ) != 1 ){
-					$this->throwException( 'Attempt to fetch last insert id value failed: '.mysql_error( $this->getConnection() ) );
+				$result = $this->query( 'SELECT LAST_INSERT_ID()' );
+				if( !$result || $this->num_rows( $result ) != 1 ){
+					$this->throwException( 'Attempt to fetch last insert id value failed: '.$this->error() );
 				}
-				$dataRow = mysql_fetch_row( $result );
+				$dataRow = $this->fetch_row( $result );
 				$foundKeyColumn->setData( array_shift( $dataRow ) );
 			}
 		}
