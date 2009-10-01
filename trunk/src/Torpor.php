@@ -1476,7 +1476,10 @@ class Torpor {
 			$return = ( $torpor->supportedGrid( $gridName ) && $torpor->typedGridClasses() );
 		}
 		if( $return ){
-			if( !class_exists( $className ) ){
+			// Using class_exists() causes some initialization recursion if typedGridClassCheck
+			// is hooked into __autoload, so we use the slightly heavier get_declared_classes
+			// instead which saves us running the same portions of code over and over.
+			if( !in_array( strtoupper( $className ), array_map( 'strtoupper', get_declared_classes() ) ) ){
 				eval( 'class '.$className.' extends '.$extends.' {}' );
 			}
 		}

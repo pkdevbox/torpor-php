@@ -2,12 +2,14 @@
 // $Rev$
 // TODO: Create a PHP 5.3+ version MySQLiDataStore() extension which uses mysqli
 class MySQLDataStore implements DataStore {
+
 	private $_connection = null;
 	private $_host = 'localhost';
 	private $_user = null;
 	private $_password = null;
 	private $_database = null;
 	private $_torpor = null;
+	private $_parameters = array();
 
 	private $_writable = false;
 	private $_affected_rows = 0;
@@ -31,6 +33,7 @@ class MySQLDataStore implements DataStore {
 		if( $writeEnabled ){
 			$this->_writable = true;
 		}
+		$this->_parameters = $settings;
 		foreach( $settings as $key => $value ){
 			switch( strtolower( $key ) ){
 				case 'host':
@@ -516,20 +519,13 @@ class MySQLDataStore implements DataStore {
 	}
 
 	protected function getDatabase(){
-		if( $this->isConnected() ){
-			$this->_database = mysql_db_name();
-		}
 		return( $this->_database );
 	}
 	public function setDatabase( $database = null ){
 		$database = ( empty( $database ) ? null : $database );
 		$return = false;
 		if( $database !== $this->getDatabase() ){
-			if( $this->isConnected() ){
-				if( !mysql_select_db( $database, $this->getConnection() ) ){
-					$this->throwException( 'Could not change database to '.$database.': '.$this->error() );
-				}
-			}
+			$this->selectDatabase( $database );
 			$return = $this->_database = $database;
 		}
 		return( $return );
@@ -550,10 +546,10 @@ class MySQLDataStore implements DataStore {
 			if( !$connection ){
 				$this->throwException( 'Could not connect to MySQL using supplied credentials: '.mysql_error() );
 			}
-			if( $this->getDatabase() ){
-				mysql_select_db( $this->getDatabase(), $connection );
-			}
 			$this->setConnection( $connection );
+			if( $this->getDatabase() ){
+				$this->selectDatabase( $this->getDatabase() );
+			}
 		}
 		return( $this->isConnected() );
 	}
@@ -572,10 +568,34 @@ class MySQLDataStore implements DataStore {
 		return( $this->_connection );
 	}
 
+	protected function selectDatabase( $database ){
+		if( $this->isConnected() ){
+			if( !mysql_select_db( $database, $this->getConnection() ) ){
+				$this->throwException( 'Could not change database to '.$database.': '.$this->error() );
+			}
+			if( $character_set = $this->getParameter( 'character_set' ) ){
+				$this->query(
+					'SET NAMES '.$this->escape( $character_set, true )
+					.(
+						$this->getParameter( 'collation' )
+						? ' COLLATE '.$this->escape( $this->getParameter( 'collation' ), true )
+						: ''
+					)
+				);
+			}
+		}
+	}
+
 	protected function setTorpor( Torpor $torpor ){ return( $this->_torpor = $torpor ); }
 	public function getTorpor(){ return( $this->_torpor ); }
 
 	public function isWritable(){ return( $this->_writable ); }
+	public function getParameter( $parameterName ){
+		return( array_key_exists( $parameterName, $this->_parameters ) ? $this->_parameters{ $parameterName } : null );
+	}
+	public function setParameter( $parameterName, $value ){
+		return( $this->_parameters{ $parameterName } = $value );
+	}
 
 	public function throwException( $msg ){
 		if( !is_null( $torpor = $this->getTorpor() ) ){
@@ -799,7 +819,7 @@ class MySQLDataStore implements DataStore {
 					// TODO: Case sensitivity assumes latin1 character set.  This needs to be adapted
 					// to the character set of the target field(s)!
 					$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' LIKE '.$target
-						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' );
+						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' ); // TODO: Dynamic binary encoding enforcement
 					break;
 				case Criteria::TYPE_ENDSWITH:
 					list( $target ) = $criteria->getArguments();
@@ -809,7 +829,7 @@ class MySQLDataStore implements DataStore {
 						$target = '\'%'.$this->escape( $target ).'\'';
 					}
 					$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target
-						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' );
+						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' ); // TODO: Dynamic binary encoding enforcement
 					break;
 				case Criteria::TYPE_EQUALS:
 					list( $target ) = $criteria->getArguments();
@@ -822,7 +842,7 @@ class MySQLDataStore implements DataStore {
 						$sql.= ' IS'.( $criteria->isNegated() ? ' NOT' : '' ).' NULL';
 					} else {
 						$sql.= ' '.( $criteria->isNegated() ? '!' : '' ).'= '.$target
-							.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' );
+							.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' ); // TODO: Dynamic binary encoding enforcement
 					}
 					break;
 				case Criteria::TYPE_GREATERTHAN:
@@ -872,7 +892,7 @@ class MySQLDataStore implements DataStore {
 						$target = '\''.$this->escape( $target ).'%\'';
 					}
 					$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target
-						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' );
+						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' ); // TODO: Dynamic binary encoding enforcement
 					break;
 				case Criteria::TYPE_CUSTOM:
 					trigger_error( 'Custom un-parsed SQL passed to database', E_USER_NOTICE );
@@ -1132,7 +1152,10 @@ class MySQLDataStore implements DataStore {
 			case 'EXECUTE':
 			case 'CALL':
 				trigger_error( 'Use of stored procedure prevents checking for write access/DDL; continuing at your peril...', E_USER_WARNING );
+			case 'DESC':
+			case 'DESCRIBE':
 			case 'SELECT':
+			case 'SET':
 			case 'SHOW':
 				break;
 			case 'ALTER':
