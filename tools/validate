@@ -1,0 +1,15 @@
+#!/bin/sh
+#<?PHP $ignore = <<<IGNORE
+source common.sh
+IGNORE;
+
+// $Rev$
+
+require( 'common.php' );
+if( !isset( $argv[1] ) ){
+	var_dump( 'help' );
+	exit;
+}
+print( 'Document "'.$argv[1].'" is '.( validate( $argv[1] ) ? 'valid' : 'invalid' )."\n\n" );
+
+?>

@@ -1,0 +1,231 @@
+#!/bin/sh
+#<?PHP $ignore = <<<IGNORE
+source common.sh
+IGNORE;
+
+// $Rev$
+
+require( 'common.php' );
+
+function mysql_die(){ die( mysql_error()."\n" ); }
+$args = parseOptions(
+	array(
+		'db'       => false,
+		'host'     => 'localhost',
+		'user'     => '',
+		'password' => null
+	)
+);
+
+function quickFetch( $connection, $query, $fieldName = null ){
+	$result = mysql_query( $query, $connection ) or mysql_die();
+	if( !mysql_num_rows( $result ) ){ die( "No rows\n" ); }
+	$row = mysql_fetch_array( $result ) or mysql_die();
+	return( !is_null( $fieldName ) ? $row{ $fieldName } : $row );
+}
+
+if( !$args['db'] && array_key_exists( 'database', $args ) ){
+	$args['db'] = $args['database'];
+}
+
+if( !$args['db'] || $args['help'] ){
+	// TODO
+	var_dump( 'help' );
+	exit;
+}
+
+$outfile = fopen( ( array_key_exists( 'out', $args ) ? $args['out'] : null ), 'w' );
+
+$host     = $args['host'];
+$user     = $args['user'];
+$password = $args['password'];
+$connection = @mysql_connect(
+	$host,
+	$user,
+	$password
+) or mysql_die();
+
+mysql_select_db( $args['db'] ) or mysql_die();
+$db_charset = quickFetch( $connection, 'SHOW VARIABLES LIKE "character_set_database"', 'Value' );
+$db_collate = quickFetch( $connection, 'SHOW VARIABLES LIKE "collation_database"', 'Value' );
+
+$db_version = quickFetch( $connection, 'SELECT VERSION() FROM DUAL', 0 );
+
+mysql_select_db(
+	'information_schema',
+	$connection
+) or mysql_die();
+
+$dataTypeMap = array(
+	'char'           => 'char',
+	'varchar'        => 'varchar',
+	'tinyint'        => 'integer',
+	'smallint'       => 'integer',
+	'mediumint'      => 'integer',
+	'bigint'         => 'integer',
+	'longtext'       => 'text',
+	'decimal'        => 'float',
+	'date'           => 'date',
+	'datetime'       => 'datetime',
+	'int'            => 'integer',
+	'timestamp'      => 'datetime',
+	'text'           => 'text',
+	'enum'           => 'varchar', // Torpor does not currently support enum.
+	'double'         => 'double',
+	'tinytext'       => 'varchar',
+	'mediumint'      => 'integer',
+	'float'          => 'float',
+	'float unsigned' => 'float',
+	'mediumtext'     => 'text',
+	'set'            => 'varchar', // Torpor does not currently support set.
+	'time'           => 'time',
+	'longblog'       => 'binary',
+	'blog'           => 'binary'
+);
+
+$charSetMap = array(
+	'big5'     => 'BIG-5',
+	'dec8'     => '8bit',
+	'cp850'    => 'CP850', // Needs review
+	'hp8'      => '8bit',
+	'koi8r'    => 'KOI8-R',
+	'latin1'   => 'ISO-8859-1',
+	'latin2'   => 'ISO-8859-2',
+	'swe7'     => '7bit',
+	'ascii'    => 'ASCII',
+	'ujis'     => 'EUC-JP',
+	'sjis'     => 'SJIS',
+	'hebrew'   => 'ISO-8859-8',
+	'tis620'   => '8bit', // This is a best guess based on the data range of the TIS-620 standard (and should maintain compatibility with either TIS-620 or ISO-8859-11 despite their minor differences)
+	'euckr'    => 'EUC-KR',
+	'koi8u'    => '8bit',
+	'gb2312'   => 'EUC-CN',
+	'greek'    => 'ISO-8859-7',
+	'cp1250'   => 'Windows-1250', // Needs review
+	'gbk'      => 'EUC-CN', // Needs review
+	'latin5'   => 'ISO-8859-9',
+	'armscii8' => 'ArmSCII-8',
+	'utf8'     => 'UTF-8',
+	'ucs2'     => 'UCS-2',
+	'cp866'    => 'CP866',
+	'keybcs2'  => '8bit', // Needs review
+	'macce'    => 'ISO-8859-16', // Needs review
+	'macroman' => '8bit', // Needs review
+	'cp852'    => '8bit', // Needs review
+	'latin7'   => 'ISO-8859-13',
+	'cp1251'   => 'Windows-1251', 
+	'cp1256'   => '8bit', // Simple "best fit" - needs review
+	'cp1257'   => '8bit', // Ditto
+	'binary'   => 'pass', // No touchy
+	'geostd8'  => '8bit', // Needs review
+	'cp932'    => 'SJIS-Win',
+	'eucjpms'  => 'eucJP-win'
+);
+
+$grids = array();
+$table_result = mysql_query( 'SELECT TABLE_NAME FROM TABLES WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'"' ) or die( mysql_error() );
+
+printHeader( $outfile );
+printContents( <<<XMLHEADER
+	<Repository>
+		<DataStore type="MySQL">
+			<Parameter name="host" value="$host"/>
+			<Parameter name="user" value="$user"/>
+			<Parameter name="password" value="$password"/>
+			<Parameter name="charcter_set" value="$db_charset"/>
+			<Parameter name="collation" value="$db_collate"/>
+		</DataStore>
+	</Repository>
+	<Grids>
+
+XMLHEADER
+	, $outfile
+);
+
+while( $table_obj = mysql_fetch_object( $table_result ) ){
+	$column_result = mysql_query( 'SELECT * FROM COLUMNS WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'" AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'" ORDER BY ORDINAL_POSITION' ) or die( mysql_error() );
+	if( mysql_num_rows( $column_result ) > 0 ){
+		printContents( "\t\t<Grid dataName=\"".$table_obj->TABLE_NAME."\">\n", $outfile );
+		printContents( "\t\t\t<Columns>\n", $outfile );
+		while( $column_obj = mysql_fetch_object( $column_result ) ){
+			printContents( "\t\t\t\t<Column"
+				.' dataName="'.$column_obj->COLUMN_NAME.'"'
+				.( $column_obj->COLUMN_DEFAULT && $column_obj->COLUMN_DEFAULT != 'CURRENT_TIMESTAMP' ? ' default="'.htmlentities( $column_obj->COLUMN_DEFAULT ).'"' : '' )
+				.( $column_obj->CHARACTER_SET_NAME ? ' encoding="'.( array_key_exists( $column_obj->CHARACTER_SET_NAME, $charSetMap ) ? $charSetMap{ $column_obj->CHARACTER_SET_NAME } : 'UNSUPPORTED:'.$column_obj->CHARACTER_SET_NAME ).'"' : '' )
+				.( $column_obj->EXTRA == 'auto_increment' || $column_obj->COLUMN_DEFAULT == 'CURRENT_TIMESTAMP' ? ' generatedOnPublish="true"' : '' )
+				.( $column_obj->CHARACTER_MAXIMUM_LENGTH ? ' length="'.$column_obj->CHARACTER_MAXIMUM_LENGTH.'"' : '' )
+				.( $column_obj->IS_NULLABLE != 'YES' ? ' nullable="false"' : '' )
+				.( $column_obj->NUMERIC_PRECISION ? ' precision="'.$column_obj->NUMERIC_PRECISION.'"' : '' )
+				.' type="'.$dataTypeMap{ $column_obj->DATA_TYPE }.'"'
+				."/>\n", $outfile );
+		}
+		printContents( "\t\t\t</Columns>\n", $outfile );
+		printContents( "\t\t\t<Keys>\n", $outfile );
+		if( version_compare( $db_version, '5.0.6' ) >= 0 ){
+			$foreign_result = mysql_query(
+				'SELECT *
+				FROM KEY_COLUMN_USAGE
+				WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'"
+				AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'"
+				AND CONSTRAINT_NAME <> "PRIMARY"
+				AND REFERENCED_TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'"
+				ORDER BY ORDINAL_POSITION'
+			) or die( mysql_error() );
+			if( mysql_num_rows( $foreign_result ) > 0 ){
+				printContents( "\t\t\t\t<Foreign>\n", $outfile );
+				while( $key_obj = mysql_fetch_object( $foreign_result ) ){
+					printContents( "\t\t\t\t\t<Key column=\"".$key_obj->COLUMN_NAME.'"'
+						.' referenceGrid="'.$key_obj->REFERENCED_TABLE_NAME.'"'
+						.( $key_obj->REFERENCED_COLUMN_NAME != $key_obj->COLUMN_NAME ? ' referencedColumn="'.$key_obj->REFERENCED_COLUMN_NAME.'"' : '' )
+						."/>\n", $outfile );
+				}
+				printContents( "\t\t\t\t</Foreign>\n", $outfile );
+			}
+		}
+
+		$pk_result = mysql_query( 'SELECT * FROM KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'" AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'" AND CONSTRAINT_NAME = "PRIMARY" ORDER BY ORDINAL_POSITION' ) or die( mysql_error() );
+		if( mysql_num_rows( $pk_result ) > 0 ){
+			printContents( "\t\t\t\t<Primary>\n", $outfile );
+			while( $key_obj = mysql_fetch_object( $pk_result ) ){
+				printContents( "\t\t\t\t\t<Key column=\"".$key_obj->COLUMN_NAME."\"/>\n", $outfile );
+			}
+			printContents( "\t\t\t\t</Primary>\n", $outfile );
+		}
+
+		$unique_result = mysql_query(
+			'SELECT *
+			FROM KEY_COLUMN_USAGE
+			WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'"
+			AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'"
+			AND CONSTRAINT_NAME <> "PRIMARY"
+			'.(
+				version_compare( $db_version, '5.0.6' ) >= 0
+				? 'AND COALESCE( REFERENCED_TABLE_NAME, "" ) = ""'
+				: ''
+			).'
+			ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION'
+		) or die( mysql_error() );
+
+		if( mysql_num_rows( $unique_result ) > 0 ){
+			printContents( "\t\t\t\t<Unique>\n", $outfile );
+			$first = true;
+			$last_constraint_name = '';
+			while( $key_obj = mysql_fetch_object( $unique_result ) ){
+				if( $last_constraint_name != $key_obj->CONSTRAINT_NAME && !$first ){
+					printContents( "\t\t\t\t</Unique>\n\t\t\t\t<Unique>\n", $outfile );
+				}
+				printContents( "\t\t\t\t\t<Key column=\"".$key_obj->COLUMN_NAME."\"/>\n", $outfile );
+				$last_constraint_name = $key_obj->CONSTRAINT_NAME;
+				$first = false;
+			}
+			printContents( "\t\t\t\t</Unique>\n", $outfile );
+		}
+		printContents( "\t\t\t</Keys>\n", $outfile );
+		printContents( "\t\t</Grid>\n", $outfile );
+	}
+	// break;
+}
+
+printFooter( $outfile );
+
+?>
