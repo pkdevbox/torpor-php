@@ -29,8 +29,7 @@ class Column extends PersistableContainer
 	const TYPE_VARCHAR          = 'VARCHAR';
 
 	// Utilities
-	// TODO: Test this regex!!
-	const REGEX_DATE = '\d{4}[,\.\-\/]?(0[1-9]|1[0-2])[,\.\-\/]?(0[1-9]|[12][0-9]|3[01])';
+	const REGEX_DATE = '\d{4}[,\.\-\/]?(0[0-9]|1[0-2])[,\.\-\/]?(0[0-9]|[12][0-9]|3[01])';
 	const REGEX_TIME = '([01][0-9]|2[0-3])([,:\-][0-5][0-9]){2}';
 
 	const ATTRIBUTE_GENERATED_ON_PUBLISH = 'generatedOnPublish';

@@ -666,7 +666,7 @@ class MySQLDataStore implements DataStore {
 
 	public function getFoundRows(){
 		$row = $this->fetch_array( $this->query( 'SELECT FOUND_ROWS()' ) );
-		return( array_shift( $row ) );
+		return( (int)array_shift( $row ) );
 	}
 
 	public function escape( $arg, $quote = false, $quoteChar = '\'' ){
@@ -1081,13 +1081,15 @@ class MySQLDataStore implements DataStore {
 			){
 				$referenceKeys = (
 					$referenceAlias == $referencedGrid
-					? $this->getTorpor()->referenceKeysBetween( $sourceGridName, $referencedGrid )
+					? $this->getTorpor()->referenceKeysBetween( $sourceGridName, $referencedGrid, Torpor::NON_ALIAS_KEYS )
 					: $this->getTorpor()->aliasReferenceKeysBetween( $sourceGridName, $referencedGrid, $referenceAlias )
 				);
 			} else if( $this->getTorpor()->canBeReferencedBy( $sourceGridName, $referencedGrid ) ){
 				$outerJoin = true;
 				$tempReferenceKeys = $this->getTorpor()->referenceKeysBetween( $referencedGrid, $sourceGridName, Torpor::NON_ALIAS_KEYS );
-				if( !is_array( $tempReferenceKeys ) || count( $tempReferenceKeys ) < 1 ){
+				if( is_array( $tempReferenceKeys ) && count( $tempReferenceKeys ) >= 1 ){
+					$referenceKeys = array_flip( $tempReferenceKeys );
+				} else {
 					trigger_error( 'No direct keys found, falling back to alias keys from '.$referencedGrid.' to '.$sourceGridName, E_USER_WARNING );
 					$tempReferenceKeys = $this->getTorpor()->referenceKeysBetween( $referencedGrid, $sourceGridName );
 					if( count( $tempReferenceKeys ) > 1 ){
