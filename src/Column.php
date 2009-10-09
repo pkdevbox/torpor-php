@@ -267,7 +267,7 @@ class Column extends PersistableContainer
 	public function getOriginalData(){ return( $this->_originalData ); }
 	protected function setOriginalData( $data ){ return( $this->_originalData = $data ); }
 
-	public function __toString(){ return( $this->getData() ); }
+	public function __toString(){ return( (string)$this->getData() ); }
 
 	// To be used when persist data and PHP data don't match, such as Y/N enums or ints acting as
 	// bools which require a facade.  It's up to the inheriting class to do anything useful with

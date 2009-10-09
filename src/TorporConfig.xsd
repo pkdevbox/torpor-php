@@ -7,6 +7,8 @@
 			<xs:element minOccurs="0" name="Options">
 				<xs:complexType>
 					<xs:sequence>
+						<xs:element default="true" minOccurs="0" name="CacheReferencedGrids"/>
+						<xs:element default="false" minOccurs="0" name="CacheReferencedGridSets"/>
 						<xs:element default="Column" minOccurs="0" name="ColumnClass">
 							<xs:simpleType>
 								<xs:restriction base="xs:string">

@@ -127,8 +127,8 @@ class GridSet extends PersistableContainer implements Iterator {
 	}
 	public function getSourceGrids(){ return( $this->_sourceGrids ); }
 
-	public function getCriteria(){ return( $this->getSourceCriteria() ); }
-	public function getSourceCriteria(){ return( $this->_sourceCriteria ); }
+	public function getSourceCriteria(){ return( $this->getCriteria() ); }
+	public function getCriteria(){ return( $this->_sourceCriteria ); }
 
 	public function setSourceGrid( Grid $grid, $alias = false, $cascadeMap = true ){
 		// New logic:
@@ -161,7 +161,8 @@ class GridSet extends PersistableContainer implements Iterator {
 		return( true );
 	}
 
-	public function setSourceCriteria( CriteriaBase $criteria ){
+	public function setSourceCriteria( CriteriaBase $criteria ){ return( $this->setCriteria( $criteria ) ); }
+	public function setCriteria( CriteriaBase $criteria ){
 		if(
 			!is_null( $this->getSourceCriteria() )
 			&& $this->getSourceCriteria() !== $criteria
@@ -171,6 +172,15 @@ class GridSet extends PersistableContainer implements Iterator {
 		}
 		$this->_sourceCriteria = $criteria;
 		return( true );
+	}
+
+	public function addCriteria( CriteriaBase $criteria ){
+		if( is_null( $this->getCriteria() ) ){
+			$this->setCriteria( new CriteriaAndSet() );
+		} else if( !$this->getCriteria() instanceof CriteriaAndSet ){
+			$this->setCriteria( new CriteriaAndSet( $this->getCriteria() ) );
+		}
+		$this->getCriteria()->addCriteria( $criteria );
 	}
 
 	public function canLoad(){
@@ -470,6 +480,40 @@ class GridSet extends PersistableContainer implements Iterator {
 	public function key(){ return( key( $this->_grids ) ); }
 	public function next(){ return( next( $this->_grids ) ); }
 	public function valid(){ return( $this->current() !== false ); }
+}
+
+class TypedGridSet extends GridSet {
+	// TODO: find a way to provide this functionality to both TypedGridSet
+	// and TypedGrid without replicating it verbosely between classes.
+	public function __construct(){
+		$args = func_get_args();
+		$torpor = null;
+		foreach( $args as $index => $arg ){
+			if( $arg instanceof Torpor ){
+				$torpor = $arg;
+				unset( $args[ $index ] );
+				break;
+			}
+		}
+		$this->_setTorpor( ( $torpor instanceof Torpor ? $torpor : Torpor::getInstance() ) );
+		$gridTypeName = get_class( $this );
+		if( $prefix = $this->Torpor()->typedGridClassesPrefix() ){
+			$gridTypeName = substr( $gridTypeName, strlen( $prefix ) );
+		}
+		$gridTypeName = substr( $gridTypeName, 0, ( -1 * strlen( Torpor::OPERATION_GET_SET ) ) );
+		if( !$this->Torpor()->supportedGrid( $gridTypeName ) ){
+			$this->throwException( 'Could not resolve grid type from class name "'.get_class( $this ).'"' );
+		}
+		$this->setType( $gridTypeName );
+
+		foreach( $args as $arg ){
+			if( $arg instanceof CriteriaBase ){
+				$this->addCriteria( $arg );
+			} else if( $arg instanceof Grid ){
+				$this->setSourceGrid( $arg );
+			}
+		}
+	}
 }
 
 ?>
