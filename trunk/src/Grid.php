@@ -1,12 +1,15 @@
 <?PHP
 // $Rev$
 // TODO: phpdoc
-// TODO: Callbacks?
 class Grid extends PersistableContainer implements Iterator
 {
 	private $_readOnly = false;
 	private $_deleted = false;
 	private $_columns = array();
+
+	// TODO:
+	// [ ] Provide secondary criteria to getX methods (criteria, ID, etc.)
+	private $_referencedObjectCache = array();
 
 	public function OnNew(){ return( true ); }
 
@@ -278,10 +281,13 @@ class Grid extends PersistableContainer implements Iterator
 		if( $operation === false ){
 			$this->throwException( 'Unkown or unsupported method "'.$function.'" requested' );
 		}
+
 		if( $operation === Torpor::OPERATION_SET && $this->isReadOnly() ){
 			$this->throwException( 'Cannot set values on a read-only record' );
 		}
+
 		$noun = $this->Torpor()->makeKeyName( substr( $function, strlen( $operation ) ) );
+
 		if( !$this->hasColumn( $noun ) ){
 			// Not attempting a column operation, see if this is something we're looking for
 			// larger factory operations.
@@ -304,7 +310,7 @@ class Grid extends PersistableContainer implements Iterator
 				foreach( $references as $sourceColumnName => $targetColumnName ){
 					$targetColumn = $incomingGrid->Column( $targetColumnName );
 
-					// Get data of data can be got.
+					// Get data if data can be got.
 					if(
 						!$targetColumn->hasData()
 						&& !$targetColumn->isLoaded()
@@ -331,12 +337,27 @@ class Grid extends PersistableContainer implements Iterator
 						$this->Column( $sourceColumnName )->setData( $incomingGrid->Column( $targetColumnName )->getData() );
 					}
 				}
+				$this->cacheReferencedObject( Torpor::OPERATION_GET.$noun.Torpor::OPERATION_MOD_FROM.$this->_getObjName(), $incomingGrid );
 				return( true );
 			} else if( stripos( $function, Torpor::OPERATION_MOD_FROM ) && $this->Torpor()->can( $function ) ){
 				// This handles both NEW x FROM and GET x FROM patterns
-				return( $this->Torpor()->$function( $this ) );
+				$return = $this->cachedReferenceObject( $noun );
+				if( !$return ){
+					$return = call_user_func_array( array( $this->Torpor(), $function ), array_merge( array( $this ), $arguments ) );
+					if( $operation == Torpor::OPERATION_GET ){
+						$this->cacheReferencedObject( $function, $return );
+					}
+				}
+				return( $return );
 			} else if( $this->Torpor()->can( $torporCall = $function.Torpor::OPERATION_MOD_FROM.$this->_getObjName() ) ){
-				return( $this->Torpor()->$torporCall( $this ) );
+				$return = $this->cachedReferenceObject( $torporCall );
+				if( !$return ){
+					$return = call_user_func_array( array( $this->Torpor(), $torporCall ), array_merge( array( $this ), $arguments ) );;
+					if( $operation == Torpor::OPERATION_GET ){
+						$this->cacheReferencedObject( $torporCall, $return );
+					}
+				}
+				return( $return );
 			} else if( $operation == Torpor::OPERATION_NEW ){
 				// The only time we should make it here is when we're attempting to create
 				// a new grid which we reference directly (rather than which references us),
@@ -395,6 +416,28 @@ class Grid extends PersistableContainer implements Iterator
 				break;
 		}
 		return( $return );
+	}
+
+	protected function cacheReferencedObject( $key, $object ){
+		$key = $this->Torpor()->makeKeyName( $key );
+		$return = false;
+		if(
+			( $object instanceof Grid && $this->Torpor()->cacheReferencedGrids() )
+			|| ( $object instanceof GridSet && $this->Torpor()->cacheReferencedGridSets() )
+		){
+			$return = $this->_referencedObjectCache{ $key } = $object;
+		}
+		return( $return );
+	}
+	protected function cachedReferenceObject( $key ){
+		$key = $this->Torpor()->makeKeyName( $key );
+		return(
+			(
+				array_key_exists( $key, $this->_referencedObjectCache )
+				? $this->_referencedObjectCache{ $key }
+				: false
+			)
+		);
 	}
 
 	public function dirtyColumn(){ $this->_setDirty(); }
@@ -469,15 +512,26 @@ class TypedGrid extends Grid {
 			$gridName = substr( $gridName, strlen( $prefix ) );
 		}
 		if( !$this->Torpor()->supportedGrid( $gridName ) ){
-			$this->throwException( 'Could not resolve grid type from class name "'.$gridName.'"' );
+			$this->throwException( 'Could not resolve grid type from class name "'.get_class( $this ).'"' );
 		}
 		$this->_setObjName( $gridName );
 		// $gridPrototype = $this->Torpor()->_newGrid( $gridName, Torpor::DEFAULT_GRID_CLASS );
 		$this->Torpor()->_newGridColumns( $this );
 
-		// TODO: 
 		// Look at the remaining arguments, and see if they match the primary key length of this
 		// grid, populating in order.
+		$primaryKey = $this->primaryKey();
+		if( !is_array( $primaryKey ) ){
+			$primaryKey = array( $primaryKey );
+		}
+		// Doing this via array_values resets any index gaps resuting from the Torpor object
+		// search and subsequent unset() calls above.
+		// This pattern of invocation assumes that all keys will be passed in the order in
+		// which they are defined in the XML (and/or that there's only 1, which will be the
+		// most common case).
+		foreach( array_values( $args ) as $index => $arg ){
+			$primaryKey[ $index ]->setData( $arg );
+		}
 	}
 }
 ?>

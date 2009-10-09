@@ -857,7 +857,7 @@ class MySQLDataStore implements DataStore {
 				case Criteria::TYPE_IN:
 					$args = $criteria->getArguments();
 					$sqlArgs = array();
-					if( $critera->isColumnTarget() ){
+					if( $criteria->isColumnTarget() ){
 						foreach( $args as $arg ){
 							$sqlArgs[] = $this->ColumnNameToSQL( $sourceGridName, array_shift( $arg ), array_shift( $arg ) );
 						}

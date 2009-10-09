@@ -50,6 +50,12 @@ class Torpor {
 	const DEFAULT_CONFIG_SCHEMA = 'TorporConfig.xsd';
 
 	// Options
+	const OPTION_CACHE_REFERENCED_GRIDS  = 'CacheReferencedGrids';
+	const DEFAULT_CACHE_REFERENCED_GRIDS = true;
+
+	const OPTION_CACHE_REFERENCED_GRID_SETS  = 'CacheReferencedGridSets';
+	const DEFAULT_CACHE_REFERENCED_GRID_SETS = true;
+
 	const OPTION_COLUMN_CLASS  = 'ColumnClass';
 	const DEFAULT_COLUMN_CLASS = 'Column';
 
@@ -234,6 +240,8 @@ class Torpor {
 	public static function defaultOptions(){
 		return(
 			array(
+				self::OPTION_CACHE_REFERENCED_GRIDS => self::DEFAULT_CACHE_REFERENCED_GRIDS,
+				self::OPTION_CACHE_REFERENCED_GRID_SETS => self::DEFAULT_CACHE_REFERENCED_GRID_SETS,
 				self::OPTION_COLUMN_CLASS => self::DEFAULT_COLUMN_CLASS,
 				self::OPTION_DEBUG => self::DEFAULT_DEBUG,
 				self::OPTION_GRID_CLASS => self::DEFAULT_GRID_CLASS,
@@ -280,42 +288,32 @@ class Torpor {
 		if( isset( $xmlObj->Options ) ){
 			foreach( $xmlObj->Options->children() as $option ){
 				switch( $option->getName() ){
+					// Handle all the bools together, since they're all processed the same way.
+					case self::OPTION_CACHE_REFERENCED_GRIDS:
+					case self::OPTION_CACHE_REFERENCED_GRID_SETS:
+					case self::OPTION_DEBUG:
+					case self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS:
+					case self::OPTION_OVERWRITE_ON_LOAD:
+					case self::OPTION_PERMIT_DDL:
+					case self::OPTION_PERPETUATE_AUTO_LINKS:
+					case self::OPTION_PUBLISH_ALL_COLUMNS:
+					case self::OPTION_PUBLISH_DEPENDENCIES:
+					case self::OPTION_RELOAD_AFTER_PUBLISH:
+					case self::OPTION_TYPED_GRID_CLASSES:
+						$options{ $option->getName() } = ( (string)$option == self::VALUE_TRUE ? true : false );
+						break;
 					case self::OPTION_COLUMN_CLASS:
 						$className = (string)$option;
 						$this->checkColumnClass( $className );
 						$options{ self::OPTION_COLUMN_CLASS } = $className;
-						break;
-					case self::OPTION_DEBUG:
-						$options{ self::OPTION_DEBUG } = ( (string)$option == self::VALUE_TRUE ? true : false );
 						break;
 					case self::OPTION_GRID_CLASS:
 						$className = (string)$option;
 						$this->checkGridClass( $className );
 						$options{ self::OPTION_GRID_CLASS } = $className;
 						break;
-					case self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS:
-						$options{ self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS } = ( (string)$option == self::VALUE_TRUE ? true : false );
-						break;
-					case self::OPTION_OVERWRITE_ON_LOAD:
-						$options{ self::OPTION_OVERWRITE_ON_LOAD } = ( (string)$option == self::VALUE_TRUE ? true : false );
-						break;
-					case self::OPTION_PERMIT_DDL:
-						$options{ self::OPTION_PERMIT_DDL } = ( (string)$option == self::VALUE_TRUE ? true : false );
-						break;
-					case self::OPTION_PERPETUATE_AUTO_LINKS:
-						$options{ self::OPTION_PERPETUATE_AUTO_LINKS } = ( (string)$option == self::VALUE_TRUE ? true : false );
-						break;
-					case self::OPTION_PUBLISH_ALL_COLUMNS:
-						$options{ self::OPTION_PUBLISH_ALL_COLUMNS } = ( (string)$option == self::VALUE_TRUE ? true : false );
-						break;
-					case self::OPTION_PUBLISH_DEPENDENCIES:
-						$options{ self::OPTION_DEPENDENCIES } = ( (string)$option == self::VALUE_TRUE ? true : false );
-						break;
-					case self::OPTION_RELOAD_AFTER_PUBLISH:
-						$options{ self::OPTION_RELOAD_AFTER_PUBLISH } = ( (string)$option == self::VALUE_TRUE ? true : false );
-						break;
-					case self::OPTION_TYPED_GRID_CLASSES:
-						$options{ self::OPTION_TYPED_GRID_CLASSES } = ( (string)$option == self::VALUE_TRUE ? true : false );
+					case self::OPTION_PAGE_SIZE:
+						$options{ $option->getName() } = (int)$option;
 						break;
 					case self::OPTION_TYPED_GRID_CLASSES_PREFIX:
 						$options{ self::OPTION_TYPED_GRID_CLASSES_PREFIX } = (string)$option;
@@ -999,6 +997,13 @@ class Torpor {
 		}
 		return( $return );
 	}
+
+	public function cacheReferencedGrids(){
+		return( $this->options( self::OPTION_CACHE_REFERENCED_GRIDS ) );
+	}
+	public function cacheReferencedGridSets(){
+		return( $this->options( self::OPTION_CACHE_REFERENCED_GRID_SETS ) );
+	}
 	public function linkUnpublishedReferenceColumns(){
 		return( $this->options( self::OPTION_LINK_UNPUBLISHED_REFERENCE_COLUMNS ) );
 	}
@@ -1222,9 +1227,6 @@ class Torpor {
 			? $this->aliasReferenceKeysBetween( $record, $gridName, $alias )
 			: $this->referenceKeysBetween( $record, $gridName, self::NON_ALIAS_KEYS )
 		);
-		if( !$record->isLoaded() ){
-			$record->Load();
-		}
 		foreach( $references as $sourceColumnName => $targetColumnName ){
 			if( $record->Column( $sourceColumnName )->hasData() ){
 				$targetGrid->Column( $targetColumnName )->setData( $record->Column( $sourceColumnName )->getData() );
@@ -1318,9 +1320,7 @@ class Torpor {
 		return( $this->_newGridFromRecord( $gridName, $record, $alias ) );
 	}
 
-	public function _newGridFromCriteria( $gridName, Criteria $criteria ){
-	}
-
+	// TODO: _newGridSetFromRecord
 	public function _newGridSet( $gridName = null, $sourceContent = null, $alias = false ){
 		return( new GridSet( $this, $gridName, $sourceContent, $alias ) );
 	}
@@ -1473,14 +1473,34 @@ class Torpor {
 		if( $checkInitialization ){
 			$torpor = ( isset( $this ) ? $this : Torpor::getInstance() );
 			$gridName = substr( $className, strlen( $torpor->typedGridClassesPrefix() ) );
+			if(
+				!$torpor->supportedGrid( $gridName )
+				&& (
+					$gridSetName = strtolower(
+						substr(
+							$gridName, ( -1 * strlen( self::OPERATION_GET_SET ) )
+						)
+					)
+				) == self::OPERATION_GET_SET
+			){
+				$gridName = substr( $gridName, 0, ( -1 * strlen( self::OPERATION_GET_SET ) ) );
+			}
 			$return = ( $torpor->supportedGrid( $gridName ) && $torpor->typedGridClasses() );
+			if( $return ){
+				$className = $torpor->typedGridClassesPrefix().$gridName;
+			}
 		}
 		if( $return ){
 			// Using class_exists() causes some initialization recursion if typedGridClassCheck
 			// is hooked into __autoload, so we use the slightly heavier get_declared_classes
 			// instead which saves us running the same portions of code over and over.
-			if( !in_array( strtoupper( $className ), array_map( 'strtoupper', get_declared_classes() ) ) ){
+			$declaredClasses = array_map( 'strtoupper', get_declared_classes() );
+			if( !in_array( strtoupper( $className ), $declaredClasses ) ){
 				eval( 'class '.$className.' extends '.$extends.' {}' );
+			}
+			$setClassName = $className.self::OPERATION_GET_SET;
+			if( !in_array( strtoupper( $setClassName ), $declaredClasses ) ){
+				eval( 'class '.$setClassName.' extends '.$extends.self::OPERATION_GET_SET.' {}' );
 			}
 		}
 		return( $return );
