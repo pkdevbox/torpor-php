@@ -6,6 +6,7 @@ class Grid extends PersistableContainer implements Iterator
 	private $_readOnly = false;
 	private $_deleted = false;
 	private $_columns = array();
+	private $_parameters = array();
 
 	// TODO:
 	// [ ] Provide secondary criteria to getX methods (criteria, ID, etc.)
@@ -54,6 +55,28 @@ class Grid extends PersistableContainer implements Iterator
 
 	public function Columns(){ return( $this->_getColumns() ); }
 	public function Column( $columnName ){ return( $this->_getColumn( $columnName ) ); }
+
+	public function parameterExists( $parameterKey ){
+		return( array_key_exists( $parameterKey, $this->_parameters ) );
+	}
+	public function parameterSet( $parameterKey, $value ){
+		return( $this->_parameters{ $parameterKey } = $value );
+	}
+	public function parameterGet( $parameterKey ){
+		$return = null;
+		if( $this->parameterExists( $parameterKey ) ){
+			$return = $this->_parameters{ $parameterKey };
+		}
+		return( $return );
+	}
+	public function parameter( $parameterKey ){
+		return(
+			( func_num_args() > 1
+				? $this->parameterSet( $parameterKey, func_get_arg(1) )
+				: $this->parameterGet( $parameterKey )
+			)
+		);
+	}
 
 	public function addColumn( Column $column, $replace = false ){
 		if( $this->hasColumn( $column ) && !$replace ){
@@ -517,6 +540,7 @@ class TypedGrid extends Grid {
 		$this->_setObjName( $gridName );
 		// $gridPrototype = $this->Torpor()->_newGrid( $gridName, Torpor::DEFAULT_GRID_CLASS );
 		$this->Torpor()->_newGridColumns( $this );
+		$this->Torpor()->_newGridParameters( $this );
 
 		// Look at the remaining arguments, and see if they match the primary key length of this
 		// grid, populating in order.

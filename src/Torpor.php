@@ -116,6 +116,7 @@ class Torpor {
 	const ARKEY_GRIDS             = 'grids';
 	const ARKEY_GRID_CLASSES      = 'grid_classes';
 	const ARKEY_GRID_COMMANDS     = 'grid_commands';
+	const ARKEY_GRID_PARAMETERS   = 'grid_parameters';
 	const ARKEY_KEYS              = 'keys';
 	const ARKEY_UNIQUEKEYS        = 'uniquekeys';
 	const ARKEY_REFERENCES        = 'references';
@@ -279,6 +280,7 @@ class Torpor {
 		$grids = array();
 		$gridClasses = array();
 		$gridCommands = array();
+		$gridParameters = array();
 		$columns = array();
 		$keys = array();
 		$uniqueKeys = array();
@@ -431,7 +433,7 @@ class Torpor {
 					}
 				}
 
-				$dataStore = call_user_func( array( $className, 'createInstance' ),  $this );
+				$dataStore = call_user_func( array( $className, 'createInstance' ), $this );
 				$dataStore->initialize(
 					( $storeType == 'write' || $writeXml === $readXml ? true : false ),
 					$settings
@@ -525,6 +527,20 @@ class Torpor {
 						$gridCommands{ $gridName }{ $command->getType() } = array();
 					}
 					$gridCommands{ $gridName }{ $command->getType() }[] = $command;
+				}
+			}
+
+			if( isset( $gridXml->DataStoreParameters ) ){
+				$parameters = array();
+				foreach( $gridXml->DataStoreParameters->Parameter as $parameterXml ){
+					$parameters{ (string)$parameterXml->attributes()->name } = ( 
+						isset( $parameterXml->attributes()->value )
+						? (string)$parameterXml->attributes()->value
+						: (string)$parameterXml
+					);
+				}
+				if( count( $parameters ) > 0 ){
+					$gridParameters{ $gridName } = $parameters;
 				}
 			}
 
@@ -630,6 +646,7 @@ class Torpor {
 			self::ARKEY_GRIDS             => $grids,
 			self::ARKEY_GRID_CLASSES      => $gridClasses,
 			self::ARKEY_GRID_COMMANDS     => $gridCommands,
+			self::ARKEY_GRID_PARAMETERS   => $gridParameters,
 			self::ARKEY_KEYS              => $keys,
 			self::ARKEY_OPTIONS           => $options,
 			self::ARKEY_REFERENCES        => $references,
@@ -654,7 +671,8 @@ class Torpor {
 		// of these keys which ones provide discrete mappings (complete overlap with one or more
 		// of the unique constraints [primary or otherwise] on the target table, such that definitive
 		// identification is assured)
-		foreach( array_keys( $this->_getGrids() ) as $gridName ){
+		$allGrids = $this->getGrids();
+		foreach( array_keys( $allGrids ) as $gridName ){
 			$references = &$this->_getReferences( $gridName );
 			if( is_array( $references ) && count( $references ) > 0 ){
 				foreach( $references as $targetGrid => $columnPairs ){
@@ -662,14 +680,20 @@ class Torpor {
 					if( strpos( $targetGrid, self::VALUE_SEPARATOR ) ){
 						list( $targetGrid, $alias ) = explode( self::VALUE_SEPARATOR, $targetGrid );
 					}
-					if( is_null( $this->_getGrids( $targetGrid ) ) ){
-						$this->throwException( 'Unknown grid "'.$targetGrid.'" in key references from grid '.$gridName );
+					if( is_null( $allGrids{ $targetGrid } ) ){
+						// Fall back to data name.
+						if( in_array( $targetGrid, array_values( $allGrids ) ) ){
+							$targetGrid = array_search( $targetGrid, $allGrids );
+						} else {
+							$this->throwException( 'Unknown grid "'.$targetGrid.'" in key references from grid '.$gridName );
+						}
 					}
-					// TODO: Keep the exceptions, because the intialize routines are the place to check for them.
-					// Otherwise, complete replace this with the canReference routines.
 					foreach( $columnPairs as $columnName => $targetColumnName ){
-						$columns = &$this->_getColumns( $targetGrid );
-						if( !is_array( $columns ) || !isset( $columns{ $targetColumnName } ) ){
+						// TODO:
+						// Fallback courtesy should be provided here, even though it allows for sloppy book-keeping.
+						// Needs to be provided via canReference though, which makes things even messier.  This is
+						// for later consideration if at all.
+						if( !is_array( $columns ) || !array_key_exists( $targetColumnName, $columns ) ){
 							$this->throwException( 'Unknown reference column "'.$targetColumnName.'" in key reference from '.$gridName.' on column '.$columnName );
 						}
 					}
@@ -698,7 +722,7 @@ class Torpor {
 						} else {
 							$this->cacheCall(
 								self::OPERATION_GET.$targetGrid.self::OPERATION_MOD_FROM.$gridName,
-								'_getGridFromRecord', // TODO: Const?
+								'_getGridFromRecord',
 								$targetGrid
 							);
 							$this->cacheCall(
@@ -727,7 +751,7 @@ class Torpor {
 		$this->checkInitialized();
 		if( $gridName ){
 			$gridName = $this->containerKeyName( $gridName );
-			if( isset( $this->_config{ $x }{ $gridName } ) ){
+			if( array_key_exists( $gridName, $this->_config{ $x } ) ){
 				return $this->_config{ $x }{ $gridName };
 			} else {
 				$x = null;
@@ -737,6 +761,14 @@ class Torpor {
 		return $this->_config{ $x };
 	}
 	protected function &_getColumns( $grid = null ){ return $this->_getInitX( self::ARKEY_COLUMNS, $grid ); }
+	// Named for "Grid" type because we may want to have additional classes of parameters for objects in the future.
+	protected function &_getGridParameters( $grid = null ){
+		$gridParameters = $this->_getInitX( self::ARKEY_GRID_PARAMETERS, $grid );
+		if( !is_array( $allParameters ) ){
+			$gridParameters = array();
+		}
+		return $gridParameters;
+	}
 	protected function &_getDataTypeMap( $grid = null ){
 		$return = null;
 		$dataTypeMap = &$this->_getInitX( self::ARKEY_DATATYPEMAP );
@@ -1277,6 +1309,7 @@ class Torpor {
 			$grid->_setTorpor( $this );
 			$grid->_setObjName( $gridName );
 			$this->_newGridColumns( $grid );
+			$this->_newGridParameters( $grid );
 			$this->cachePrototype( $grid );
 		}
 		$grid = clone( $this->cachedPrototype( $gridName ) );
@@ -1292,6 +1325,14 @@ class Torpor {
 				$class = $this->columnClass( $gridName, $columnName );
 				$grid->addColumn( new $class( $this, $columnName, $columnXml, $grid ) );
 			}
+		}
+		return( $grid );
+	}
+	public function _newGridParameters( $grid ){
+		$this->checkSupportedGrid( $grid );
+		$gridName = $this->containerKeyName( $grid );
+		foreach( $this->_getGridParameters( $gridName ) as $parameter => $value ){
+			$grid->parameterSet( $parameter, $value );
 		}
 		return( $grid );
 	}

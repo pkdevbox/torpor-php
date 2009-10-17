@@ -1,0 +1,279 @@
+#!/bin/sh
+#<?PHP $ignore = <<<IGNORE
+source common.sh
+IGNORE;
+
+// $Rev$
+
+require( 'common.php' );
+
+function oci_die(){ die( var_dump( oci_error(), true )."\n" ); }
+$args = parseOptions(
+	array(
+		'host'     => '',
+		'user'     => '',
+		'password' => null
+	)
+);
+
+function oci_query( $query, $connection ){
+	$statement = oci_parse( $connection, $query );
+	oci_execute( $statement );
+	return( $statement );
+}
+
+function quickFetch( $connection, $query, $fieldName = null ){
+	$result = oci_query( $query, $connection ) or oci_die();
+	$row = oci_fetch_array( $result ) or oci_die();
+	return( !is_null( $fieldName ) ? $row{ $fieldName } : $row );
+}
+
+if( !$args['host'] || $args['help'] ){
+	// TODO
+	var_dump( 'help' );
+	exit;
+}
+
+$outfile = ( array_key_exists( 'out', $args ) ? fopen( $args['out'], 'w' ) : null );
+
+$host     = $args['host'];
+$user     = $args['user'];
+$password = $args['password'];
+$connection = @oci_connect(
+	$user,
+	$password,
+	$host
+) or oci_die();
+
+// oci_select_db( $args['db'] ) or oci_die();
+// $db_charset = quickFetch( $connection, 'SHOW VARIABLES LIKE "character_set_database"', 'Value' );
+// $db_collate = quickFetch( $connection, 'SHOW VARIABLES LIKE "collation_database"', 'Value' );
+// 
+// $db_version = quickFetch( $connection, 'SELECT VERSION() FROM DUAL', 0 );
+
+$dataTypeMap = array(
+	'BINARY_INTEGER' => 'integer',
+	'BFILE' => 'binary',
+	'BLOB' => 'binary',
+	'CHAR' => 'char',
+	'CLOB' => 'text',
+	'DATE' => 'date', // The oracle data adapter will need to recognize the DATE content and convert appropriately.
+	'FLOAT' => 'float',
+	'INTERVAL_YEAR' => 'float',
+	'INTERVAL_DAY' => 'float',
+	'LONG' => 'integer',
+	'MLSLABEL' => 'binary',
+	'NCHAR' => 'char',
+	'NCLOB' => 'text',
+	'NUMBER' => 'integer',
+	'NVARCHAR' => 'varchar',
+	'NVARCHAR2' => 'varchar',
+	'PLS_INTEGER' => 'integer',
+	'RAW' => 'binary',
+	'ROWID' => 'varchar',
+	'TIMESTAMP' => 'integer', // NOTE: Timestamps do not come across as date values!
+	'VARCHAR' => 'varchar',
+	'VARCHAR2' => 'varchar',
+	'UROWID' => 'varchar',
+	'XMLType' => 'text'
+);
+
+$charSetMap = array(
+);
+
+$grids = array();
+$sql = 'SELECT TABLE_NAME FROM USER_TABLES';
+if( array_key_exists( 'table', $args ) ){
+	$tables = ( is_array( $args['table'] ) ? $args['table'] : array( $args['table'] ) );
+	$sql.= ' AND UPPER( TABLE_NAME ) IN ( "'.implode( '", "', array_map( 'strtoupper', $tables ) ).'" )';
+}
+$table_result = oci_query( $sql, $connection ) or die( oci_error() );
+
+if( !array_key_exists( 'table', $args ) ){
+	printHeader( $outfile );
+	printContents( <<<XMLHEADER
+	<Repository>
+		<DataStore type="MySQL">
+			<Parameter name="user" value="$user"/>
+			<Parameter name="password" value="$password"/>
+			<Parameter name="schema" value="$host"/>
+		</DataStore>
+	</Repository>
+	<Grids>
+
+XMLHEADER
+		, $outfile
+	);
+}
+
+while( $table_obj = oci_fetch_object( $table_result ) ){
+	$column_result = oci_query( "SELECT * FROM USER_TAB_COLUMNS WHERE TABLE_NAME = '".$table_obj->TABLE_NAME."' ORDER BY COLUMN_ID", $connection ) or die( oci_error() );
+	// if( oci_num_rows( $column_result ) > 0 ){
+		printContents( "\t\t<Grid dataName=\"".$table_obj->TABLE_NAME."\">\n", $outfile );
+		printContents( "\t\t\t<Columns>\n", $outfile );
+		while( $column_obj = oci_fetch_object( $column_result ) ){
+			// print_r( $column_obj );
+			$column = new TorporConfigColumn();
+			$column->dataName = $column_obj->COLUMN_NAME;
+			// TODO: Map NUMBER to int or float depending on precision values
+			$column->type = (
+				array_key_exists( $column_obj->DATA_TYPE, $dataTypeMap )
+				? (
+					$dataTypeMap{ $column_obj->DATA_TYPE } == 'integer' && !empty( $column_obj->DATA_SCALE )
+					? 'float'
+					: $dataTypeMap{ $column_obj->DATA_TYPE }
+				)
+				: 'UNSUPPORTED:'.$column_obj->DATA_TYPE
+			);
+			if( $column_obj->DATA_DEFAULT && $column_obj->DATA_DEFAULT ){
+				$column->default = $column_obj->DATA_DEFAULT;
+			}
+			if( $column_obj->CHARACTER_SET_NAME ){
+				$column->encoding = ( array_key_exists( $column_obj->CHARACTER_SET_NAME, $charSetMap ) ? $charSetMap{ $column_obj->CHARACTER_SET_NAME } : 'UNSUPPORTED:'.$column_obj->CHARACTER_SET_NAME );
+			}
+			if( $column_obj->DATA_LENGTH ){ // Should only apply to...?
+				$column->length = $column_obj->DATA_LENGTH;
+			}
+			if( $column_obj->NULLABLE == 'N' ){
+				$column->nullable = false;
+			}
+			if( !is_null( $column_obj->DATA_SCALE ) ){
+				// NOTE: This produces a positive number for integers, which implies float precision but has other meanings for MySQL; can be ommitted for integer types altogether?
+				 $column->precision = $column_obj->DATA_SCALE;
+			}
+			printContents( $column->formatColumn(), $outfile );
+			
+			/*
+			printContents( "\t\t\t\t<Column"
+				.' dataName="'.$column_obj->COLUMN_NAME.'"'
+				.( $column_obj->COLUMN_DEFAULT && $column_obj->COLUMN_DEFAULT != 'CURRENT_TIMESTAMP' ? ' default="'.htmlentities( $column_obj->COLUMN_DEFAULT ).'"' : '' )
+				.( $column_obj->CHARACTER_SET_NAME ? ' encoding="'.( array_key_exists( $column_obj->CHARACTER_SET_NAME, $charSetMap ) ? $charSetMap{ $column_obj->CHARACTER_SET_NAME } : 'UNSUPPORTED:'.$column_obj->CHARACTER_SET_NAME ).'"' : '' )
+				.( $column_obj->EXTRA == 'auto_increment' || $column_obj->COLUMN_DEFAULT == 'CURRENT_TIMESTAMP' ? ' generatedOnPublish="true"' : '' )
+				.( $column_obj->CHARACTER_MAXIMUM_LENGTH ? ' length="'.$column_obj->CHARACTER_MAXIMUM_LENGTH.'"' : '' )
+				.( $column_obj->IS_NULLABLE != 'YES' ? ' nullable="false"' : '' )
+				.( $column_obj->NUMERIC_PRECISION ? ' precision="'.$column_obj->NUMERIC_PRECISION.'"' : '' ) // NOTE: This produces a positive number for integers, which implies float precision but has other meanings for MySQL; can be ommitted for integer types altogether?
+				.' type="'.$dataTypeMap{ $column_obj->DATA_TYPE }.'"'
+				."/>\n", $outfile );
+			*/
+		}
+		printContents( "\t\t\t</Columns>\n", $outfile );
+		printContents( "\t\t\t<Keys>\n", $outfile );
+
+		if(
+			quickFetch(
+				$connection, 
+				"SELECT COUNT( 1 ) AS found_foreign_keys
+				FROM USER_CONSTRAINTS UC
+				LEFT JOIN USER_CONS_COLUMNS UCC
+				  ON UCC.CONSTRAINT_NAME = UC.CONSTRAINT_NAME
+				  AND UCC.TABLE_NAME = UC.TABLE_NAME
+				WHERE UC.TABLE_NAME = '".$table_obj->TABLE_NAME."'
+				AND UC.CONSTRAINT_TYPE = 'R'",
+				'FOUND_FOREIGN_KEYS'
+			)
+		){
+			printContents( "\t\t\t\t<Foreign>\n", $outfile );
+			$foreign_result = oci_query(
+				"SELECT
+				  UCC.COLUMN_NAME,
+				  RUCC.TABLE_NAME AS REFERENCED_TABLE,
+				  RUCC.COLUMN_NAME AS REFERENCED_COLUMN
+				FROM USER_CONSTRAINTS UC
+				LEFT JOIN USER_CONS_COLUMNS UCC
+				  ON UCC.CONSTRAINT_NAME = UC.CONSTRAINT_NAME
+				  AND UCC.TABLE_NAME = UC.TABLE_NAME
+				LEFT JOIN USER_CONSTRAINTS RUC
+				  ON RUC.CONSTRAINT_NAME = UC.R_CONSTRAINT_NAME
+				LEFT JOIN USER_CONS_COLUMNS RUCC
+				  ON RUCC.CONSTRAINT_NAME = RUC.CONSTRAINT_NAME
+				  AND RUCC.TABLE_NAME = RUC.TABLE_NAME
+				  AND RUCC.POSITION = UCC.POSITION
+				WHERE UC.TABLE_NAME = '".$table_obj->TABLE_NAME."'
+				AND UC.CONSTRAINT_TYPE = 'R'
+				ORDER BY UCC.POSITION",
+				$connection
+			);
+			while( $key_obj = oci_fetch_object( $foreign_result ) ){
+				printContents( "\t\t\t\t\t<Key column=\"".$key_obj->COLUMN_NAME.'"'
+					.' referenceGrid="'.$key_obj->REFERENCED_TABLE.'"'
+					.( $key_obj->REFERENCED_COLUMN != $key_obj->COLUMN_NAME ? ' referenceColumn="'.$key_obj->REFERENCED_COLUMN.'"' : '' )
+					."/>\n", $outfile );
+			}
+			printContents( "\t\t\t\t</Foreign>\n", $outfile );
+		}
+
+		if(
+			quickFetch(
+				$connection,
+				"SELECT COUNT( 1 ) AS FOUND_PK
+				FROM USER_CONSTRAINTS
+				WHERE TABLE_NAME = '".$table_obj->TABLE_NAME."'
+				AND CONSTRAINT_TYPE = 'P'",
+				'FOUND_PK'
+			)
+		){
+			printContents( "\t\t\t\t<Primary>\n", $outfile );
+			$pk_result = oci_query(
+				"SELECT COLUMN_NAME
+				FROM USER_CONSTRAINTS UC
+				LEFT JOIN USER_CONS_COLUMNS UCC
+				  ON UCC.CONSTRAINT_NAME = UC.CONSTRAINT_NAME
+				  AND UCC.TABLE_NAME = UC.TABLE_NAME
+				WHERE UC.TABLE_NAME = '".$table_obj->TABLE_NAME."'
+				AND UC.CONSTRAINT_TYPE = 'P'
+				ORDER BY UCC.POSITION",
+				$connection
+			);
+			while( $key_obj = oci_fetch_object( $pk_result ) ){
+				printContents( "\t\t\t\t\t<Key column=\"".$key_obj->COLUMN_NAME."\"/>\n", $outfile );
+			}
+			printContents( "\t\t\t\t</Primary>\n", $outfile );
+		}
+
+		if(
+			quickFetch(
+				$connection,
+				"SELECT COUNT( 1 ) AS FOUND_PK
+				FROM USER_CONSTRAINTS
+				WHERE TABLE_NAME = '".$table_obj->TABLE_NAME."'
+				AND CONSTRAINT_TYPE = 'U'",
+				'FOUND_PK'
+			)
+		){
+			printContents( "\t\t\t\t<Unique>\n", $outfile );
+			$first = true;
+			$last_constraint_name = '';
+			$unique_result = oci_query(
+				"SELECT
+					UC.CONSTRAINT_NAME,
+					UCC.COLUMN_NAME
+				FROM USER_CONSTRAINTS UC
+				LEFT JOIN USER_CONS_COLUMNS UCC
+				  ON UCC.CONSTRAINT_NAME = UC.CONSTRAINT_NAME
+				  AND UCC.TABLE_NAME = UC.TABLE_NAME
+				WHERE UC.TABLE_NAME = '".$table_obj->TABLE_NAME."'
+				AND UC.CONSTRAINT_TYPE = 'U'
+				ORDER BY UC.CONSTRAINT_NAME, UCC.POSITION",
+				$connection
+			);
+			while( $key_obj = oci_fetch_object( $unique_result ) ){
+				if( $last_constraint_name != $key_obj->CONSTRAINT_NAME && !$first ){
+					printContents( "\t\t\t\t</Unique>\n\t\t\t\t<Unique>\n", $outfile );
+				}
+				printContents( "\t\t\t\t\t<Key column=\"".$key_obj->COLUMN_NAME."\"/>\n", $outfile );
+				$last_constraint_name = $key_obj->CONSTRAINT_NAME;
+				$first = false;
+			}
+			printContents( "\t\t\t\t</Unique>\n", $outfile );
+		}
+		printContents( "\t\t\t</Keys>\n", $outfile );
+		printContents( "\t\t</Grid>\n", $outfile );
+	// }
+	// break;
+}
+
+if( !array_key_exists( 'table', $args ) ){
+	printFooter( $outfile );
+}
+
+?>

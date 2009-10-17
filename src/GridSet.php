@@ -380,7 +380,12 @@ class GridSet extends PersistableContainer implements Iterator {
 	public function getTotalRecordCount(){ return( $this->getTotalGridCount() ); }
 	public function getTotalGridCount(){ return( $this->getGridCount( true ) ); }
 	public function getRecordCount(){ return( $this->getGridCount() ); }
-	public function getGridCount( $total = false ){ return( ( $total ? $this->_totalGridCount : count( $this->_grids ) ) ); }
+	public function getGridCount( $total = false ){
+		if( $total && !$this->isLoaded() && $this->canLoad() ){
+			$this->Load();
+		}
+		return( ( $total ? $this->_totalGridCount : count( $this->_grids ) ) );
+	}
 
 	// Used so we can have descriptive names, such as add<Grid>, etc.
 	public function __call( $function, $arguments ){
