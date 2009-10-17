@@ -280,6 +280,18 @@
 											</xs:sequence>
 										</xs:complexType>
 									</xs:element>
+									<xs:element minOccurs="0" name="DataStoreParameters">
+										<xs:complexType>
+											<xs:sequence minOccurs="0">
+												<xs:element maxOccurs="unbounded" minOccurs="0" name="Parameter">
+													<xs:complexType mixed="true">
+														<xs:attribute name="name" type="xs:string" use="required"/>
+														<xs:attribute name="value" type="xs:string"/>
+													</xs:complexType>
+												</xs:element>
+											</xs:sequence>
+										</xs:complexType>
+									</xs:element>
 									<xs:element minOccurs="0" name="DataTypeMap">
 										<xs:complexType>
 											<xs:sequence>

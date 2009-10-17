@@ -34,18 +34,19 @@ if( !$args['db'] || $args['help'] ){
 	exit;
 }
 
-$outfile = fopen( ( array_key_exists( 'out', $args ) ? $args['out'] : null ), 'w' );
+$outfile = ( array_key_exists( 'out', $args ) ? fopen( $args['out'], 'w' ) : null );
 
 $host     = $args['host'];
 $user     = $args['user'];
 $password = $args['password'];
+$db       = $args['db'];
 $connection = @mysql_connect(
 	$host,
 	$user,
 	$password
 ) or mysql_die();
 
-mysql_select_db( $args['db'] ) or mysql_die();
+mysql_select_db( $db ) or mysql_die();
 $db_charset = quickFetch( $connection, 'SHOW VARIABLES LIKE "character_set_database"', 'Value' );
 $db_collate = quickFetch( $connection, 'SHOW VARIABLES LIKE "collation_database"', 'Value' );
 
@@ -67,7 +68,7 @@ $dataTypeMap = array(
 	'decimal'        => 'float',
 	'date'           => 'date',
 	'datetime'       => 'datetime',
-	'int'            => 'integer',
+	'int'            => 'integer', // TODO: integer signing is stored not it DATA_TYPE like the rest of this, but COLUMN_TYPE; will need some work to sort out.
 	'timestamp'      => 'datetime',
 	'text'           => 'text',
 	'enum'           => 'varchar', // Torpor does not currently support enum.
@@ -123,15 +124,22 @@ $charSetMap = array(
 );
 
 $grids = array();
-$table_result = mysql_query( 'SELECT TABLE_NAME FROM TABLES WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'"' ) or die( mysql_error() );
+$sql = 'SELECT TABLE_NAME FROM TABLES WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $db ).'"';
+if( array_key_exists( 'table', $args ) ){
+	$tables = ( is_array( $args['table'] ) ? $args['table'] : array( $args['table'] ) );
+	$sql.= ' AND TABLE_NAME IN ( "'.implode( '", "', array_map( 'mysql_real_escape_string', $tables ) ).'" )';
+}
+$table_result = mysql_query( $sql ) or mysql_die();
 
-printHeader( $outfile );
-printContents( <<<XMLHEADER
+if( !array_key_exists( 'table', $args ) ){
+	printHeader( $outfile );
+	printContents( <<<XMLHEADER
 	<Repository>
 		<DataStore type="MySQL">
 			<Parameter name="host" value="$host"/>
 			<Parameter name="user" value="$user"/>
 			<Parameter name="password" value="$password"/>
+			<Parameter name="database" value="$db"/>
 			<Parameter name="charcter_set" value="$db_charset"/>
 			<Parameter name="collation" value="$db_collate"/>
 		</DataStore>
@@ -139,15 +147,41 @@ printContents( <<<XMLHEADER
 	<Grids>
 
 XMLHEADER
-	, $outfile
-);
+		, $outfile
+	);
+}
 
 while( $table_obj = mysql_fetch_object( $table_result ) ){
-	$column_result = mysql_query( 'SELECT * FROM COLUMNS WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'" AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'" ORDER BY ORDINAL_POSITION' ) or die( mysql_error() );
+	$column_result = mysql_query( 'SELECT * FROM COLUMNS WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $db ).'" AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'" ORDER BY ORDINAL_POSITION' ) or mysql_die();
 	if( mysql_num_rows( $column_result ) > 0 ){
 		printContents( "\t\t<Grid dataName=\"".$table_obj->TABLE_NAME."\">\n", $outfile );
 		printContents( "\t\t\t<Columns>\n", $outfile );
 		while( $column_obj = mysql_fetch_object( $column_result ) ){
+			$column = new TorporConfigColumn();
+			$column->dataName = $column_obj->COLUMN_NAME;
+			if( $column_obj->COLUMN_DEFAULT && $column_obj->COLUMN_DEFAULT != 'CURRENT_TIMESTAMP' ){
+				$column->default = $column_obj->COLUMN_DEFAULT;
+			}
+			if( $column_obj->CHARACTER_SET_NAME ){
+				$column->encoding = ( array_key_exists( $column_obj->CHARACTER_SET_NAME, $charSetMap ) ? $charSetMap{ $column_obj->CHARACTER_SET_NAME } : 'UNSUPPORTED:'.$column_obj->CHARACTER_SET_NAME );
+			}
+			if( $column_obj->EXTRA == 'auto_increment' || $column_obj->COLUMN_DEFAULT == 'CURRENT_TIMESTAMP' ){
+				$column->generatedOnPublish = true;
+			}
+			if( $column_obj->CHARACTER_MAXIMUM_LENGTH ){
+				$column->length = $column_obj->CHARACTER_MAXIMUM_LENGTH;
+			}
+			if( $column_obj->IS_NULLABLE != 'YES' ){
+				$column->nullable = false;
+			}
+			if( !is_null( $column_obj->NUMERIC_PRECISION ) && strpos( 'int', $column_obj->DATA_TYPE ) === false ){
+				// NOTE: This produces a positive number for integers, which implies float precision but has other meanings for MySQL; can be ommitted for integer types altogether?
+				 $column->precision = $column_obj->NUMERIC_PRECISION;
+			}
+			$column->type = ( array_key_exists( $column_obj->DATA_TYPE, $dataTypeMap ) ? $dataTypeMap{ $column_obj->DATA_TYPE } : 'UNSUPPORTED' );
+			printContents( $column->formatColumn(), $outfile );
+			
+			/*
 			printContents( "\t\t\t\t<Column"
 				.' dataName="'.$column_obj->COLUMN_NAME.'"'
 				.( $column_obj->COLUMN_DEFAULT && $column_obj->COLUMN_DEFAULT != 'CURRENT_TIMESTAMP' ? ' default="'.htmlentities( $column_obj->COLUMN_DEFAULT ).'"' : '' )
@@ -155,9 +189,10 @@ while( $table_obj = mysql_fetch_object( $table_result ) ){
 				.( $column_obj->EXTRA == 'auto_increment' || $column_obj->COLUMN_DEFAULT == 'CURRENT_TIMESTAMP' ? ' generatedOnPublish="true"' : '' )
 				.( $column_obj->CHARACTER_MAXIMUM_LENGTH ? ' length="'.$column_obj->CHARACTER_MAXIMUM_LENGTH.'"' : '' )
 				.( $column_obj->IS_NULLABLE != 'YES' ? ' nullable="false"' : '' )
-				.( $column_obj->NUMERIC_PRECISION ? ' precision="'.$column_obj->NUMERIC_PRECISION.'"' : '' )
+				.( $column_obj->NUMERIC_PRECISION ? ' precision="'.$column_obj->NUMERIC_PRECISION.'"' : '' ) // NOTE: This produces a positive number for integers, which implies float precision but has other meanings for MySQL; can be ommitted for integer types altogether?
 				.' type="'.$dataTypeMap{ $column_obj->DATA_TYPE }.'"'
 				."/>\n", $outfile );
+			*/
 		}
 		printContents( "\t\t\t</Columns>\n", $outfile );
 		printContents( "\t\t\t<Keys>\n", $outfile );
@@ -165,25 +200,25 @@ while( $table_obj = mysql_fetch_object( $table_result ) ){
 			$foreign_result = mysql_query(
 				'SELECT *
 				FROM KEY_COLUMN_USAGE
-				WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'"
+				WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $db ).'"
 				AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'"
 				AND CONSTRAINT_NAME <> "PRIMARY"
-				AND REFERENCED_TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'"
+				AND REFERENCED_TABLE_SCHEMA = "'.mysql_real_escape_string( $db ).'"
 				ORDER BY ORDINAL_POSITION'
-			) or die( mysql_error() );
+			) or mysql_die();
 			if( mysql_num_rows( $foreign_result ) > 0 ){
 				printContents( "\t\t\t\t<Foreign>\n", $outfile );
 				while( $key_obj = mysql_fetch_object( $foreign_result ) ){
 					printContents( "\t\t\t\t\t<Key column=\"".$key_obj->COLUMN_NAME.'"'
 						.' referenceGrid="'.$key_obj->REFERENCED_TABLE_NAME.'"'
-						.( $key_obj->REFERENCED_COLUMN_NAME != $key_obj->COLUMN_NAME ? ' referencedColumn="'.$key_obj->REFERENCED_COLUMN_NAME.'"' : '' )
+						.( $key_obj->REFERENCED_COLUMN_NAME != $key_obj->COLUMN_NAME ? ' referenceColumn="'.$key_obj->REFERENCED_COLUMN_NAME.'"' : '' )
 						."/>\n", $outfile );
 				}
 				printContents( "\t\t\t\t</Foreign>\n", $outfile );
 			}
 		}
 
-		$pk_result = mysql_query( 'SELECT * FROM KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'" AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'" AND CONSTRAINT_NAME = "PRIMARY" ORDER BY ORDINAL_POSITION' ) or die( mysql_error() );
+		$pk_result = mysql_query( 'SELECT * FROM KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $db ).'" AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'" AND CONSTRAINT_NAME = "PRIMARY" ORDER BY ORDINAL_POSITION' ) or mysql_die();
 		if( mysql_num_rows( $pk_result ) > 0 ){
 			printContents( "\t\t\t\t<Primary>\n", $outfile );
 			while( $key_obj = mysql_fetch_object( $pk_result ) ){
@@ -195,7 +230,7 @@ while( $table_obj = mysql_fetch_object( $table_result ) ){
 		$unique_result = mysql_query(
 			'SELECT *
 			FROM KEY_COLUMN_USAGE
-			WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $args['db'] ).'"
+			WHERE TABLE_SCHEMA = "'.mysql_real_escape_string( $db ).'"
 			AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'"
 			AND CONSTRAINT_NAME <> "PRIMARY"
 			'.(
@@ -204,7 +239,7 @@ while( $table_obj = mysql_fetch_object( $table_result ) ){
 				: ''
 			).'
 			ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION'
-		) or die( mysql_error() );
+		) or mysql_die();
 
 		if( mysql_num_rows( $unique_result ) > 0 ){
 			printContents( "\t\t\t\t<Unique>\n", $outfile );
@@ -226,6 +261,8 @@ while( $table_obj = mysql_fetch_object( $table_result ) ){
 	// break;
 }
 
-printFooter( $outfile );
+if( !array_key_exists( 'table', $args ) ){
+	printFooter( $outfile );
+}
 
 ?>
