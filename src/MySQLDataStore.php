@@ -193,14 +193,20 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 		return( $this->scanForInsertId( $grid ) );
 	}
 	protected function selectAndCount( $selectStatement, $limit = null, $offset = null ){
-		if( !strpos( $selectStatement, 'LIMIT' ) && !is_null( $limit ) ){
-			$selectStatement.= ' LIMIT '.(int)$limit.( !is_null( $offset ) ? ' OFFSET '.(int)$offset : '' );
+		$count = null;
+		if( strpos( $selectStatement, 'SELECT' ) === 0 ){
+			if( !strpos( $selectStatement, 'LIMIT' ) && !is_null( $limit ) ){
+				$selectStatement.= ' LIMIT '.(int)$limit.( !is_null( $offset ) ? ' OFFSET '.(int)$offset : '' );
+			}
+			if( !strpos( $selectStatement, 'SQL_CALC_FOUND_ROWS' ) ){
+				$selectStatement = preg_replace( '/^SELECT /', 'SELECT SQL_CALC_FOUND_ROWS ', $selectStatement, 1 );
+			}
+			$result = $this->query( $selectStatement );
+			$count = $this->getFoundRows();
+		} else {
+			$result = $this->query( $selectStatement );
 		}
-		if( !strpos( $selectStatement, 'SQL_CALC_FOUND_ROWS' ) ){
-			$selectStatement = preg_replace( '/^SELECT /', 'SELECT SQL_CALC_FOUND_ROWS ', $selectStatement, 1 );
-		}
-		$result = $this->query( $selectStatement );
-		return( array( $result, $this->getFoundRows() ) );
+		return( array( $result, $count ) );
 	}
 	/*
 	public function generateInsertSQL( Grid $grid, array $pairs = null ){}

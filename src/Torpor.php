@@ -680,13 +680,19 @@ class Torpor {
 					if( strpos( $targetGrid, self::VALUE_SEPARATOR ) ){
 						list( $targetGrid, $alias ) = explode( self::VALUE_SEPARATOR, $targetGrid );
 					}
-					if( is_null( $allGrids{ $targetGrid } ) ){
+					/*
+					// Good intentions, but they might not play nice without a huge tweak to canReference that I'm not ready for.
+					if( !array_key_exists( $targetGrid, $allGrids ) ){
 						// Fall back to data name.
 						if( in_array( $targetGrid, array_values( $allGrids ) ) ){
 							$targetGrid = array_search( $targetGrid, $allGrids );
 						} else {
 							$this->throwException( 'Unknown grid "'.$targetGrid.'" in key references from grid '.$gridName );
 						}
+					}
+					*/
+					if( !$this->supportedGrid( $targetGrid ) ){
+						$this->throwException( 'Unknown grid "'.$targetGrid.'" in key references from grid '.$gridName );
 					}
 					foreach( $columnPairs as $columnName => $targetColumnName ){
 						// TODO:

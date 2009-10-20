@@ -24,6 +24,8 @@ abstract class ANSISQLDataStore {
 
 	protected $_criteriaHandlerMap = array();
 	protected $_concatOperator = '||';
+	protected $asColumnOperator = 'AS';
+	protected $asTableOperator = 'AS';
 
 	protected function __construct(){}
 
@@ -225,7 +227,7 @@ abstract class ANSISQLDataStore {
 
 		$sql = '';
 		if( count( $finalCriteriaSet->getCriteria() ) >= 1 ){
-			$sql = $this->CriteriaToSQL( $gridType, $finalCriteriaSet );
+			$sql = $this->CriteriaToSQL( $gridType, $finalCriteriaSet, $gridSet->getSortOrder() );
 		} else {
 			$sql = $this->generateSelectSQL( $gridSet->Torpor()->dataNameForGrid( $gridType ), $gridSet->getSortOrder() );
 		}
@@ -494,7 +496,9 @@ abstract class ANSISQLDataStore {
 		if( $grid instanceof Grid ){
 			$from = $this->gridTableName( $grid );
 			foreach( $grid->ColumnNames() as $columnName ){
-				$declarations[] = $grid->Column( $columnName )->getDataName().' AS '.$this->escapeDataNameAlias( $grid->Column( $columnName )->_getObjName() );
+				$declarations[] = $grid->Column( $columnName )->getDataName()
+				.' '.$this->asColumnOperator.' '
+				.$this->escapeDataNameAlias( $grid->Column( $columnName )->_getObjName() );
 			}
 			$clauses = $this->makeClauses( $grid );
 		} else {
@@ -502,12 +506,13 @@ abstract class ANSISQLDataStore {
 			foreach( $this->getTorpor()->$grid() as $columnName ){
 				$declarations[] = $from.'.'
 					.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $grid, $columnName ) )
-					.' AS '.$this->escapeDataNameAlias( $columnName );
+					.' '.$this->asColumnOperator.' '
+					.$this->escapeDataNameAlias( $columnName );
 			}
 		}
 		$sql = 'SELECT DISTINCT '.implode( ', ', $declarations ).' FROM '.$from;
 		if( count( $clauses ) > 0 ){ $sql.= ' WHERE '.implode( ' AND ', $clauses ); }
-		if( count( $orderBy ) > 0 ){
+		if( is_array( $orderBy ) && count( $orderBy ) > 0 ){
 			$orderClauses = array();
 			foreach( $orderBy as $sortSpec ){
 				list( $gridName, $columnName, $order ) = $sortSpec;
@@ -533,11 +538,17 @@ abstract class ANSISQLDataStore {
 		// only half the functionality?  Because it makes sense to have a template, and to be able to
 		// explain the caveats and limitations to the implementing developer using a real "living" example.
 		$count = null;
-		$countStatment = preg_replace( '/^SELECT.*?FROM/', 'SELECT COUNT( 1 ) AS __COUNT FROM', $selectStatment, 1 );
-		$countResult = $this->query( $countStatement );
-		if( $countResult ){
-			$countRow = $this->fetch_row( $countResult );
-			$count = (int)array_shift( $countRow );
+		if( strpos( $selectStatement, 'SELECT' ) === 0 ){
+			$countStatement = preg_replace(
+				'/^SELECT.*?FROM/',
+				'SELECT COUNT( 1 ) '.$this->asColumnOperator.' '.$this->escapeDataName( 'THECOUNT' ).' FROM', $selectStatement,
+				1
+			);
+			$countResult = $this->query( $countStatement );
+			if( $countResult ){
+				$countRow = $this->fetch_row( $countResult );
+				$count = (int)array_shift( $countRow );
+			}
 		}
 		return( array( $this->query( $selectStatement ), $count ) );
 	}
@@ -578,7 +589,6 @@ abstract class ANSISQLDataStore {
 		return( $return );
 	}
 
-	abstract public function getFoundRows();
 	abstract public function escape( $arg, $quote = false, $quoteChar = '\'' );
 	abstract public function escapeDataName( $dataName );
 	abstract public function escapeDataNameAlias( $dataNameAlias );
@@ -663,20 +673,30 @@ abstract class ANSISQLDataStore {
 		return( $finalCriteriaSet );
 	}
 
-	public function CriteriaToSQL( $sourceGridName, CriteriaBase $criteria ){
+	public function CriteriaToSQL( $sourceGridName, CriteriaBase $criteria, array $orderBy = null ){
 		$sourceGridName = $this->getTorpor()->containerKeyName( $sourceGridName );
 		$escapedSourceGridName = $this->escapeDataName( $sourceGridName );
 		$declarations = array();
 		foreach( $this->getTorpor()->$sourceGridName() as $columnName ){
 			$declarations[] = $escapedSourceGridName.'.'
 				.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $sourceGridName, $columnName ) )
-				.' AS '.$this->escapeDataNameAlias( $columnName );
+				.' '.$this->asColumnOperator.' '
+				.$this->escapeDataNameAlias( $columnName );
 		}
-		return(
-			'SELECT DISTINCT '.implode( ', ', $declarations )
+		$sql = 'SELECT DISTINCT '.implode( ', ', $declarations )
 			.' FROM '.$this->CriteriaToJoinClause( $sourceGridName, $criteria ).' '
-			.$this->CriteriaToConditions( $sourceGridName, $criteria )
-		);
+			.$this->CriteriaToConditions( $sourceGridName, $criteria );
+		if( is_array( $orderBy ) && count( $orderBy ) > 0 ){
+			$orderClauses = array();
+			foreach( $orderBy as $sortSpec ){
+				list( $gridName, $columnName, $order ) = $sortSpec;
+				$orderClauses[] = $this->escapeDataName( $gridName )
+					.'.'.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ) )
+					.' '.( $order == GridSet::ORDER_DESCENDING ? 'DESC' : 'ASC' );
+			}
+			$sql.= ' ORDER BY '.implode( ', ', $orderClauses );
+		}
+		return( $sql );
 	}
 
 	public function CriteriaHandlerTYPE( $sourceGridName, Criteria $criteria, $column ){ /* return( $finishedSQLexpression ); */ }
@@ -965,7 +985,8 @@ abstract class ANSISQLDataStore {
 		//    3.2 For that references this, left OUTER join
 
 		$sql = $this->escapeDataName( $this->getTorpor()->dataNameForGrid( $sourceGridName ) )
-			.' AS '.$this->escapeDataNameAlias( $sourceGridName );
+			.' '.$this->asTableOperator.' '
+			.$this->escapeDataNameAlias( $sourceGridName );
 
 		// Flatten all criteria
 		$allCriteria = array();
@@ -1049,7 +1070,8 @@ abstract class ANSISQLDataStore {
 			
 			$sql.= ' LEFT '.( $outerJoin ? 'OUTER ' : '' ).'JOIN '
 				.$this->escapeDataName( $this->getTorpor()->dataNameForGrid( $referencedGrid ) )
-				.' AS '.$this->escapeDataNameAlias( $referenceAlias )
+				.' '.$this->asTableOperator.' '
+				.$this->escapeDataNameAlias( $referenceAlias )
 				.' ON '.implode( ' AND ', $onConditions );
 		}
 
