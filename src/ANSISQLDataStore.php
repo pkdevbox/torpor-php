@@ -10,6 +10,8 @@
 // get_called_class() is not available prior to PHP 5.3.0; we aim for
 // compatibility, and don't want to resort to introspecting the debug_backtrace,
 // so it is left undone for now; passing the savings on to you).
+
+// TODO: Finalize public / protected / private
 abstract class ANSISQLDataStore {
 
 	private $_torpor = null;
@@ -19,6 +21,9 @@ abstract class ANSISQLDataStore {
 
 	public static $_publishing = array();
 	public static $_parsing = array();
+
+	protected $_criteriaHandlerMap = array();
+	protected $_concatOperator = '||';
 
 	protected function __construct(){}
 
@@ -110,24 +115,27 @@ abstract class ANSISQLDataStore {
 		$return = false;
 		$result = $this->query( $command->getCommand() );
 		if( is_resource( $result ) ){
-			$rowCount = $this->num_rows( $result );
-			if( $rowCount == 0 ){
-				trigger_error( 'No rows returned from executed command', E_USER_WARNING );
-				return( $return );
-			}
 			if( $returnAs instanceof Grid ){
-				if( $this->num_rows( $result ) > 1 ){
-					trigger_error( 'Multiple rows returned, only using the first to populate '.$grid->_getObjName().' grid', E_USER_WARNING );
+				$gridLoad = $this->fetch_assoc( $result );
+				if( $gridLoad === false ){
+					trigger_error( 'No rows returned from executed command', E_USER_WARNING );
+				} else {
+					$return = $this->LoadGridArray( $returnAs, $gridLoad );
+					if( $this->fetch_assoc( $result ) !== false ){
+						trigger_error( 'Multiple rows returned, only using the first to populate '.$grid->_getObjName().' grid', E_USER_WARNING );
+					}
 				}
-				$return = $this->LoadGridArray( $returnAs, $this->fetch_assoc( $result ) );
 			} elseif( $returnAs instanceof GridSet ){
 				$return = 0;
 				$newCommand = Torpor::OPERATION_NEW.$returnAs->gridType();
 				while( $dataRow = $this->fetch_assoc( $result ) ){
-					$returnAs++;
+					$return++;
 					$grid = $returnAs->Torpor()->$newCommand();
 					$this->LoadGridArray( $grid, $dataRow );
 					$returnAs->addGrid( $grid );
+				}
+				if( $return == 0 ){
+					trigger_error( 'No rows returned from executed command', E_USER_WARNING );
 				}
 			} else {
 				$this->throwException(
@@ -170,9 +178,8 @@ abstract class ANSISQLDataStore {
 				// that, and an array of object references really isn't that expensive.
 				$command = array_shift( $commands );
 				$this->checkCommand( $grid->Torpor(), $command );
-				$result = $this->query( $this->parseCommand( $command, $grid ) );
+				list( $result, $rowCount ) = $this->selectAndCount( $this->parseCommand( $command, $grid ), 1 );
 				if( is_resource( $result ) ){
-					$rowCount = $this->num_rows( $result );
 					if( $rowCount > 0 ){
 						if( $rowCount > 1 ){
 							trigger_error( 'Too many results returned from command; only using first row', E_USER_WARNING );
@@ -187,9 +194,6 @@ abstract class ANSISQLDataStore {
 					}
 				}
 			} else {
-				// TODO: Pass an "expected" value to LoadGridFromQuery, which it will check
-				// against FOUND_ROWS() and produce appropriate warnings?  Or handle all
-				// of that locally?
 				$this->LoadGridFromQuery(
 					$grid,
 					$this->generateSelectSQL( $grid ),
@@ -223,55 +227,31 @@ abstract class ANSISQLDataStore {
 		if( count( $finalCriteriaSet->getCriteria() ) >= 1 ){
 			$sql = $this->CriteriaToSQL( $gridType, $finalCriteriaSet );
 		} else {
-			$escapedGridName = $this->escapeDataName( $gridType );
-			foreach( $this->getTorpor()->$gridType() as $columnName ){
-				$declarations[] = $escapedGridName.'.'
-					.$this->escapeDataName( $gridSet->Torpor()->dataNameForColumn( $gridType, $columnName ) )
-					.' AS '.$this->escapeDataNameAlias( $columnName );
-			}
-			$sql = 'SELECT DISTINCT '.implode( ', ', $declarations )
-				.' FROM '.$this->escapeDataName( $gridSet->Torpor()->dataNameForGrid( $gridType ) )
-				.' AS '.$this->escapeDataNameAlias( $gridType );
+			$sql = $this->generateSelectSQL( $gridSet->Torpor()->dataNameForGrid( $gridType ), $gridSet->getSortOrder() );
 		}
 
-		// TODO: break out the SQL construction for a grid set for use
-		// in the IN SET and NOT IN SET criteria
-		if( count( $sortOrder = $gridSet->getSortOrder() ) > 0 ){
-			$orderBy = array();
-			foreach( $sortOrder as $sortSpec ){
-				list( $gridName, $columnName, $order ) = $sortSpec;
-				$orderBy[] = $this->escapeDataName( $gridName )
-					.'.'.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ) )
-					.' '.( $order == GridSet::ORDER_DESCENDING ? 'DESC' : 'ASC' );
-			}
-			$sql.= ' ORDER BY '.implode( ', ', $orderBy );
-		}
-
-		// TODO: Pull this out of here, find a way of invoking a class-provided limiter.
-		if( $gridSet->getPageSize() >= 0 ){
-			$sql.= ' LIMIT '
-				.( $gridSet->getPageSize() )
-				.( $gridSet->getGridOffset() >= 0 ? ' OFFSET '.$gridSet->getGridOffset() : '' );
-		}
-
-		$result = $this->query( $sql );
+		list( $result, $count ) = $this->selectAndCount(
+			$sql,
+			( $gridSet->getPageSize() >= 0 ? $gridSet->getPageSize() : null ),
+			( $gridSet->getGridOffset() >= 0 ? $gridSet->getGridOffset() : null )
+		);
 		if( $result === false ){
 			$this->throwException( 'Load of '.$gridType.' grid set failed: '.$this->error() );
 		} else if( $result === true ){
 			$this->throwException( 'Load command for '.$gridType.' grid set executed successfully but did not produce a result set (even a zero row result set)' );
 		} else if( is_resource( $result ) ){
-			if( $this->num_rows( $result ) > 0 ){
+			if( $count > 0 ){
 				$newCommand = Torpor::OPERATION_NEW.$gridType;
 				while( $dataRow = $this->fetch_assoc( $result ) ){
 					$loadedGrid = $this->getTorpor()->$newCommand();
 					$this->LoadGridArray( $loadedGrid, $dataRow );
 					$gridSet->addGrid( $loadedGrid, false );
 				}
-				$gridSet->setTotalGridCount( $this->getFoundRows() );
+				$gridSet->setTotalGridCount( $count );
 				$return = $gridSet->setLoaded();
 			}
 		} else {
-			$this->throwException( 'Cannot handle query return type: '.gettype( $resul ) );
+			$this->throwException( 'Cannot handle query return type: '.gettype( $result ) );
 		}
 		return( $return );
 	}
@@ -318,9 +298,9 @@ abstract class ANSISQLDataStore {
 		$grid->OnBeforePublish();
 		if( count( $commands ) > 0 ){
 			foreach( $commands as $command ){
-				$result = $this->query( $this->parseCommand( $command, $grid ) );
+				list( $result, $count ) = $this->selectAndCount( $this->parseCommand( $command, $grid ) );
 				if( is_resource( $result ) ){
-					if( $this->num_rows( $result ) > 1 ){
+					if( $count > 1 ){
 						trigger_error( 'Too many results returned from command; only using first row', E_USER_WARNING );
 					}
 					$this->LoadGridArray( $grid, $this->fetch_assoc( $result ) );
@@ -440,7 +420,6 @@ abstract class ANSISQLDataStore {
 	abstract public function query( $query, array $bindVariables = null );
 	abstract public function error( $resource = null );
 	abstract public function affected_rows( $resource = null );
-	abstract public function num_rows( $resource );
 	abstract public function fetch_row( $resource );
 	abstract public function fetch_array( $resource );
 	abstract public function fetch_assoc( $resource );
@@ -448,8 +427,8 @@ abstract class ANSISQLDataStore {
 	//*********************************************
 	//*  SQL generation & management abstraction  *
 	//*********************************************
-	public function preInsert( Grid $grid ){}
-	public function postInsert( Grid $grid ){}
+	protected function preInsert( Grid $grid ){}
+	protected function postInsert( Grid $grid ){}
 	public function generateInsertSQL( Grid $grid, array $pairs = null ){
 		if( !is_array( $pairs ) ){
 			$pairs = array();
@@ -508,20 +487,40 @@ abstract class ANSISQLDataStore {
 			.' WHERE '.implode( ' AND ', $this->makeClauses( $grid ) )
 		);
 	}
-	public function generateSelectSQL( Grid $grid ){ // Single grid only; criteria are used for larger sets.
+	public function generateSelectSQL( $grid, array $orderBy = null ){ // Single grid only; criteria are used for larger sets.
+		$clauses = array();
 		$declarations = array();
-		foreach( $grid->ColumnNames() as $columnName ){
-			$declarations[] = $grid->Column( $columnName )->getDataName().' AS '.$this->escapeDataNameAlias( $grid->Column( $columnName )->_getObjName() );
+		$from = null;
+		if( $grid instanceof Grid ){
+			$from = $this->gridTableName( $grid );
+			foreach( $grid->ColumnNames() as $columnName ){
+				$declarations[] = $grid->Column( $columnName )->getDataName().' AS '.$this->escapeDataNameAlias( $grid->Column( $columnName )->_getObjName() );
+			}
+			$clauses = $this->makeClauses( $grid );
+		} else {
+			$from = $this->escapeDataName( $grid );
+			foreach( $this->getTorpor()->$grid() as $columnName ){
+				$declarations[] = $from.'.'
+					.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $grid, $columnName ) )
+					.' AS '.$this->escapeDataNameAlias( $columnName );
+			}
 		}
-		$clauses = $this->makeClauses( $grid );
-		return(
-			'SELECT DISTINCT '.implode( ', ', $declarations )
-			.' FROM '.$this->gridTableName( $grid )
-			.' WHERE '.implode( ' AND ', $clauses )
-		);
+		$sql = 'SELECT DISTINCT '.implode( ', ', $declarations ).' FROM '.$from;
+		if( count( $clauses ) > 0 ){ $sql.= ' WHERE '.implode( ' AND ', $clauses ); }
+		if( count( $orderBy ) > 0 ){
+			$orderClauses = array();
+			foreach( $orderBy as $sortSpec ){
+				list( $gridName, $columnName, $order ) = $sortSpec;
+				$orderClauses[] = $this->escapeDataName( $gridName )
+					.'.'.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ) )
+					.' '.( $order == GridSet::ORDER_DESCENDING ? 'DESC' : 'ASC' );
+			}
+			$sql.= ' ORDER BY '.implode( ', ', $orderClauses );
+		}
+		return( $sql );
 	}
 
-	public function selectAndCount( $selectStatement, $expected = null, $limit = null, $offset = null ){
+	protected function selectAndCount( $selectStatement, $limit = null, $offset = null ){
 		// This method is expected to retrieve a count of available records in a way most efficient to
 		// each implementing DataStore implemmentation, and to return the results of that executions as
 		// well as the returned count.
@@ -529,24 +528,16 @@ abstract class ANSISQLDataStore {
 		// regex is non greedy, assuming that and sub-selects (other occurrances of "FROM") will appear only
 		// in the restrictive clauses, as is the torpor fashion; this may break on custom queries, but those
 		// are also less likely to be traveling this path.  You have been warned.
+		// Also note that there is no ANSI compliant way or performing the limit and offset - those will be
+		// left to the implementing classes.  So why not make this an abstract class, instead of providing
+		// only half the functionality?  Because it makes sense to have a template, and to be able to
+		// explain the caveats and limitations to the implementing developer using a real "living" example.
 		$count = null;
 		$countStatment = preg_replace( '/^SELECT.*?FROM/', 'SELECT COUNT( 1 ) AS __COUNT FROM', $selectStatment, 1 );
 		$countResult = $this->query( $countStatement );
 		if( $countResult ){
 			$countRow = $this->fetch_row( $countResult );
 			$count = (int)array_shift( $countRow );
-		}
-		if(
-			!is_null( $count )
-			&& !is_null( $expected )
-			&& $expected > 0
-			&& $count > $expected
-		){
-			trigger_error(
-				'Wrong number of results returned in '.$grid->_getObjName()
-				.' load (expected '.$expected.', found '.$count
-				.'; only '.min( $expected, $count ).' will be used)', E_USER_WARNING
-			);
 		}
 		return( array( $this->query( $selectStatement ), $count ) );
 	}
@@ -561,26 +552,22 @@ abstract class ANSISQLDataStore {
 	}
 
 	public function LoadGridFromQuery( Grid $grid, $sql, $expectedRows = -1 ){
-		$result = $this->query( $sql );
+		list( $result, $totalCount ) = $this->selectAndCount( $sql, 1 );
 		if( $result === false ){
 			$this->throwException( 'Load of '.$grid->_getObjName().' grid failed: '.$this->error() );
+		} else if( $result === true ){
+			$this->throwException( 'Load of '.$grid->_getObjName().' grid executed successfully but did not produce a result set (even a zero row result set)' );
 		} else if( is_resource( $result ) ){
-			if( ( $rowCount = $this->num_rows( $result ) ) >= 1 ){
-				if(
-					$expectedRows > 0
-					&& (
-						( $foundRows = $this->getFoundRows() ) !== $expectedRows
-						|| $rowCount !== $expectedRows
-					)
-				){
-					trigger_error(
-						'Wrong number of results returned in '.$grid->_getObjName()
-						.' load (expected '.$expectedRows.', got '.$foundRows
-						.'; only '.min( $expectedRows, $rowCount ).' will be used)', E_USER_WARNING
-					);
-				}
-				$this->LoadGridArray( $grid, $this->fetch_assoc( $result ) );
+			if( $expectedRows > 0 && $totalCount != $expectedRows ){
+				trigger_error(
+					'Wrong number of results returned in '.$grid->_getObjName()
+					.' load (expected '.$expectedRows.', got '.$totalCount
+					.'; only '.min( $expectedRows, $totalCount ).' will be used)', E_USER_WARNING
+				);
 			}
+			$this->LoadGridArray( $grid, $this->fetch_assoc( $result ) );
+		} else {
+			$this->throwException( 'Cannot handle query return type: '.gettype( $result ) );
 		}
 	}
 
@@ -692,6 +679,7 @@ abstract class ANSISQLDataStore {
 		);
 	}
 
+	public function CriteriaHandlerTYPE( $sourceGridName, Criteria $criteria, $column ){ /* return( $finishedSQLexpression ); */ }
 	public function CriteriaToConditions( $sourceGridName, CriteriaBase $criteria, $clause = 'WHERE' ){
 		// TODO: Check for recursion
 		$sourceGridName = $this->getTorpor()->containerKeyName( $sourceGridName );
@@ -714,227 +702,248 @@ abstract class ANSISQLDataStore {
 					: true
 				)
 			);
-			switch( $criteria->getBaseType() ){
-				case Criteria::TYPE_BETWEEN:
-					list( $lowRange, $highRange ) = $criteria->getArguments();
-					if( $criteria->isColumnTarget() ){
-						$lowRange = $this->ColumnNameToSQL( $sourceGridName, array_shift( $lowRange ), array_shift( $lowRange ) );
-						$highRange = $this->ColumnNameToSQL( $sourceGridName, array_shift( $highRange ), array_shift( $highRange ) );
-					} else {
-						$lowRange = $this->escape( $lowRange, true );
-						$highRange = $this->escape( $highRange, true );
-					}
-					if( $criteria->isInclusive() ){
-						$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' BETWEEN '.$lowRange.' AND '.$highRange;
-					} else {
-						$sql = ( $criteria->isNegated() ? 'NOT ' : '' ).'( '.$sql.' > '.$lowRange.' AND '.$sql.' < '.$highRange.' )';
-					}
-					break;
-				case Criteria::TYPE_CONTAINS:
-					list( $target ) = $criteria->getArguments();
-					if( $criteria->isColumnTarget() ){
-						$target = 'CONCAT( \'%\', '.$this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) ).', \'%\' )';
-					} else {
-						$target = '\'%'.$this->escape( $target ).'%\'';
-					}
-					// TODO: Case sensitivity assumes latin1 character set.  This needs to be adapted
-					// to the character set of the target field(s)!
-					$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' LIKE '.$target
-						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' ); // TODO: Dynamic binary encoding enforcement
-					break;
-				case Criteria::TYPE_ENDSWITH:
-					list( $target ) = $criteria->getArguments();
-					if( $criteria->isColumnTarget() ){
-						$target = 'CONCAT( \'%\', '.$this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) ).' )';
-					} else {
-						$target = '\'%'.$this->escape( $target ).'\'';
-					}
-					$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target
-						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' ); // TODO: Dynamic binary encoding enforcement
-					break;
-				case Criteria::TYPE_EQUALS:
-					list( $target ) = $criteria->getArguments();
-					if( $criteria->isColumnTarget() ){
-						$target = $this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) );
-					} else if( !is_null( $target ) ){
-						$target = $this->escape( $target, true );
-					}
-					if( is_null( $target ) ){
-						$sql.= ' IS'.( $criteria->isNegated() ? ' NOT' : '' ).' NULL';
-					} else {
-						$sql.= ' '.( $criteria->isNegated() ? '!' : '' ).'= '.$target
-							.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' ); // TODO: Dynamic binary encoding enforcement
-					}
-					break;
-				case Criteria::TYPE_GREATERTHAN:
-					list( $target ) = $criteria->getArguments();
-					if( $criteria->isColumnTarget() ){
-						$target = $this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) );
-					} else {
-						$target = $this->escape( $target, true );
-					}
-					$sql = ( $criteria->isNegated() ? ' NOT ' : '' ).$sql.' >'.( $criteria->isInclusive() ? '=' : '' ).' '.$target;
-					break;
-				case Criteria::TYPE_IN:
-					$args = $criteria->getArguments();
-					$sqlArgs = array();
-					if( $criteria->isColumnTarget() ){
-						foreach( $args as $arg ){
-							$sqlArgs[] = $this->ColumnNameToSQL( $sourceGridName, array_shift( $arg ), array_shift( $arg ) );
+			
+			if( array_key_exists( $criteria->getBaseType(), $this->_criteriaHandlerMap ) ){
+				$handler = $this->_criteriaHandlerMap{ $criteria->getBaseType() };
+				$sql = $this->$handler( $sourceGridName, $criteria, $sql );
+			} else {
+				switch( $criteria->getBaseType() ){
+					case Criteria::TYPE_BETWEEN:
+						list( $lowRange, $highRange ) = $criteria->getArguments();
+						if( $criteria->isColumnTarget() ){
+							$lowRange = $this->ColumnNameToSQL( $sourceGridName, array_shift( $lowRange ), array_shift( $lowRange ) );
+							$highRange = $this->ColumnNameToSQL( $sourceGridName, array_shift( $highRange ), array_shift( $highRange ) );
+						} else {
+							$lowRange = $this->escape( $lowRange, true );
+							$highRange = $this->escape( $highRange, true );
 						}
-					} else {
-						foreach( $args as $arg ){
-							$sqlArgs[] = $this->escape( $arg, true );
+						if( $criteria->isInclusive() ){
+							$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' BETWEEN '.$lowRange.' AND '.$highRange;
+						} else {
+							$sql = ( $criteria->isNegated() ? 'NOT ' : '' ).'( '.$sql.' > '.$lowRange.' AND '.$sql.' < '.$highRange.' )';
 						}
-					}
-					if( !count( $sqlArgs ) ){
-						$this->throwException( 'Nothing in IN criteria, cannot continue' );
-					}
-					$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' IN ( '.( implode( ', ', $sqlArgs ) ).' )';
-					break;
-				case Criteria::TYPE_LESSTHAN:
-					list( $target ) = $criteria->getArguments();
-					if( $criteria->isColumnTarget() ){
-						$target = $this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) );
-					} else {
-						$target = $this->escape( $target, true );
-					}
-					$sql = ( $criteria->isNegateD() ? ' NOT ' : '' ).$sql.' <'.( $criteria->isInclusive() ? '=' : '' ).' '.$target;
-					break;
-				case Criteria::TYPE_PATTERN:
-					list( $regex ) = $criteria->getArguments();
-					$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'REGEXP '.$this->escape( str_replace( '\\', '\\\\', $regex ), true );
-					break;
-				case Criteria::TYPE_STARTSWITH:
-					list( $target ) = $criteria->getArguments();
-					if( $criteria->isColumnTarget() ){
-						$target = 'CONCAT( '.$this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) ).', \'%\' )';
-					} else {
-						$target = '\''.$this->escape( $target ).'%\'';
-					}
-					$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target
-						.( $criteria->isCaseSensitive() ? ' COLLATE latin1_bin' : '' ); // TODO: Dynamic binary encoding enforcement
-					break;
-				case Criteria::TYPE_CUSTOM:
-					trigger_error( 'Custom un-parsed SQL passed to database', E_USER_NOTICE );
-					if( $criteria->isNegated() ){
-						trigger_error( 'Ignoring criteria negation for '.$criteria->getType().' criteria', E_USER_WARNING );
-					}
-					if( $criteria->isColumnTarget() ){
-						trigger_error( 'Ignoring column target setting for '.$criteria->getType().' criteria', E_USER_WARNING );
-					}
-					if( count( $criteria->getArguments() ) > 0 ){
-						trigger_error( 'Ignoring arguments for '.$criteria->getType().' criteria', E_USER_WARNING );
-					}
-					$sql = $criteria->getCustom();
-					break;
-				case Criteria::TYPE_IN_SET:
-					// TODO: Extract/Create the SQL used to populate a GridSet,
-					// and use that as a sub-select inclusion/exclusion, eg. $grid.$column [NOT] IN ( SELECT ... )
-					// Need to specify which column of the SET pertains to this column...
-					list( $gridSet ) = $criteria->getArguments();
-					if( !$gridSet->canLoad() && $gridSet->getGridCount() < 1 ){
-						$this->throwException( 'GridSet lacks valid content or criteria, cannot continue' );
-					}
-
-					$criteriaGridType = $criteria->getGridName();
-					if( !$this->getTorpor()->supportedGrid( $criteriaGridType )){
-						$criteriaGridType = $this->getTorpor()->referenceAliasGrid( $sourceGridName, $criteriaGridType );
-						if( is_null( $criteriaGridType ) ){
-							$this->throwException( 'No reference path between '.$sourceGridName.' and '.$criteria->getGridName().' in '.$criteria->getType().' criteria' );
+						break;
+					case Criteria::TYPE_CONTAINS:
+						list( $target ) = $criteria->getArguments();
+						if( $criteria->isColumnTarget() ){
+							$target = '\'%\' '.$this->_concatOperator.' '.$this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) ).' '.$this->_concatOperator.' \'%\'';
+						} else {
+							$target = '\'%'.$this->escape( $target ).'%\'';
 						}
-					}
-
-					// The targetColumnName needs to correspond to the relationship from the
-					// criteria column to the gridSet.  We know the originating column, so we
-					// only need to find the key relationship to which that belongs.
-					// In the event that the key relationship is not immediately apparent:
-					// 1. Check to see if grid references criteria
-					// 2. Check to see if grid is the same as sourceGridName 
-					$targetColumName = null;
-					$referenceKeys = array();
-					if( $this->getTorpor()->canReference( $criteriaGridType, $gridSet->gridType() ) ){
-						$referenceKeys = $this->getTorpor()->referenceKeysBetween( $criteriaGridType, $gridSet->gridType() );
-					} else if( $this->getTorpor()->canBeReferencedBy( $criteriaGridType, $gridSet->gridType() ) ){
-						$inverseReferenceKeys = $this->getTorpor()->referenceKeysBetween( $gridSet->gridType(), $criteriaGridType );
-						foreach( $inverseReferenceKeys as $context => $keys ){
-							$referenceKeys{ $context } = array();
-							foreach( $keys as $thatColumn => $thisColumn ){
-								$referenceKeys{ $context }{ $thisColumn } = $thatColumn;
+						if( $criteria->isCaseInSensitive() ){
+							$sql = 'UPPER( '.$sql.' )';
+							$target = 'UPPER( '.$target.' )';
+						}
+						$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' LIKE '.$target;
+						break;
+					case Criteria::TYPE_ENDSWITH:
+						list( $target ) = $criteria->getArguments();
+						if( $criteria->isColumnTarget() ){
+							$target = 'CONCAT( \'%\', '.$this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) ).' )';
+						} else {
+							$target = '\'%'.$this->escape( $target ).'\'';
+						}
+						if( $criteria->isCaseInSensitive() ){
+							$sql = 'UPPER( '.$sql.' )';
+							$target = 'UPPER( '.$target.' )';
+						}
+						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target;
+						break;
+					case Criteria::TYPE_EQUALS:
+						list( $target ) = $criteria->getArguments();
+						if( $criteria->isColumnTarget() ){
+							$target = $this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) );
+						} else if( !is_null( $target ) ){
+							$target = $this->escape( $target, true );
+						}
+						if( is_null( $target ) ){
+							$sql.= ' IS'.( $criteria->isNegated() ? ' NOT' : '' ).' NULL';
+						} else {
+							if( $criteria->isCaseInSensitive() ){
+								$sql = 'UPPER( '.$sql.' )';
+								$target = 'UPPER( '.$target.' )';
+							}
+							$sql.= ' '.( $criteria->isNegated() ? '!' : '' ).'= '.$target;
+						}
+						break;
+					case Criteria::TYPE_GREATERTHAN:
+						list( $target ) = $criteria->getArguments();
+						if( $criteria->isColumnTarget() ){
+							$target = $this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) );
+						} else {
+							$target = $this->escape( $target, true );
+						}
+						$sql = ( $criteria->isNegated() ? ' NOT ' : '' ).$sql.' >'.( $criteria->isInclusive() ? '=' : '' ).' '.$target;
+						break;
+					case Criteria::TYPE_IN:
+						$args = $criteria->getArguments();
+						$sqlArgs = array();
+						if( $criteria->isColumnTarget() ){
+							foreach( $args as $arg ){
+								$sqlArgs[] = $this->ColumnNameToSQL( $sourceGridName, array_shift( $arg ), array_shift( $arg ) );
+							}
+						} else {
+							foreach( $args as $arg ){
+								$sqlArgs[] = $this->escape( $arg, true );
 							}
 						}
-					} else if( $criteriaGridType == $gridSet->gridType() ){
-						$referenceKeys = array( 'AUTOLOGICAL' => array( $criteria->getColumnName() => $criteria->getColumnName() ) );
-					} else {
-						$this->throwException( 'No reference path between '.$sourceGridName.' and '.$criteria->getGridName().' in '.$criteria->getType().' criteria' );
-					}
-
-					foreach( $referenceKeys as $context => $keys ){
-						if( count( $keys ) != 1 ){ continue; }
-						if( isset( $keys{ $criteria->getColumnName() } ) ){
-							$targetColumnName = $keys{ $criteria->getColumnName() };
-							break;
+						if( $criteria->isCaseInsensitive() ){
+							foreach( $sqlArgs as $key => $arg ){
+								$sqlArgs[ $key ] = 'UPPER( '.$arg.' )';
+							}
 						}
-					}
-					if( is_null( $targetColumnName ) ){
-						$this->throwException( 'Could not determine ideal column to column map between '.$criteriaGridType.' and '.$gridSet->gridType().' in '.$criteria->getType().' criteria' );
-					}
-
-					if( $criteria->isExclusive() && $gridSet->getGridCount() < 1 ){
-						$gridSet->Load();
-						if( $gridSet->getGridCount() < 1 ){
-							// Exclusive criteria failed to yield any results; using it as a subselect
-							// would also yield zero results; therefor we need to return either a boolean
-							// TRUE or FALSE condition based on whether or not we have been negated.
-							// If we must be IN an Empty collection, return false.
-							// If we must NOT be in an Empty collection return true.
-							// This is the most performant way of doing this, even if it is a little obscure.
-							$sql = ( $criteria->isNegated() ? '1 = 1' : '1 != 1' );
-							break;
+						if( !count( $sqlArgs ) ){
+							$this->throwException( 'Nothing in IN criteria, cannot continue' );
 						}
-					}
+						$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' IN ( '.( implode( ', ', $sqlArgs ) ).' )';
+						break;
+					case Criteria::TYPE_LESSTHAN:
+						list( $target ) = $criteria->getArguments();
+						if( $criteria->isColumnTarget() ){
+							$target = $this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) );
+						} else {
+							$target = $this->escape( $target, true );
+						}
+						$sql = ( $criteria->isNegateD() ? ' NOT ' : '' ).$sql.' <'.( $criteria->isInclusive() ? '=' : '' ).' '.$target;
+						break;
+					case Criteria::TYPE_PATTERN:
+						list( $regex ) = $criteria->getArguments();
+						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'REGEXP '.$this->escape( str_replace( '\\', '\\\\', $regex ), true );
+						break;
+					case Criteria::TYPE_STARTSWITH:
+						list( $target ) = $criteria->getArguments();
+						if( $criteria->isColumnTarget() ){
+							$target = $this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) ).' '.$this->_concatOperator.' \'%\'';
+						} else {
+							$target = '\''.$this->escape( $target ).'%\'';
+						}
+						if( $criteria->isCaseInsensitive() ){
+							$sql = 'UPPER( '.$sql.' )';
+							$target = 'UPPER( '.$target.' )';
+						}
+						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'LIKE '.$target;
+						break;
+					case Criteria::TYPE_CUSTOM:
+						trigger_error( 'Custom un-parsed SQL passed to database', E_USER_NOTICE );
+						if( $criteria->isNegated() ){
+							trigger_error( 'Ignoring criteria negation for '.$criteria->getType().' criteria', E_USER_WARNING );
+						}
+						if( $criteria->isColumnTarget() ){
+							trigger_error( 'Ignoring column target setting for '.$criteria->getType().' criteria', E_USER_WARNING );
+						}
+						if( count( $criteria->getArguments() ) > 0 ){
+							trigger_error( 'Ignoring arguments for '.$criteria->getType().' criteria', E_USER_WARNING );
+						}
+						$sql = $criteria->getCustom();
+						break;
+					case Criteria::TYPE_IN_SET:
+						// TODO: Extract/Create the SQL used to populate a GridSet,
+						// and use that as a sub-select inclusion/exclusion, eg. $grid.$column [NOT] IN ( SELECT ... )
+						// Need to specify which column of the SET pertains to this column...
+						list( $gridSet ) = $criteria->getArguments();
+						if( !$gridSet->canLoad() && $gridSet->getGridCount() < 1 ){
+							$this->throwException( 'GridSet lacks valid content or criteria, cannot continue' );
+						}
 
-					$inclusiveSQL = null;
-					$loadedSQL = null;
-					if( $criteria->isInclusive() ){
-						// TODO: Special handling for an empty criteria gridSet w/o pagination:
-						// Implicitly convert to a left outer join and use (NOT) IS NULL here?
-						$gridSetCriteria = $this->GridSetToCriteria( $gridSet );
-						$inclusiveSQL = 'SELECT DISTINCT '.$this->escapeDataName( $this->getTorpor()->dataNameForGrid( $gridSet->gridType() ) )
-							.'.'.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $gridSet->gridType(), $targetColumnName ) )
-							.' FROM '.$this->CriteriaToJoinClause( $gridSet->gridType(), $gridSetCriteria )
-							.( count( $gridSetCriteria->getCriteria() ) > 0 ? ' '.$this->CriteriaToConditions( $gridSet->gridType(), $gridSetCriteria ) : '' );
-					} else {
-						if( !$gridSet->isLoaded() && $gridSet->getGridCount() < 1 ){
+						$criteriaGridType = $criteria->getGridName();
+						if( !$this->getTorpor()->supportedGrid( $criteriaGridType )){
+							$criteriaGridType = $this->getTorpor()->referenceAliasGrid( $sourceGridName, $criteriaGridType );
+							if( is_null( $criteriaGridType ) ){
+								$this->throwException( 'No reference path between '.$sourceGridName.' and '.$criteria->getGridName().' in '.$criteria->getType().' criteria' );
+							}
+						}
+
+						// The targetColumnName needs to correspond to the relationship from the
+						// criteria column to the gridSet.  We know the originating column, so we
+						// only need to find the key relationship to which that belongs.
+						// In the event that the key relationship is not immediately apparent:
+						// 1. Check to see if grid references criteria
+						// 2. Check to see if grid is the same as sourceGridName 
+						$targetColumName = null;
+						$referenceKeys = array();
+						if( $this->getTorpor()->canReference( $criteriaGridType, $gridSet->gridType() ) ){
+							$referenceKeys = $this->getTorpor()->referenceKeysBetween( $criteriaGridType, $gridSet->gridType() );
+						} else if( $this->getTorpor()->canBeReferencedBy( $criteriaGridType, $gridSet->gridType() ) ){
+							$inverseReferenceKeys = $this->getTorpor()->referenceKeysBetween( $gridSet->gridType(), $criteriaGridType );
+							foreach( $inverseReferenceKeys as $context => $keys ){
+								$referenceKeys{ $context } = array();
+								foreach( $keys as $thatColumn => $thisColumn ){
+									$referenceKeys{ $context }{ $thisColumn } = $thatColumn;
+								}
+							}
+						} else if( $criteriaGridType == $gridSet->gridType() ){
+							$referenceKeys = array( 'AUTOLOGICAL' => array( $criteria->getColumnName() => $criteria->getColumnName() ) );
+						} else {
+							$this->throwException( 'No reference path between '.$sourceGridName.' and '.$criteria->getGridName().' in '.$criteria->getType().' criteria' );
+						}
+
+						foreach( $referenceKeys as $context => $keys ){
+							if( count( $keys ) != 1 ){ continue; }
+							if( isset( $keys{ $criteria->getColumnName() } ) ){
+								$targetColumnName = $keys{ $criteria->getColumnName() };
+								break;
+							}
+						}
+						if( is_null( $targetColumnName ) ){
+							$this->throwException( 'Could not determine ideal column to column map between '.$criteriaGridType.' and '.$gridSet->gridType().' in '.$criteria->getType().' criteria' );
+						}
+
+						if( $criteria->isExclusive() && $gridSet->getGridCount() < 1 ){
 							$gridSet->Load();
+							if( $gridSet->getGridCount() < 1 ){
+								// Exclusive criteria failed to yield any results; using it as a subselect
+								// would also yield zero results; therefor we need to return either a boolean
+								// TRUE or FALSE condition based on whether or not we have been negated.
+								// If we must be IN an Empty collection, return false.
+								// If we must NOT be in an Empty collection return true.
+								// This is the most performant way of doing this, even if it is a little obscure.
+								$sql = ( $criteria->isNegated() ? '1 = 1' : '1 != 1' );
+								break;
+							}
 						}
-					}
-					if( $gridSet->getGridCount() > 0 ){
-						$columnValues = array();
-						for( $i = 0; $i < $gridSet->getGridCount(); $i++ ){
-							$columnValues = $this->escape( $gridSet->getGrid( $i )->Column( $columnName )->getPersistData(), true );
-						}
-						$loadedSQL = implode( ', ', $columnValues );
-					}
 
-					if( is_null( $inclusiveSQL ) && is_null( $loadedSQL ) ){
-						$this->throwException( 'Could not construct valid clauses for '.$criteria->getType().' criteria using provided '.$gridSet->gridType().' grid set' );
-					} else if( !is_null( $inclusiveSQL ) && !is_null( $loadedSQL ) ){
-						$sql = '( '
-							.'( '
-								.$sql.( $criteria->isNegated() ? ' NOT' : '' ).' ( '.$inclusiveSQL.' )'
-								.' ) AND ( '
-								.$sql.( $critiera->isNegated() ? ' NOT' : '' ).' ( '.$loadedSQL.' )'
-							.' )'
-						.' )';
-					} else {
-						$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' IN ( '
-							.( !is_null( $inclusiveSQL ) ? $inclusiveSQL : $loadedSQL ).' )';
-					}
-					break;
-				default:
-					$this->throwException( 'Unsupported criteria requested: '.$criteria->getType() );
-					break;
+						$inclusiveSQL = null;
+						$loadedSQL = null;
+						if( $criteria->isInclusive() ){
+							// TODO: Special handling for an empty criteria gridSet w/o pagination:
+							// Implicitly convert to a left outer join and use (NOT) IS NULL here?
+							$gridSetCriteria = $this->GridSetToCriteria( $gridSet );
+							$inclusiveSQL = 'SELECT DISTINCT '.$this->escapeDataName( $this->getTorpor()->dataNameForGrid( $gridSet->gridType() ) )
+								.'.'.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $gridSet->gridType(), $targetColumnName ) )
+								.' FROM '.$this->CriteriaToJoinClause( $gridSet->gridType(), $gridSetCriteria )
+								.( count( $gridSetCriteria->getCriteria() ) > 0 ? ' '.$this->CriteriaToConditions( $gridSet->gridType(), $gridSetCriteria ) : '' );
+						} else {
+							if( !$gridSet->isLoaded() && $gridSet->getGridCount() < 1 ){
+								$gridSet->Load();
+							}
+						}
+						if( $gridSet->getGridCount() > 0 ){
+							$columnValues = array();
+							for( $i = 0; $i < $gridSet->getGridCount(); $i++ ){
+								$columnValues = $this->escape( $gridSet->getGrid( $i )->Column( $columnName )->getPersistData(), true );
+							}
+							$loadedSQL = implode( ', ', $columnValues );
+						}
+
+						if( is_null( $inclusiveSQL ) && is_null( $loadedSQL ) ){
+							$this->throwException( 'Could not construct valid clauses for '.$criteria->getType().' criteria using provided '.$gridSet->gridType().' grid set' );
+						} else if( !is_null( $inclusiveSQL ) && !is_null( $loadedSQL ) ){
+							$sql = '( '
+								.'( '
+									.$sql.( $criteria->isNegated() ? ' NOT' : '' ).' ( '.$inclusiveSQL.' )'
+									.' ) AND ( '
+									.$sql.( $critiera->isNegated() ? ' NOT' : '' ).' ( '.$loadedSQL.' )'
+								.' )'
+							.' )';
+						} else {
+							$sql.= ( $criteria->isNegated() ? ' NOT' : '' ).' IN ( '
+								.( !is_null( $inclusiveSQL ) ? $inclusiveSQL : $loadedSQL ).' )';
+						}
+						break;
+					default:
+						$this->throwException( 'Unsupported criteria requested: '.$criteria->getType() );
+						break;
+				}
 			}
 		} else if( $criteria instanceof CriteriaSet ){
 			$clauses = array();

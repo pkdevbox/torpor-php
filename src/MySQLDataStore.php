@@ -9,22 +9,25 @@
 
 require_once( 'ANSISQLDataStore.php' );
 class MySQLDataStore extends ANSISQLDataStore implements DataStore {
-
 	private $_connection = null;
 	private $_host = 'localhost';
 	private $_user = null;
 	private $_password = null;
 	private $_database = null;
-	private $_torpor = null;
-	private $_parameters = array();
-
-	private $_writable = false;
 	private $_affected_rows = 0;
 
 	public static $_publishing = array();
 	public static $_parsing = array();
 
 	protected function MySQLDataStore(){}
+
+	protected $_criteriaHandlerMap = array(
+		Criteria::TYPE_CONTAINS   => 'criteriaContains',
+		Criteria::TYPE_ENDSWITH   => 'criteriaEndsWith',
+		Criteria::TYPE_EQUALS     => 'criteriaEquals',
+		Criteria::TYPE_IN         => 'criteriaIn',
+		Criteria::TYPE_STARTSWITH => 'criteriaStartsWith'
+	);
 
 	//*********************************
 	//*  DataStore Interface Methods  *
@@ -33,17 +36,6 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 		$dataStore = new MySQLDataStore();
 		$dataStore->setTorpor( $torpor );
 		return( $dataStore );
-	}
-
-	public function LoadFromCriteria( Grid $grid, CriteriaBase $criteria, $refresh = false ){
-		if( !$grid->isLoaded() || $refresh ){
-			$sql = $this->CriteriaToSQL( $grid, $criteria );
-			if( !preg_match( '/limit\s\+\d(\s*,\s*\d)?\s*$/is', $sql ) ){
-				$sql.= ' LIMIT 1';
-			}
-			$this->LoadGridFromQuery( $grid, $sql, 1 );
-		}
-		return( $grid->isLoaded() );
 	}
 
 	//***********************************
@@ -70,17 +62,15 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 		}
 		if( $user !== $this->getUser() ){
 			if( $this->isConnected() ){
-				if( $user !== $this->getUser() ){
-					if(
-						!mysql_change_user(
-							$user,
-							$this->getPassword(),
-							$this->getDatabase(),
-							$this->getConnection()
-						)
-					){
-						$this->throwException( 'Could not change users on MySQL connection: '.$this->error() );
-					}
+				if(
+					!mysql_change_user(
+						$user,
+						$this->getPassword(),
+						$this->getDatabase(),
+						$this->getConnection()
+					)
+				){
+					$this->throwException( 'Could not change users on MySQL connection: '.$this->error() );
 				}
 			}
 			$return = $this->_user = $user;
@@ -119,7 +109,7 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 		if( !$this->isConnected() || $reconnect ){
 			// TODO: Use a setting to differentiate between
 			// connect & pconnect
-			$connection = mysql_connect(
+			$connection = mysql_pconnect(
 				$this->getHost(),
 				$this->getUser(),
 				$this->getPassword(),
@@ -168,9 +158,9 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 		}
 	}
 
-	//********************************
-	//*  Database interface routines *
-	//********************************
+	//*********************************
+	//*  Database interface routines  *
+	//*********************************
 	public function query( $query, array $bindVariables = null ){
 		// $bindVariables not supported in MySQL.
 		$result = mysql_query( $query, $this->getConnection() );
@@ -199,17 +189,106 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 	//*  ANSISQLDataStore Extensions  *
 	//*********************************
 	// public function preInsert( Grid $grid ){}
-	public function postInsert( Grid $grid ){
+	protected function postInsert( Grid $grid ){
 		return( $this->scanForInsertId( $grid ) );
 	}
-	public function selectAndCount( $selectStatement, $expected = null, $limit = null, $offset = null ){
+	protected function selectAndCount( $selectStatement, $limit = null, $offset = null ){
+		if( !strpos( $selectStatement, 'LIMIT' ) && !is_null( $limit ) ){
+			$selectStatement.= ' LIMIT '.(int)$limit.( !is_null( $offset ) ? ' OFFSET '.(int)$offset : '' );
+		}
+		if( !strpos( $selectStatement, 'SQL_CALC_FOUND_ROWS' ) ){
+			$selectStatement = preg_replace( '/^SELECT /', 'SELECT SQL_CALC_FOUND_ROWS ', $selectStatement, 1 );
+		}
+		$result = $this->query( $selectStatement );
+		return( array( $result, $this->getFoundRows() ) );
 	}
 	/*
 	public function generateInsertSQL( Grid $grid, array $pairs = null ){}
 	public function generateUpdateSQL( Grid $grid, array $pairs = null ){}
 	public function generateDeleteSQL( Grid $grid ){}
-	public function generateSelectSQL( Grid $grid ){}
+	public function generateSelectSQL( Grid $grid, array $orderBy = null ){}
 	*/
+
+	//******************************
+	//*  Custom Criteria Handlers  *
+	//******************************
+	protected function criteriaContains( $sourceGridName, Criteria $criteria, $column ){
+		list( $target ) = $criteria->getArguments();
+		if( $criteria->isColumnTarget() ){
+			$target = 'CONCAT( \'%\', '.$this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) ).', \'%\' )';
+		} else {
+			$target = '\'%'.$this->escape( $target ).'%\'';
+		}
+		// TODO: Case sensitivity assumes latin1 character set.  This needs to be adapted
+		// to the character set of the target field(s)!
+		$sql = ( $criteria->isCaseSensitive() ? 'BINARY ' : '' )
+			.$column
+			.( $criteria->isNegated() ? ' NOT' : '' )
+			.' LIKE '.$target;
+		return( $sql );
+	}
+	protected function criteriaEndsWith( $sourceGridName, Criteria $critera, $column ){
+		list( $target ) = $criteria->getArguments();
+		if( $criteria->isColumnTarget() ){
+			$target = 'CONCAT( \'%\', '.$this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) ).' )';
+		} else {
+			$target = '\'%'.$this->escape( $target ).'\'';
+		}
+		$sql = ( $criteria->isCaseSensitive() ? 'BINARY ' : '' )
+			.$column
+			.( $criteria->isNegated() ? ' NOT ' : '' )
+			.' LIKE '.$target;
+		return( $sql );
+	}
+	protected function criteriaEquals( $sourceGridName, Criteria $criteria, $column ){
+		list( $target ) = $criteria->getArguments();
+		if( $criteria->isColumnTarget() ){
+			$target = $this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) );
+		} else if( !is_null( $target ) ){
+			$target = $this->escape( $target, true );
+		}
+		$sql = ( $criteria->isCaseSensitive() ? 'BINARY ' : '' ).$column.' ';
+		if( is_null( $target ) ){
+			$sql.= 'IS'.( $criteria->isNegated() ? ' NOT' : '' ).' NULL';
+		} else {
+			$sql.= ( $criteria->isNegated() ? '!' : '' ).'= '.$target;
+		}
+		return( $sql );
+	}
+	protected function criteriaIn( $sourceGridName, Criteria $criteria, $column ){
+		$args = $criteria->getArguments();
+		$sqlArgs = array();
+		if( $criteria->isColumnTarget() ){
+			foreach( $args as $arg ){
+				$sqlArgs[] = $this->ColumnNameToSQL( $sourceGridName, array_shift( $arg ), array_shift( $arg ) );
+			}
+		} else {
+			foreach( $args as $arg ){
+				$sqlArgs[] = $this->escape( $arg, true );
+			}
+		}
+		if( !count( $sqlArgs ) ){
+			$this->throwException( 'Nothing in IN criteria, cannot continue' );
+		}
+		$sql = ( $criteria->isCaseSensitive() ? 'BINARY ' : '' ).$column
+			.( $criteria->isNegated() ? ' NOT' : '' )
+			.' IN ( '.( implode( ', ', $sqlArgs ) ).' )';
+		return( $sql );
+	}
+	protected function criteriaStartsWith( $sourceGridName, Criteria $criteria, $column ){
+		list( $target ) = $criteria->getArguments();
+		if( $criteria->isColumnTarget() ){
+			$target = 'CONCAT( '.$this->ColumnNameToSQL( $sourceGridName, array_shift( $target ), array_shift( $target ) ).', \'%\' )';
+		} else {
+			$target = '\''.$this->escape( $target ).'%\'';
+		}
+			; // TODO: Dynamic binary encoding enforcement
+		$sql = ( $criteria->isCaseSensitive() ? 'BINARY ' : '' )
+			.$column
+			.( $criteria->isNegated() ? ' NOT ' : '' )
+			.' LIKE '.$target;
+		return( $sql );
+	}
 
 	//************************************
 	//*  Utility and supporting methods  *
@@ -229,7 +308,7 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 	public function escapeDataName( $dataName ){
 		return( $this->escape( $dataName, true, '`' ) );
 	}
-	public function escapeDataNameAlias( $dataName ){ return( $this->escapeDataName ); }
+	public function escapeDataNameAlias( $dataName ){ return( $this->escapeDataName( $dataName ) ); }
 
 	protected function scanForInsertId( Grid $grid ){
 		if( !$grid->isLoaded() ){
