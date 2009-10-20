@@ -93,7 +93,7 @@ if( !array_key_exists( 'table', $args ) ){
 	printHeader( $outfile );
 	printContents( <<<XMLHEADER
 	<Repository>
-		<DataStore type="MySQL">
+		<DataStore type="Oracle">
 			<Parameter name="user" value="$user"/>
 			<Parameter name="password" value="$password"/>
 			<Parameter name="schema" value="$host"/>
