@@ -229,7 +229,9 @@ class Grid extends PersistableContainer implements Iterator
 				}
 				$return = true;
 			} else {
-				trigger_error( 'Skipping unrecognized Column "'.$key.'" for grid '.$grid->_getObjName(), E_USER_WARNING );
+				if( strpos( $key, '__' ) !== 0 ){
+					trigger_error( 'Skipping unrecognized Column "'.$key.'" for grid '.$grid->_getObjName(), E_USER_WARNING );
+				}
 			}
 		}
 		if( $return && $setLoaded ){

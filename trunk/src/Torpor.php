@@ -671,7 +671,7 @@ class Torpor {
 		// of these keys which ones provide discrete mappings (complete overlap with one or more
 		// of the unique constraints [primary or otherwise] on the target table, such that definitive
 		// identification is assured)
-		$allGrids = $this->getGrids();
+		$allGrids = &$this->_getGrids();
 		foreach( array_keys( $allGrids ) as $gridName ){
 			$references = &$this->_getReferences( $gridName );
 			if( is_array( $references ) && count( $references ) > 0 ){
@@ -693,6 +693,7 @@ class Torpor {
 						// Fallback courtesy should be provided here, even though it allows for sloppy book-keeping.
 						// Needs to be provided via canReference though, which makes things even messier.  This is
 						// for later consideration if at all.
+						$columns = &$this->_getColumns( $targetGrid );
 						if( !is_array( $columns ) || !array_key_exists( $targetColumnName, $columns ) ){
 							$this->throwException( 'Unknown reference column "'.$targetColumnName.'" in key reference from '.$gridName.' on column '.$columnName );
 						}
@@ -764,7 +765,7 @@ class Torpor {
 	// Named for "Grid" type because we may want to have additional classes of parameters for objects in the future.
 	protected function &_getGridParameters( $grid = null ){
 		$gridParameters = $this->_getInitX( self::ARKEY_GRID_PARAMETERS, $grid );
-		if( !is_array( $allParameters ) ){
+		if( !is_array( $gridParameters ) ){
 			$gridParameters = array();
 		}
 		return $gridParameters;
