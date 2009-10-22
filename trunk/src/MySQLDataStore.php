@@ -1,12 +1,6 @@
 <?PHP
 // $Rev$
 // TODO: Create a PHP 5.3+ version MySQLiDataStore() extension which uses mysqli
-
-// [ ] selectAndCount()
-//    [ ] MySQL implementation
-//    [ ] Wired-up as appropriate
-// [ ] criteriaHandlerMap
-
 require_once( 'ANSISQLDataStore.php' );
 class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 	private $_connection = null;
@@ -15,9 +9,6 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 	private $_password = null;
 	private $_database = null;
 	private $_affected_rows = 0;
-
-	public static $_publishing = array();
-	public static $_parsing = array();
 
 	protected function MySQLDataStore(){}
 

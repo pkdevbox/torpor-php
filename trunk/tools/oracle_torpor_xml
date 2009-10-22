@@ -81,7 +81,6 @@ $dataTypeMap = array(
 $charSetMap = array(
 );
 
-$grids = array();
 $sql = 'SELECT TABLE_NAME FROM USER_TABLES';
 if( array_key_exists( 'table', $args ) ){
 	$tables = ( is_array( $args['table'] ) ? $args['table'] : array( $args['table'] ) );
@@ -89,7 +88,13 @@ if( array_key_exists( 'table', $args ) ){
 }
 $table_result = oci_query( $sql, $connection ) or die( oci_error() );
 
-if( !array_key_exists( 'table', $args ) ){
+if(
+	!array_key_exists( 'table', $args )
+	|| (
+		array_key_exists( 'headers', $args )
+		&& $args['headers']
+	)
+){
 	printHeader( $outfile );
 	printContents( <<<XMLHEADER
 	<Repository>
@@ -125,7 +130,7 @@ while( $table_obj = oci_fetch_object( $table_result ) ){
 				)
 				: 'UNSUPPORTED:'.$column_obj->DATA_TYPE
 			);
-			if( $column_obj->DATA_DEFAULT && $column_obj->DATA_DEFAULT ){
+			if( $column_obj->DATA_DEFAULT ){
 				$column->default = $column_obj->DATA_DEFAULT;
 			}
 			if( $column_obj->CHARACTER_SET_NAME ){
@@ -272,7 +277,13 @@ while( $table_obj = oci_fetch_object( $table_result ) ){
 	// break;
 }
 
-if( !array_key_exists( 'table', $args ) ){
+if(
+	!array_key_exists( 'table', $args )
+	|| (
+		array_key_exists( 'headers', $args )
+		&& $args['headers']
+	)
+){
 	printFooter( $outfile );
 }
 
