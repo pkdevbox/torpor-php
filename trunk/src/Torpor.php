@@ -1517,6 +1517,7 @@ class Torpor {
 	}
 	public static function typedGridClassCreate( $className, $checkInitialization = true, $extends = 'TypedGrid' ){
 		$return = !( $checkInitialization );
+		$setClass = false;
 		if( $checkInitialization ){
 			$torpor = ( isset( $this ) ? $this : Torpor::getInstance() );
 			$gridName = substr( $className, strlen( $torpor->typedGridClassesPrefix() ) );
@@ -1530,6 +1531,7 @@ class Torpor {
 					)
 				) == self::OPERATION_GET_SET
 			){
+				$setClass = true;
 				$gridName = substr( $gridName, 0, ( -1 * strlen( self::OPERATION_GET_SET ) ) );
 			}
 			$return = ( $torpor->supportedGrid( $gridName ) && $torpor->typedGridClasses() );
@@ -1538,16 +1540,23 @@ class Torpor {
 			}
 		}
 		if( $return ){
+			// Should be done in 2 passes: determine if we're looking for a set, and if so create
+			// that definition.  If not, create the grid class only.  This allows for more flexible
+			// end user implementation (can extend one without affecting the other)
+
 			// Using class_exists() causes some initialization recursion if typedGridClassCheck
 			// is hooked into __autoload, so we use the slightly heavier get_declared_classes
 			// instead which saves us running the same portions of code over and over.
 			$declaredClasses = array_map( 'strtoupper', get_declared_classes() );
-			if( !in_array( strtoupper( $className ), $declaredClasses ) ){
-				eval( 'class '.$className.' extends '.$extends.' {}' );
-			}
-			$setClassName = $className.self::OPERATION_GET_SET;
-			if( !in_array( strtoupper( $setClassName ), $declaredClasses ) ){
-				eval( 'class '.$setClassName.' extends '.$extends.self::OPERATION_GET_SET.' {}' );
+			if( $setClass ){
+				$setClassName = $className.self::OPERATION_GET_SET;
+				if( !in_array( strtoupper( $setClassName ), $declaredClasses ) ){
+					eval( 'class '.$setClassName.' extends '.$extends.self::OPERATION_GET_SET.' {}' );
+				}
+			} else {
+				if( !in_array( strtoupper( $className ), $declaredClasses ) ){
+					eval( 'class '.$className.' extends '.$extends.' {}' );
+				}
 			}
 		}
 		return( $return );
