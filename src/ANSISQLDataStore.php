@@ -541,11 +541,12 @@ abstract class ANSISQLDataStore {
 		if( strpos( $selectStatement, 'SELECT' ) === 0 ){
 			$countStatement = preg_replace(
 				'/^SELECT.*?FROM/',
-				'SELECT COUNT( 1 ) '.$this->asColumnOperator.' '.$this->escapeDataName( 'THECOUNT' ).' FROM', $selectStatement,
+				'SELECT COUNT( 1 ) '.$this->asColumnOperator.' '.$this->escapeDataName( 'THECOUNT' ).' FROM',
+				$selectStatement,
 				1
 			);
 			$countResult = $this->query( $countStatement );
-			if( $countResult ){
+			if( is_resource( $countResult ) ){
 				$countRow = $this->fetch_row( $countResult );
 				$count = (int)array_shift( $countRow );
 			}

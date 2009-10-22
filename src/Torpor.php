@@ -402,6 +402,7 @@ class Torpor {
 							$this->throwException( 'Custom data store requested but no class set' );
 							break;
 						case 'mssql':
+						case 'sqlserver':
 							require_once( ( $className = 'MSSQLDataStore' ).'.php' );
 							break;
 						case 'mysql':
@@ -468,9 +469,7 @@ class Torpor {
 				}
 				$gridClasses{ $gridName } = $className;
 			} else if( $options{ self::OPTION_TYPED_GRID_CLASSES } ){
-				$className = $options{ self::OPTION_TYPED_GRID_CLASSES_PREFIX }.$gridName;
-				$this->typedGridClassCreate( $className, false );
-				$gridClasses{ $gridName } = $className;
+				$gridClasses{ $gridName } = $options{ self::OPTION_TYPED_GRID_CLASSES_PREFIX }.$gridName;
 			}
 
 			foreach( $gridXml->Columns->Column as $columnXml ){

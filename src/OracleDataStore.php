@@ -1,6 +1,7 @@
 <?PHP
 // $Rev$
 require_once( 'ANSISQLDataStore.php' );
+// TODO: Special handling for LOB/CLOB interfaces?
 class OracleDataStore extends ANSISQLDataStore implements DataStore {
 	private $_connection = null;
 	private $_schema = null;
@@ -73,10 +74,11 @@ class OracleDataStore extends ANSISQLDataStore implements DataStore {
 				$this->getCharSet()
 			);
 			if( !$connection ){
-				$this->throwException( 'Could not connect to MySQL using supplied credentials: '.mysql_error() );
+				$this->throwException( 'Could not connect to Oracle using supplied credentials: '.mysql_error() );
 			}
 			$this->setConnection( $connection );
 			$this->query( 'ALTER SESSION SET NLS_DATE_FORMAT = \'YYYY-MM-DD HH24:MI:SS\'' );
+			$this->query( 'SET ESCAPE \\' );
 		}
 		return( $this->isConnected() );
 	}
@@ -136,6 +138,7 @@ class OracleDataStore extends ANSISQLDataStore implements DataStore {
 		// derived either from parameters passed globally to this DataStore or identified specifically on the
 		// grid in question (checking grid first, then falling back to $this, then throwing an exception)
 		// Have an option for special: call a function instead of executing a sequence (thus can grab GUID, etc.)
+		$this->throwException( 'Need to determine sequence scheme!' );
 	}
 	protected function selectAndCount( $selectStatement, $limit = null, $offset = null ){
 		$count = null;
