@@ -941,7 +941,7 @@ abstract class ANSISQLDataStore {
 						if( $gridSet->getGridCount() > 0 ){
 							$columnValues = array();
 							for( $i = 0; $i < $gridSet->getGridCount(); $i++ ){
-								$columnValues = $this->escape( $gridSet->getGrid( $i )->Column( $columnName )->getPersistData(), true );
+								$columnValues[] = $this->escape( $gridSet->getGrid( $i )->Column( $criteria->getColumnName() )->getPersistData(), true );
 							}
 							$loadedSQL = implode( ', ', $columnValues );
 						}
@@ -971,7 +971,11 @@ abstract class ANSISQLDataStore {
 			foreach( $criteria as $criterion ){
 				$clauses[] = $this->CriteriaToConditions( $sourceGridName, $criterion, '' );
 			}
-			$sql.= '( '.implode( ' '.$criteria->getType().' ', $clauses ).' )';
+			if( count( $clauses ) > 1 ){
+				$sql.= '( '.implode( ' '.$criteria->getType().' ', $clauses ).' )';
+			} else {
+				$sql.= array_shift( $clauses );
+			}
 		}
 		return( ( !empty( $clause ) ? $clause.' ' : '' ).$sql );
 	}
