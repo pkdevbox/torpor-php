@@ -147,19 +147,6 @@ while( $table_obj = oci_fetch_object( $table_result ) ){
 				 $column->precision = $column_obj->DATA_SCALE;
 			}
 			printContents( $column->formatColumn(), $outfile );
-			
-			/*
-			printContents( "\t\t\t\t<Column"
-				.' dataName="'.$column_obj->COLUMN_NAME.'"'
-				.( $column_obj->COLUMN_DEFAULT && $column_obj->COLUMN_DEFAULT != 'CURRENT_TIMESTAMP' ? ' default="'.htmlentities( $column_obj->COLUMN_DEFAULT ).'"' : '' )
-				.( $column_obj->CHARACTER_SET_NAME ? ' encoding="'.( array_key_exists( $column_obj->CHARACTER_SET_NAME, $charSetMap ) ? $charSetMap{ $column_obj->CHARACTER_SET_NAME } : 'UNSUPPORTED:'.$column_obj->CHARACTER_SET_NAME ).'"' : '' )
-				.( $column_obj->EXTRA == 'auto_increment' || $column_obj->COLUMN_DEFAULT == 'CURRENT_TIMESTAMP' ? ' generatedOnPublish="true"' : '' )
-				.( $column_obj->CHARACTER_MAXIMUM_LENGTH ? ' length="'.$column_obj->CHARACTER_MAXIMUM_LENGTH.'"' : '' )
-				.( $column_obj->IS_NULLABLE != 'YES' ? ' nullable="false"' : '' )
-				.( $column_obj->NUMERIC_PRECISION ? ' precision="'.$column_obj->NUMERIC_PRECISION.'"' : '' ) // NOTE: This produces a positive number for integers, which implies float precision but has other meanings for MySQL; can be ommitted for integer types altogether?
-				.' type="'.$dataTypeMap{ $column_obj->DATA_TYPE }.'"'
-				."/>\n", $outfile );
-			*/
 		}
 		printContents( "\t\t\t</Columns>\n", $outfile );
 		printContents( "\t\t\t<Keys>\n", $outfile );
