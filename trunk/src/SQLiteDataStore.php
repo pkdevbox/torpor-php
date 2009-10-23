@@ -128,8 +128,8 @@ class SQLiteDataStore extends ANSISQLDataStore implements DataStore {
 		// $bindVariables not supported in SQLite.
 		return( sqlite_query( $this->getConnection(), $query ) );
 	}
-	public function error( $resource = null ){ return( sqlite_error_string( sqlite_last_error( ( $resource ? $resource : $this->getConnection() ) ) ) ); }
-	public function affected_rows( $resource ){ return( sqlite_changes( $resource ) ); }
+	public function error( $resource = null ){ return( sqlite_error_string( sqlite_last_error( ( is_resource( $resource ) ? $resource : $this->getConnection() ) ) ) ); }
+	public function affected_rows( $resource = null ){ return( sqlite_changes( ( is_resource( $resource ) ? $resource : $this->getConnection() ) ) ); }
 	public function num_rows( $resource ){ return( sqlite_num_rows( $resource ) ); }
 	public function fetch_row( $resource ){ return( sqlite_fetch_array( $resource, SQLITE_NUM ) ); }
 	public function fetch_array( $resource ){ return( sqlite_fetch_array( $resource, SQLITE_BOTH ) ); }
@@ -199,7 +199,7 @@ class SQLiteDataStore extends ANSISQLDataStore implements DataStore {
 				$foundKeyColumn
 				&& $lastInsertId = sqlite_last_insert_rowid( $this->getConnection() )
 			){
-				$foundKeyColumn->setData( array_shift( $lastInsertId ) );
+				$foundKeyColumn->setData( $lastInsertId );
 			}
 		}
 	}
