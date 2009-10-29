@@ -274,11 +274,12 @@ class Column extends PersistableContainer
 	// this.
 	public function getPersistData( $localOnly = false ){ return( $this->getData( $localOnly ) ); }
 	public function getData( $localOnly = false ){
-		if( $this->isLinked() && !$localOnly ){
-			// TODO: What to do if the linked column no longer exists?
-			if( $this->getLinkedColumn()->hasData() ){
-				// Setting data automatically destroys links unless it is instructed otherwise.
-				$this->setData( $this->getLinkedColumn()->getData(), $this->perpetuateLink() );
+		if( $this->isLinked() ){
+			if( !$localOnly ){
+				if( $this->getLinkedColumn()->hasData() ){
+					// Setting data automatically destroys links unless it is instructed otherwise.
+					$this->setData( $this->getLinkedColumn()->getData(), $this->perpetuateLink() );
+				}
 			}
 		} else {
 			// TODO: WARNING: What to do in the case that Grid is already
@@ -495,7 +496,7 @@ class Column extends PersistableContainer
 			}
 		} else {
 			$this->_data = $data;
-			if( $this->isLinked() && !!$preserveLink ){
+			if( $this->isLinked() && !$preserveLink ){
 				$this->destroyLink();
 			}
 			// Indicate that we have changed since loading.
