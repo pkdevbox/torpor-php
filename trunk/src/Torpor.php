@@ -1276,29 +1276,29 @@ class Torpor {
 		return( $targetGrid );
 	}
 
-	public function _getGridFromCriteria( $gridName, Criteria $criteria ){
+	public function _getGridFromCriteria( $gridName, CriteriaBase $criteria ){
 		// TODO: This.
 	}
 
-	public function _getGridSetFromRecord( $gridName, Grid $sourceGrid, Criteria $criteria = null ){
+	public function _getGridSetFromRecord( $gridName, Grid $sourceGrid, CriteriaBase $criteria = null ){
 		// TODO: Ensure $criteria is properly passed through from the Grid->get<Grid>Set( $criteria )
 		// calls in order to AND them together when retrieving corresponding grid records.
 		$gridSet = $this->_newGridSet( $gridName, $sourceGrid );
-		if( $criteria instanceof Criteria ){
+		if( $criteria instanceof CriteriaBase ){
 			$gridSet->setSourceCriteria( $criteria );
 		}
 		return( $gridSet );
 	}
 
-	public function _getGridSetFromAliasRecord( $gridName, $alias, Grid $sourceGrid, Criteria $criteria = null ){
+	public function _getGridSetFromAliasRecord( $gridName, $alias, Grid $sourceGrid, CriteriaBase $criteria = null ){
 		$gridSet = $this->_newGridSet( $gridName, $sourceGrid, $alias );
-		if( $criteria instanceof Criteria ){
+		if( $criteria instanceof CriteriaBase ){
 			$gridSet->setSourceCriteria( $criteria );
 		}
 		return( $gridSet );
 	}
 
-	public function _getGridSetFromCriteria( $gridName, Criteria $criteria ){
+	public function _getGridSetFromCriteria( $gridName, CriteriaBase $criteria ){
 		return( $this->_newGridSet( $gridName, $criteria ) );
 	}
 
