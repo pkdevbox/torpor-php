@@ -829,7 +829,7 @@ abstract class ANSISQLDataStore {
 						break;
 					case Criteria::TYPE_PATTERN:
 						list( $regex ) = $criteria->getArguments();
-						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'REGEXP '.$this->escape( str_replace( '\\', '\\\\', $regex ), true );
+						$sql.= ' '.( $criteria->isNegated() ? 'NOT ' : '' ).'REGEXP '.$this->escape( $regex, true );
 						break;
 					case Criteria::TYPE_STARTSWITH:
 						list( $target ) = $criteria->getArguments();

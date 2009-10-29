@@ -17,6 +17,7 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 		Criteria::TYPE_ENDSWITH   => 'criteriaEndsWith',
 		Criteria::TYPE_EQUALS     => 'criteriaEquals',
 		Criteria::TYPE_IN         => 'criteriaIn',
+		Criteria::TYPE_PATTERN    => 'criteriaPattern',
 		Criteria::TYPE_STARTSWITH => 'criteriaStartsWith'
 	);
 
@@ -284,6 +285,14 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 			.$column
 			.( $criteria->isNegated() ? ' NOT ' : '' )
 			.' LIKE '.$target;
+		return( $sql );
+	}
+	protected function criteriaPattern( $sourceGridName, Criteria $criteria, $column ){
+		list( $regex ) = $criteria->getArguments();
+		$sql = ( $criteria->isCaseSensitive() ? 'BINARY ' : '' )
+				.$column
+				.( $criteria->isNegated() ? ' NOT' : '' )
+				.' REGEXP '.$this->escape( $regex, true );
 		return( $sql );
 	}
 
