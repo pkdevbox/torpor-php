@@ -288,8 +288,11 @@ class Criteria extends CriteriaBase {
 				$this->addArgument( $set );
 				break;
 			case self::TYPE_PATTERN:
-				if( $preppedArgCount != 1 ){ throw( $argCountException ); }
-				$this->addArgument( array_shift( $preppedArgs ) );
+				if( $preppedArgCount < 1 || $preppedArgCount > 2 ){ throw( $argCountException ); }
+				$preppedArgs[] = false; // Default for "case insensitive"
+				list( $regex, $caseInsensitive ) = $preppedArgs;
+				$this->addArgument( $regex );
+				$this->setCaseInsensitive( $caseInsensitive );
 				break;
 			case null:
 			default:
