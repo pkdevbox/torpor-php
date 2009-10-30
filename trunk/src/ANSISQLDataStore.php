@@ -570,14 +570,16 @@ abstract class ANSISQLDataStore {
 		} else if( $result === true ){
 			$this->throwException( 'Load of '.$grid->_getObjName().' grid executed successfully but did not produce a result set (even a zero row result set)' );
 		} else if( is_resource( $result ) ){
-			if( $expectedRows > 0 && $totalCount != $expectedRows ){
-				trigger_error(
-					'Wrong number of results returned in '.$grid->_getObjName()
-					.' load (expected '.$expectedRows.', got '.$totalCount
-					.'; only '.min( $expectedRows, $totalCount ).' will be used)', E_USER_WARNING
-				);
+			if( $totalCount > 0 ){
+				if( $expectedRows > 0 && $totalCount != $expectedRows ){
+					trigger_error(
+						'Wrong number of results returned in '.$grid->_getObjName()
+						.' load (expected '.$expectedRows.', got '.$totalCount
+						.'; only '.min( $expectedRows, $totalCount ).' will be used)', E_USER_WARNING
+					);
+				}
+				$this->LoadGridArray( $grid, $this->fetch_assoc( $result ) );
 			}
-			$this->LoadGridArray( $grid, $this->fetch_assoc( $result ) );
 		} else {
 			$this->throwException( 'Cannot handle query return type: '.gettype( $result ) );
 		}

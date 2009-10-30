@@ -286,10 +286,18 @@ class Column extends PersistableContainer
 			// loaded?  Should we care?  This answer determines whether or
 			// not we throw an exception (if grid is loaded and we're not),
 			// and/or whether we call Load() with refresh set to true.
-			// Only load in the event that we don't already contain data?
+			// Only load in the event that we don't already contain data
+			// (or the only data we contain is of the default variety)?
 			if(
 				!$this->isLoaded()
-				&& !$this->isDirty()
+				&& (
+					!$this->isDirty()
+					|| (
+						$this->isDirty()
+						&& $this->hasDefaultData()
+						&& $this->_data == $this->_defaultData
+					)
+				)
 				&& $this->Grid() instanceof Grid
 				&& $this->Grid()->canLoad()
 			){
