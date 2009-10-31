@@ -6,7 +6,7 @@ error_reporting( E_ALL | E_STRICT );
 function parseOptions( array $defaults = null ){
 	global $argv;
 	$args = array();
-	foreach( preg_split( '/(\s*-+|\s\/)/', join( ' ', array_slice( $argv, 1 ) ) ) as $argset ){
+	foreach( preg_split( '/(^-+|\s-+|\s\/)/', join( ' ', array_slice( $argv, 1 ) ) ) as $argset ){
 		$key = null;
 		$value = null;
 		if( preg_match( '/[\s=]+/', $argset ) ){

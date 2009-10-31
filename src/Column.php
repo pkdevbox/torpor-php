@@ -289,7 +289,8 @@ class Column extends PersistableContainer
 			// Only load in the event that we don't already contain data
 			// (or the only data we contain is of the default variety)?
 			if(
-				!$this->isLoaded()
+				!$localOnly
+				&& !$this->isLoaded()
 				&& (
 					!$this->isDirty()
 					|| (

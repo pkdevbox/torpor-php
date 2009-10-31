@@ -172,7 +172,6 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 	}
 	public function error( $resource = null ){ return( mysql_error( ( $resource ? $resource : $this->getConnection() ) ) ); }
 	public function affected_rows( $resource = null ){ return( ( is_resource( $resource ) ? mysql_affected_rows( $resource ) : $this->_affected_rows ) ); }
-	public function num_rows( $resource ){ return( mysql_num_rows( $resource ) ); }
 	public function fetch_row( $resource ){ return( mysql_fetch_row( $resource ) ); }
 	public function fetch_array( $resource ){ return( mysql_fetch_array( $resource ) ); }
 	public function fetch_assoc( $resource ){ return( mysql_fetch_assoc( $resource ) ); }
@@ -206,6 +205,7 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 	public function generateDeleteSQL( Grid $grid ){}
 	public function generateSelectSQL( Grid $grid, array $orderBy = null ){}
 	*/
+	public function num_rows( $resource ){ return( mysql_num_rows( $resource ) ); }
 
 	//******************************
 	//*  Custom Criteria Handlers  *

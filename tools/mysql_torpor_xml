@@ -102,7 +102,6 @@ $charSetMap = array(
 	'koi8u'    => '8bit',
 	'gb2312'   => 'EUC-CN',
 	'greek'    => 'ISO-8859-7',
-	'cp1250'   => 'Windows-1250', // Needs review
 	'gbk'      => 'EUC-CN', // Needs review
 	'latin5'   => 'ISO-8859-9',
 	'armscii8' => 'ArmSCII-8',
@@ -164,7 +163,7 @@ while( $table_obj = mysql_fetch_object( $table_result ) ){
 		while( $column_obj = mysql_fetch_object( $column_result ) ){
 			$column = new TorporConfigColumn();
 			$column->dataName = $column_obj->COLUMN_NAME;
-			if( $column_obj->COLUMN_DEFAULT && $column_obj->COLUMN_DEFAULT != 'CURRENT_TIMESTAMP' ){
+			if( !is_null( $column_obj->COLUMN_DEFAULT ) && $column_obj->COLUMN_DEFAULT != 'CURRENT_TIMESTAMP' ){
 				$column->default = $column_obj->COLUMN_DEFAULT;
 			}
 			if( $column_obj->CHARACTER_SET_NAME ){
@@ -181,7 +180,7 @@ while( $table_obj = mysql_fetch_object( $table_result ) ){
 			}
 			if( !is_null( $column_obj->NUMERIC_PRECISION ) && strpos( 'int', $column_obj->DATA_TYPE ) === false ){
 				// NOTE: This produces a positive number for integers, which implies float precision but has other meanings for MySQL; can be ommitted for integer types altogether?
-				 $column->precision = $column_obj->NUMERIC_PRECISION;
+				$column->precision = $column_obj->NUMERIC_PRECISION;
 			}
 			$column->type = ( array_key_exists( $column_obj->DATA_TYPE, $dataTypeMap ) ? $dataTypeMap{ $column_obj->DATA_TYPE } : 'UNSUPPORTED' );
 			printContents( $column->formatColumn(), $outfile );
@@ -250,7 +249,6 @@ while( $table_obj = mysql_fetch_object( $table_result ) ){
 		printContents( "\t\t\t</Keys>\n", $outfile );
 		printContents( "\t\t</Grid>\n", $outfile );
 	}
-	// break;
 }
 
 if(
