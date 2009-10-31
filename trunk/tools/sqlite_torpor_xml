@@ -3,7 +3,7 @@
 source common.sh
 IGNORE;
 
-// $Rev: 46 $
+// $Rev$
 
 require( 'common.php' );
 function sqlite_die(){ die( var_dump( sqlite_error_string( sqlite_last_error( $GLOBALS['connection'] ) ), true ) ); }

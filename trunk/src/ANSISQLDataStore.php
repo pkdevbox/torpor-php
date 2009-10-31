@@ -1,5 +1,5 @@
 <?PHP
-// $Rev: 43 $
+// $Rev$
 
 // Note that this class does NOT implement the DataStore interface on its own.
 // It intentionally leaves gaps which the extending class will need to define

@@ -1,7 +1,6 @@
 <?PHP
 // $Rev$
 require_once( 'ANSISQLDataStore.php' );
-// TODO: Special handling for LOB/CLOB interfaces?
 class OracleDataStore extends ANSISQLDataStore implements DataStore {
 	private $_connection = null;
 	private $_schema = null;
@@ -105,7 +104,6 @@ class OracleDataStore extends ANSISQLDataStore implements DataStore {
 	//*  Database interface routines  *
 	//*********************************
 	public function query( $query, array $bindVariables = null ){
-		var_dump( $query );
 		$statment = null;
 		if( !array_key_exists( $query, $this->_statementCache ) && is_array( $bindVariables ) ){
 			// To keep memory constraints down, only cache those statements which can be used
