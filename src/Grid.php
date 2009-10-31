@@ -249,7 +249,7 @@ class Grid extends PersistableContainer implements Iterator
 		$returnArray = array();
 		foreach( $this->Columns() as $columnName => $columnObj ){
 			if( $all || $columnObj->hasData() ){
-				$returnArray{ $columnName } = ( $load || $columnObj->hasData() ? $columnObj->getData() : null );
+				$returnArray{ $columnName } = ( $load || $columnObj->hasData() ? $columnObj->getData( !$load ) : null );
 			}
 		}
 		return( $returnArray );
