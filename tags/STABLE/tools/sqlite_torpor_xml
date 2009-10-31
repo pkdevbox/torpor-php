@@ -1,0 +1,130 @@
+#!/bin/sh
+#<?PHP $ignore = <<<IGNORE
+source common.sh
+IGNORE;
+
+// $Rev$
+
+require( 'common.php' );
+function sqlite_die(){ die( var_dump( sqlite_error_string( sqlite_last_error( $GLOBALS['connection'] ) ), true ) ); }
+$args = parseOptions( array( 'dbfile' => '' ) );
+
+function quickFetch( $connection, $query, $fieldName = null ){
+	$result = sqlite_query( $connection, $query ) or oci_die();
+	$row = sqlite_fetch_array( $result ) or oci_die();
+	return( !is_null( $fieldName ) ? $row{ $fieldName } : $row );
+}
+
+if( !$args['dbfile'] || $args['help'] ){
+	var_dump( 'help' );
+	exit;
+}
+
+$outfile = ( array_key_exists( 'out', $args ) ? fopen( $args['out'], 'w' ) : null );
+
+$connection = sqlite_open( $args['dbfile'] ) or die( "could not connect\n" );
+
+$dataTypeMape = array(
+);
+
+$charSetMap = array(
+);
+
+$sql = 'SELECT * FROM sqlite_master WHERE type = \'table\'';
+if( array_key_exists( 'table', $args ) ){
+	$tables = ( is_array( $args['table'] ) ? $args['table'] : array( $args['table'] ) );
+	$sql.= ' AND name IN ( "'.implode( '", "', array_map( 'strtolower', $tables ) ).'" )';
+}
+$sql.= ' ORDER BY name';
+$table_result = sqlite_query( $connection, $sql );
+
+if(
+	!array_key_exists( 'table', $args )
+	|| (
+		array_key_exists( 'headers', $args )
+		&& $args['headers']
+	)
+){
+	$file = $args['dbfile'];
+	printHeader( $outfile );
+	printContents( <<<XMLHEADER
+	<Repository>
+		<DataStore type="SQLite">
+			<Parameter name="file" value="$file"/>
+		</DataStore>
+	</Repository>
+	<Grids>
+
+XMLHEADER
+		, $outfile
+	);
+}
+
+while( $table_obj = sqlite_fetch_object( $table_result ) ){
+	$column_result = sqlite_query( $connection, 'PRAGMA table_info( '.$table_obj->name.' )' );
+	printContents( "\t\t<Grid dataName=\"".$table_obj->name."\">\n", $outfile );
+	printContents( "\t\t\t<Columns>\n", $outfile );
+	$pk = array();
+	while( $column_obj = sqlite_fetch_object( $column_result ) ){
+		$column = new TorporConfigColumn();
+		$column->dataName = $column_obj->name;
+		$column->type = preg_replace( '/\([^\)]*\)/', '', $column_obj->type );
+		if( strpos( $column_obj->type, '(' ) ){
+			$column->length = preg_replace( '/^.*\(([^\)]*)\).*$/', '$1', $column_obj->type );
+		}
+		if( !is_null( $column_obj->dflt_value ) ){
+			$column->default = $column_obj->dflt_value;
+		}
+		if( $column_obj->pk == '1' ){
+			$pk[] = $column_obj->name;
+			$column->generatedOnPublish = true;
+		}
+		if( $column_obj->notnull != '0' ){
+			$column->nullable = false;
+		}
+		printContents( $column->formatColumn(), $outfile );
+	}
+	printContents( "\t\t\t</Columns>\n", $outfile );
+	printContents( "\t\t\t<Keys>\n", $outfile );
+	$foreign_result = sqlite_query( $connection, 'PRAGMA foreign_key_list( \''.$table_obj->name.'\' )' );
+	if( sqlite_num_rows( $foreign_result ) ){
+		printContents( "\t\t\t\t<Foreign>\n", $outfile );
+		while( $foreign_key_obj = sqlite_fetch_object( $foreign_result ) ){
+			printContents( "\t\t\t\t\t<Key column=\"".$foreign_key_obj->from.'"'
+				.' referenceGrid="'.$foreign_key_obj->table.'"'
+				.( $foreign_key_obj->from != $foreign_key_obj->to ? ' referenceColumn="'.$foreign_key_obj->to.'"' : '' )
+				."/>\n", $outfile );
+		}
+		printContents( "\t\t\t\t</Foreign>\n", $outfile );
+	}
+	if( count( $pk ) > 0 ){
+		printContents( "\t\t\t\t<Primary>\n", $outfile );
+		foreach( $pk as $column_name ){
+			printContents( "\t\t\t\t\t<Key column=\"".$column_name."\"/>\n", $outfile );
+		}
+		printContents( "\t\t\t\t</Primary>\n", $outfile );
+	}
+	$unique_result = sqlite_query( $connection, 'PRAGMA index_list('.$table_obj->name.')' );
+	while( $unique_index_obj = sqlite_fetch_object( $unique_result ) ){
+		printContents( "\t\t\t\t<Unique>\n", $outfile );
+		$unique_key_result = sqlite_query( $connection, 'PRAGMA index_info( \''.$unique_index_obj->name.'\' )' );
+		while( $unique_key_obj = sqlite_fetch_object( $unique_key_result ) ){
+			printContents( "\t\t\t\t\t<Key column=\"".$unique_key_obj->name."\"/>\n", $outfile );
+		}
+		printContents( "\t\t\t\t</Unique>\n", $outfile );
+	}
+	printContents( "\t\t\t</Keys>\n", $outfile );
+	printContents( "\t\t</Grid>\n", $outfile );
+}
+
+if(
+	!array_key_exists( 'table', $args )
+	|| (
+		array_key_exists( 'headers', $args )
+		&& $args['headers']
+	)
+){
+	printFooter( $outfile );
+}
+
+?>

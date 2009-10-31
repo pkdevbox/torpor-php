@@ -1,0 +1,283 @@
+#!/bin/sh
+#<?PHP $ignore = <<<IGNORE
+source common.sh
+IGNORE;
+
+// $Rev$
+
+require( 'common.php' );
+
+function mssql_die(){ die( 'Dead: '.mssql_get_last_message()."\n".var_export( debug_backtrace(), true ) ); }
+$args = parseOptions(
+	array(
+		'db'       => false,
+		'host'     => 'localhost',
+		'user'     => '',
+		'password' => null
+	)
+);
+
+function quickFetch( $connection, $query, $fieldName = null ){
+	$result = mssql_query( $query, $connection ) or mssql_die();
+	if( !mssql_num_rows( $result ) ){ die( "No rows\n" ); }
+	$row = mssql_fetch_array( $result ) or mssql_die();
+	return( !is_null( $fieldName ) ? $row{ $fieldName } : $row );
+}
+
+if( !$args['db'] && array_key_exists( 'database', $args ) ){
+	$args['db'] = $args['database'];
+}
+
+if( !$args['db'] || $args['help'] ){
+	// TODO
+	var_dump( 'help' );
+	exit;
+}
+
+$outfile = ( array_key_exists( 'out', $args ) ? fopen( $args['out'], 'w' ) : null );
+
+$host     = $args['host'];
+$user     = $args['user'];
+$password = $args['password'];
+$db       = $args['db'];
+$connection = mssql_connect(
+	$host,
+	$user,
+	$password
+) or mssql_die();
+
+mssql_select_db( $db ) or mssql_die();
+/*
+$db_charset = quickFetch( $connection, 'SHOW VARIABLES LIKE "character_set_database"', 'Value' );
+$db_collate = quickFetch( $connection, 'SHOW VARIABLES LIKE "collation_database"', 'Value' );
+$db_version = quickFetch( $connection, 'SELECT VERSION() FROM DUAL', 0 );
+*/
+
+$dataTypeMap = array(
+	'char'           => 'char',
+	'varchar'        => 'varchar',
+	'tinyint'        => 'integer',
+	'smallint'       => 'integer',
+	'mediumint'      => 'integer',
+	'bigint'         => 'integer',
+	'longtext'       => 'text',
+	'decimal'        => 'float',
+	'date'           => 'date',
+	'datetime'       => 'datetime',
+	'int'            => 'integer', // TODO: integer signing is stored not it DATA_TYPE like the rest of this, but COLUMN_TYPE; will need some work to sort out.
+	'timestamp'      => 'datetime',
+	'text'           => 'text',
+	'enum'           => 'varchar', // Torpor does not currently support enum.
+	'double'         => 'double',
+	'tinytext'       => 'varchar',
+	'mediumint'      => 'integer',
+	'float'          => 'float',
+	'float unsigned' => 'float',
+	'mediumtext'     => 'text',
+	'set'            => 'varchar', // Torpor does not currently support set.
+	'time'           => 'time',
+	'longblog'       => 'binary',
+	'blog'           => 'binary'
+);
+
+$charSetMap = array(
+	'ascii_7'  => 'ASCII',
+	'cp866'    => 'CP866',
+	'cp936'    => 'CP936',
+	'cp950'    => 'CP950',
+	'cp1251'   => 'Windows-1251',
+	'cp1252'   => 'Windows-1252',
+	'eucjis'   => 'EUC-JP',
+	'iso_1'    => 'ISO-8859-1',
+	'iso15'    => 'ISO-8859-15',
+	'iso88592' => 'ISO-8859-2',
+	'is088595' => 'ISO-8859-5',
+	'iso88596' => 'ISO-8859-6',
+	'iso88597' => 'ISO-8859-7',
+	'iso88598' => 'ISO-8859-8',
+	'iso88599' => 'ISO-8859-9',
+	'koi8'     => 'KOI8-R',
+	'mac'      => '8bit',
+	'roman8'   => '8bit',
+	'sjis'     => 'SJIS',
+	'utf8'     => 'UTF-8'
+);
+
+$sql = 'SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = "'.$db.'" AND TABLE_TYPE = "BASE TABLE"';
+if( array_key_exists( 'table', $args ) ){
+	$tables = ( is_array( $args['table'] ) ? $args['table'] : array( $args['table'] ) );
+	$sql.= ' AND TABLE_NAME IN ( "'.implode( '", "', $tables ).'" )';
+}
+$sql.= ' ORDER BY TABLE_NAME';
+$table_result = mssql_query( $sql ) or mssql_die();
+
+if(
+	!array_key_exists( 'table', $args )
+	|| (
+		array_key_exists( 'headers', $args )
+		&& $args['headers']
+	)
+){
+	printHeader( $outfile );
+	printContents( <<<XMLHEADER
+	<Repository>
+		<DataStore type="MSSQL">
+			<Parameter name="host" value="$host"/>
+			<Parameter name="user" value="$user"/>
+			<Parameter name="password" value="$password"/>
+			<Parameter name="database" value="$db"/>
+		</DataStore>
+	</Repository>
+	<Grids>
+
+XMLHEADER
+		, $outfile
+	);
+}
+
+while( $table_obj = mssql_fetch_object( $table_result ) ){
+	$column_result = mssql_query(
+		'SELECT
+			*,
+			COLUMNPROPERTY(
+				OBJECT_ID( QUOTENAME( TABLE_SCHEMA ) + "." + QUOTENAME( TABLE_NAME ) ),
+				COLUMN_NAME,
+				"IsIdentity"
+			) AS "IS_IDENTITY" 
+		FROM INFORMATION_SCHEMA.COLUMNS
+		WHERE TABLE_CATALOG = "'.$db.'"
+		AND TABLE_NAME = "'.$table_obj->TABLE_NAME.'"
+		ORDER BY ORDINAL_POSITION'
+	) or mssql_die();
+	if( mssql_num_rows( $column_result ) > 0 ){
+		printContents( "\t\t<Grid dataName=\"".$table_obj->TABLE_NAME."\">\n", $outfile );
+		printContents( "\t\t\t<Columns>\n", $outfile );
+		while( $column_obj = mssql_fetch_object( $column_result ) ){
+			$column = new TorporConfigColumn();
+			$column->dataName = $column_obj->COLUMN_NAME;
+			if( !is_null( $column_obj->COLUMN_DEFAULT ) ){
+				$column->default = (
+					preg_match( '/^\(\'.*\'\)$/', $column_obj->COLUMN_DEFAULT )
+					? preg_replace( '/^\(\'(.*)\'\)$/', '$1', $column_obj->COLUMN_DEFAULT )
+					: $column_obj->COLUMN_DEFAULT
+				);
+			}
+			if( $column_obj->CHARACTER_SET_NAME ){
+				$column->encoding = ( array_key_exists( $column_obj->CHARACTER_SET_NAME, $charSetMap ) ? $charSetMap{ $column_obj->CHARACTER_SET_NAME } : 'UNSUPPORTED:'.$column_obj->CHARACTER_SET_NAME );
+			}
+			if( $column_obj->IS_IDENTITY == 1 || $column_obj->COLUMN_DEFAULT == 'CURRENT_TIMESTAMP' || preg_match( '/^\w+\(\)$/', $column_obj->COLUMN_DEFAULT ) ){
+				$column->generatedOnPublish = true;
+			}
+			if( $column_obj->CHARACTER_MAXIMUM_LENGTH ){
+				$column->length = $column_obj->CHARACTER_MAXIMUM_LENGTH;
+			}
+			if( $column_obj->IS_NULLABLE != 'YES' ){
+				$column->nullable = false;
+			}
+			if( !is_null( $column_obj->NUMERIC_PRECISION ) && strpos( 'int', $column_obj->DATA_TYPE ) === false ){
+				// NOTE: This produces a positive number for integers, which implies float precision but has other meanings for mssql; can be ommitted for integer types altogether?
+				$column->precision = $column_obj->NUMERIC_PRECISION;
+			}
+			$column->type = ( array_key_exists( $column_obj->DATA_TYPE, $dataTypeMap ) ? $dataTypeMap{ $column_obj->DATA_TYPE } : 'UNSUPPORTED' );
+			printContents( $column->formatColumn(), $outfile );
+		}
+		printContents( "\t\t\t</Columns>\n", $outfile );
+		printContents( "\t\t\t<Keys>\n", $outfile );
+		$foreign_result = mssql_query(
+			'SELECT
+				KCU.COLUMN_NAME,
+				KCU2.TABLE_NAME AS REFERENCED_TABLE_NAME,
+				KCU2.COLUMN_NAME AS REFERENCED_COLUMN_NAME
+			FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
+			LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS RC
+				ON RC.CONSTRAINT_CATALOG = KCU.TABLE_CATALOG
+				AND RC.CONSTRAINT_SCHEMA = KCU.TABLE_SCHEMA
+				AND RC.CONSTRAINT_NAME = KCU.CONSTRAINT_NAME
+			LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU2
+				ON KCU2.TABLE_CATALOG = RC.UNIQUE_CONSTRAINT_CATALOG
+				AND KCU2.TABLE_SCHEMA = RC.UNIQUE_CONSTRAINT_SCHEMA
+				AND KCU2.CONSTRAINT_NAME = RC.UNIQUE_CONSTRAINT_NAME
+			WHERE KCU.TABLE_CATALOG = "'.$db.'"
+			AND KCU.TABLE_NAME = "'.$table_obj->TABLE_NAME.'"
+			AND RC.CONSTRAINT_NAME IS NOT NULL
+			ORDER BY KCU.COLUMN_NAME',
+			$connection
+		) or mssql_die();
+		if( mssql_num_rows( $foreign_result ) > 0 ){
+			printContents( "\t\t\t\t<Foreign>\n", $outfile );
+			while( $key_obj = mssql_fetch_object( $foreign_result ) ){
+				printContents( "\t\t\t\t\t<Key column=\"".$key_obj->COLUMN_NAME.'"'
+					.' referenceGrid="'.$key_obj->REFERENCED_TABLE_NAME.'"'
+					.( $key_obj->REFERENCED_COLUMN_NAME != $key_obj->COLUMN_NAME ? ' referenceColumn="'.$key_obj->REFERENCED_COLUMN_NAME.'"' : '' )
+					."/>\n", $outfile );
+			}
+			printContents( "\t\t\t\t</Foreign>\n", $outfile );
+		}
+
+		$pk_result = mssql_query(
+			'SELECT KCU.COLUMN_NAME
+			FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS TC
+			LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
+				ON KCU.CONSTRAINT_SCHEMA = TC.CONSTRAINT_SCHEMA
+				AND KCU.CONSTRAINT_NAME = TC.CONSTRAINT_NAME
+				AND KCU.TABLE_SCHEMA = TC.TABLE_SCHEMA
+				AND KCU.TABLE_NAME = TC.TABLE_NAME
+			WHERE TC.TABLE_CATALOG = "'.$db.'"
+			AND TC.TABLE_NAME = "'.$table_obj->TABLE_NAME.'"
+			AND TC.CONSTRAINT_TYPE = "PRIMARY KEY"
+			ORDER BY KCU.COLUMN_NAME',
+			$connection
+		);
+		if( mssql_num_rows( $pk_result ) > 0 ){
+			printContents( "\t\t\t\t<Primary>\n", $outfile );
+			while( $key_obj = mssql_fetch_object( $pk_result ) ){
+				printContents( "\t\t\t\t\t<Key column=\"".$key_obj->COLUMN_NAME."\"/>\n", $outfile );
+			}
+			printContents( "\t\t\t\t</Primary>\n", $outfile );
+		}
+
+		$unique_result = mssql_query(
+			'SELECT KCU.CONSTRAINT_NAME, KCU.COLUMN_NAME
+			FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS TC
+			LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
+				ON KCU.CONSTRAINT_SCHEMA = TC.CONSTRAINT_SCHEMA
+				AND KCU.CONSTRAINT_NAME = TC.CONSTRAINT_NAME
+				AND KCU.TABLE_SCHEMA = TC.TABLE_SCHEMA
+				AND KCU.TABLE_NAME = TC.TABLE_NAME
+			WHERE TC.TABLE_CATALOG = "'.$db.'"
+			AND TC.TABLE_NAME = "'.$table_obj->TABLE_NAME.'"
+			AND TC.CONSTRAINT_TYPE = "UNIQUE"
+			ORDER BY KCU.CONSTRAINT_NAME, KCU.COLUMN_NAME',
+			$connection
+		) or mssql_die();
+
+		if( mssql_num_rows( $unique_result ) > 0 ){
+			printContents( "\t\t\t\t<Unique>\n", $outfile );
+			$first = true;
+			$last_constraint_name = '';
+			while( $key_obj = mssql_fetch_object( $unique_result ) ){
+				if( $last_constraint_name != $key_obj->CONSTRAINT_NAME && !$first ){
+					printContents( "\t\t\t\t</Unique>\n\t\t\t\t<Unique>\n", $outfile );
+				}
+				printContents( "\t\t\t\t\t<Key column=\"".$key_obj->COLUMN_NAME."\"/>\n", $outfile );
+				$last_constraint_name = $key_obj->CONSTRAINT_NAME;
+				$first = false;
+			}
+			printContents( "\t\t\t\t</Unique>\n", $outfile );
+		}
+		printContents( "\t\t\t</Keys>\n", $outfile );
+		printContents( "\t\t</Grid>\n", $outfile );
+	}
+}
+
+if(
+	!array_key_exists( 'table', $args )
+	|| (
+		array_key_exists( 'headers', $args )
+		&& $args['headers']
+	)
+){
+	printFooter( $outfile );
+}
+
+?>
