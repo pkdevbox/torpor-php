@@ -10,7 +10,7 @@ require( 'common.php' );
 function oci_die(){ die( var_dump( oci_error(), true )."\n" ); }
 $args = parseOptions(
 	array(
-		'host'     => '',
+		'dba '     => '',
 		'user'     => '',
 		'password' => null
 	)
@@ -28,7 +28,7 @@ function quickFetch( $connection, $query, $fieldName = null ){
 	return( !is_null( $fieldName ) ? $row{ $fieldName } : $row );
 }
 
-if( !$args['host'] || $args['help'] ){
+if( !$args['db'] || $args['help'] ){
 	// TODO
 	var_dump( 'help' );
 	exit;
@@ -36,7 +36,7 @@ if( !$args['host'] || $args['help'] ){
 
 $outfile = ( array_key_exists( 'out', $args ) ? fopen( $args['out'], 'w' ) : null );
 
-$host     = $args['host'];
+$host     = $args['db'];
 $user     = $args['user'];
 $password = $args['password'];
 $connection = @oci_connect(
@@ -45,47 +45,159 @@ $connection = @oci_connect(
 	$host
 ) or oci_die();
 
-// oci_select_db( $args['db'] ) or oci_die();
-// $db_charset = quickFetch( $connection, 'SHOW VARIABLES LIKE "character_set_database"', 'Value' );
-// $db_collate = quickFetch( $connection, 'SHOW VARIABLES LIKE "collation_database"', 'Value' );
-// 
-// $db_version = quickFetch( $connection, 'SELECT VERSION() FROM DUAL', 0 );
+$charset = quickFetch(
+	$connection,
+	'SELECT VALUE
+	FROM NLS_DATABASE_PARAMETERS
+	WHERE PARAMETER = \'NLS_CHARACTERSET\'',
+	'VALUE'
+);
+
+$national_charset = quickFetch(
+	$connection,
+	'SELECT VALUE
+	FROM NLS_DATABASE_PARAMETERS
+	WHERE PARAMETER = \'NLS_NCHAR_CHARACTERSET\'',
+	'VALUE'
+);
 
 $dataTypeMap = array(
 	'BINARY_INTEGER' => 'integer',
-	'BFILE' => 'binary',
-	'BLOB' => 'binary',
-	'CHAR' => 'char',
-	'CLOB' => 'text',
-	'DATE' => 'date', // The oracle data adapter will need to recognize the DATE content and convert appropriately.
-	'FLOAT' => 'float',
-	'INTERVAL_YEAR' => 'float',
-	'INTERVAL_DAY' => 'float',
-	'LONG' => 'integer',
-	'MLSLABEL' => 'binary',
-	'NCHAR' => 'char',
-	'NCLOB' => 'text',
-	'NUMBER' => 'integer',
-	'NVARCHAR' => 'varchar',
-	'NVARCHAR2' => 'varchar',
-	'PLS_INTEGER' => 'integer',
-	'RAW' => 'binary',
-	'ROWID' => 'varchar',
-	'TIMESTAMP' => 'integer', // NOTE: Timestamps do not come across as date values!
-	'VARCHAR' => 'varchar',
-	'VARCHAR2' => 'varchar',
-	'UROWID' => 'varchar',
-	'XMLType' => 'text'
+	'BFILE'          => 'binary',
+	'BLOB'           => 'binary',
+	'CHAR'           => 'char',
+	'CLOB'           => 'text',
+	'DATE'           => 'date', // The oracle data adapter will need to recognize the DATE content and convert appropriately.
+	'FLOAT'          => 'float',
+	'INTERVAL_YEAR'  => 'float',
+	'INTERVAL_DAY'   => 'float',
+	'LONG'           => 'integer',
+	'MLSLABEL'       => 'binary',
+	'NCHAR'          => 'char',
+	'NCLOB'          => 'text',
+	'NUMBER'         => 'integer',
+	'NVARCHAR'       => 'varchar',
+	'NVARCHAR2'      => 'varchar',
+	'PLS_INTEGER'    => 'integer',
+	'RAW'            => 'binary',
+	'ROWID'          => 'varchar',
+	'TIMESTAMP'      => 'integer', // NOTE: Timestamps do not come across as date values!
+	'VARCHAR'        => 'varchar',
+	'VARCHAR2'       => 'varchar',
+	'UROWID'         => 'varchar',
+	'XMLType'        => 'text'
 );
 
-$charSetMap = array(
+// Cllent side or conversion only character sets have not been mapped.
+$charSetMap = array (
+	'AL16UTF16'       => 'UTF-16',
+	'AL32UTF8'        => 'UTF-8',
+	'AR8ISO8859P6'    => 'ISO-8859-6',
+	'AZ8ISO8859PE'    => 'ISO-8859-9',
+	'CEL8ISO8859P14'  => 'ISO-8859-13',
+	'CL8KOI8R'        => 'KOI8-R',
+	'CL8MSWIN1251'    => 'Windows-1251',
+	'EE8ISO8859P2'    => 'ISO-8859-5',
+	'EL8ISO8859P7'    => 'ISO-8859-7',
+	'IW8ISO8859P8'    => 'ISO-8859-8',
+	'JA16SJIS'        => 'SJIS',
+	'NE8ISO8859P10'   => 'ISO-8859-10',
+	'NEE8ISO8859P4'   => 'ISO-8859-4',
+	'US7ASCII'        => 'ASCII',
+	'UTF8'            => 'UTF-8',
+	'WE8ISO8859P1'    => 'ISO-8859-1',
+	'WE8ISO8859P15'   => 'ISO-8859-15',
+	'WE8ISO8859P9'    => 'ISO-8859-9',
+	'WE8MSWIN1252'    => 'Windows-1252',
+	// Here there be dragons.  These are not explicitly supported, but do fit the
+	// xbit character encoding width and so *should* be handled correctly.  Needs
+	// testing; but hopefully you're using something that is not this.
+	'AR8ADOS710'      => '8bit',
+	'AR8ADOS710T'     => '8bit',
+	'AR8ADOS720'      => '8bit',
+	'AR8ADOS720T'     => '8bit',
+	'AR8APTEC715'     => '8bit',
+	'AR8APTEC715T'    => '8bit',
+	'AR8ARABICMAC'    => '8bit',
+	'AR8ARABICMACS'   => '8bit',
+	'AR8ASMO708PLUS'  => '8bit',
+	'AR8ASMO8X'       => '8bit',
+	'AR8HPARABIC8T'   => '8bit',
+	'AR8MSWIN1256'    => '8bit',
+	'AR8MUSSAD768'    => '8bit',
+	'AR8MUSSAD768T'   => '8bit',
+	'AR8NAFITHA711'   => '8bit',
+	'AR8NAFITHA711T'  => '8bit',
+	'AR8NAFITHA721'   => '8bit',
+	'AR8NAFITHA721T'  => '8bit',
+	'AR8SAKHR706'     => '8bit',
+	'AR8SAKHR707'     => '8bit',
+	'AR8SAKHR707T'    => '8bit',
+	'AR8XBASIC'       => '8bit',
+	'BG8MSWIN'        => '8bit',
+	'BLT8CP921'       => '8bit',
+	'BLT8PC775'       => '8bit',
+	'BN8BSCII'        => '8bit',
+	'CDN8PC863'       => '8bit',
+	'CL8ISOIR111'     => '8bit',
+	'CL8MACCYRILLICS' => '8bit',
+	'EE8MACCES'       => '8bit',
+	'EE8MACCROATIANS' => '8bit',
+	'EE8PC852'        => '8bit',
+	'EL8DEC'          => '8bit',
+	'EL8MACGREEKS'    => '8bit',
+	'EL8PC437S'       => '8bit',
+	'EL8PC851'        => '8bit',
+	'EL8PC869'        => '8bit',
+	'ET8MSWIN923'     => '8bit',
+	'HU8ABMOD'        => '8bit',
+	'HU8CWI2'         => '8bit',
+	'IN8ISCII'        => '8bit',
+	'IS8PC861'        => '8bit',
+	'IW7IS960'        => '7bit',
+	'IW8MACHEBREW'    => '8bit',
+	'IW8MSWIN1255'    => '8bit',
+	'IW8PC1507'       => '8bit',
+	'LA8ISO6937'      => '8bit',
+	'LA8PASSPORT'     => '8bit',
+	'LT8MSWIN921'     => '8bit',
+	'LT8PC772'        => '8bit',
+	'LT8PC774'        => '8bit',
+	'LV8PC1117'       => '8bit',
+	'LV8PC8LR'        => '8bit',
+	'LV8RST104090'    => '8bit',
+	'N8PC865'         => '8bit',
+	'RU8BESTA'        => '8bit',
+	'RU8PC855'        => '8bit',
+	'RU8PC866'        => '8bit',
+	'SE8ISO8859P3'    => '8bit',
+	'TH8MACTHAIS'     => '8bit',
+	'TH8TISASCII'     => '8bit',
+	'TR7DEC'          => '7bit',
+	'TR8DEC'          => '8bit',
+	'TR8MACTURKISH'   => '8bit',
+	'TR8MACTURKISHS'  => '8bit',
+	'TR8MSWIN1254'    => '8bit',
+	'TR8PC857'        => '8bit',
+	'US8PC437'        => '8bit',
+	'VN8VN3'          => '8bit',
+	'WE8DEC'          => '8bit',
+	'WE8DG'           => '8bit',
+	'WE8MACROMAN8S'   => '8bit',
+	'WE8NCR4970'      => '8bit',
+	'WE8NEXTSTEP'     => '8bit',
+	'WE8PC850'        => '8bit',
+	'WE8PC858'        => '8bit',
+	'WE8PC860'        => '8bit',
+	'WE8ROMAN8'       => '8bit'
 );
 
 $sql = 'SELECT TABLE_NAME FROM USER_TABLES';
 if( array_key_exists( 'table', $args ) ){
 	$tables = ( is_array( $args['table'] ) ? $args['table'] : array( $args['table'] ) );
-	$sql.= ' AND UPPER( TABLE_NAME ) IN ( "'.implode( '", "', array_map( 'strtoupper', $tables ) ).'" )';
+	$sql.= ' WHERE UPPER( TABLE_NAME ) IN ( \''.implode( '\', \'', array_map( 'strtoupper', $tables ) ).'\' )';
 }
+$sql.= ' ORDER BY TABLE_NAME';
 $table_result = oci_query( $sql, $connection ) or die( oci_error() );
 
 if(
@@ -102,6 +214,7 @@ if(
 			<Parameter name="user" value="$user"/>
 			<Parameter name="password" value="$password"/>
 			<Parameter name="schema" value="$host"/>
+			<Parameter name="character_set" value="$charset"/>
 		</DataStore>
 	</Repository>
 	<Grids>
@@ -120,7 +233,6 @@ while( $table_obj = oci_fetch_object( $table_result ) ){
 			// print_r( $column_obj );
 			$column = new TorporConfigColumn();
 			$column->dataName = $column_obj->COLUMN_NAME;
-			// TODO: Map NUMBER to int or float depending on precision values
 			$column->type = (
 				array_key_exists( $column_obj->DATA_TYPE, $dataTypeMap )
 				? (
@@ -131,9 +243,19 @@ while( $table_obj = oci_fetch_object( $table_result ) ){
 				: 'UNSUPPORTED:'.$column_obj->DATA_TYPE
 			);
 			if( $column_obj->DATA_DEFAULT ){
-				$column->default = $column_obj->DATA_DEFAULT;
+				$column->default = preg_replace( '/^\'?(.*?)\'*\s*$/', '$1', $column_obj->DATA_DEFAULT );
+				if( strpos( strtolower( $column ), 'sysdate' ) !== false ){
+					$column->generatedOnPublish = true;
+					$column->default = null;
+				}
 			}
+			// TODO: Determine CHAR_CS mapping up front, and look for deviations here.
 			if( $column_obj->CHARACTER_SET_NAME ){
+				if( $column_obj->CHARACTER_SET_NAME == 'CHAR_CS' ){
+					$column_obj->CHARACTER_SET_NAME = $charset;
+				} elseif( $column_obj->CHARACTER_SET_NAME = 'NCHAR_CS' ){
+					$column_obj->CHARACTER_SET_NAME = $national_charset;
+				}
 				$column->encoding = ( array_key_exists( $column_obj->CHARACTER_SET_NAME, $charSetMap ) ? $charSetMap{ $column_obj->CHARACTER_SET_NAME } : 'UNSUPPORTED:'.$column_obj->CHARACTER_SET_NAME );
 			}
 			if( $column_obj->DATA_LENGTH ){ // Should only apply to...?

@@ -68,8 +68,8 @@ abstract class ANSISQLDataStore {
 		if( count( $commands ) > 0 ){
 			foreach( $commands as $command ){
 				$result = $this->query( $this->parseCommand( $command, $grid ) );
-				if( $result === true ){
-					if( ( $affected = $this->affected_rows() ) != 1 ){
+				if( $result === true || is_resource( $result ) ){
+					if( ( $affected = ( is_resource( $result ) ? $this->affected_rows( $result ) : 1 ) ) != 1 ){
 						trigger_error( 'Successful delete command execution affected '.$affected.' rows, expected 1', E_USER_WARNING );
 						if( $affected >= 1 ){
 							$grid->UnLoad( false );
@@ -83,10 +83,10 @@ abstract class ANSISQLDataStore {
 				}
 			}
 		} else {
-			if( !$this->query( $this->generateDeleteSQL( $grid ) ) ){
+			if( !( $result = $this->query( $this->generateDeleteSQL( $grid ) ) ) ){
 				$this->throwException( $grid->_getObjName().' delete failed: '.$this->error() );
 			} else {
-				if( $this->affected_rows() != 1 ){
+				if( $this->affected_rows( $result ) != 1 ){
 					trigger_error( 'No '.$grid->_getObjName().' records deleted', E_USER_WARNING );
 				} else {
 					if( $this->getTorpor()->isCacheEnabled() ){
@@ -307,15 +307,7 @@ abstract class ANSISQLDataStore {
 					}
 					$this->LoadGridArray( $grid, $this->fetch_assoc( $result ) );
 				} else if( $result === true ){
-					if( $new ){
-						if( ( $affected = $this->affected_rows() ) != 1 ){
-							trigger_error( 'Successful publish command execution affected '.$affected.' rows; insert success unknown', E_USER_WARNING );
-						} else {
-							$published = true;
-						}
-					} else {
-						$published = true;
-					}
+					$published = true;
 				} else if( $result === false ){
 					$this->throwException( $grid->_getObjName().' publish command failed: '.$this->error() );
 				}
@@ -340,7 +332,7 @@ abstract class ANSISQLDataStore {
 				){
 					$declarations{
 						$this->escapeDataName( $grid->Column( $columnName )->getDataName() )
-					} = $this->autoQuoteColumn( $grid->Column( $columnName ) );
+					} = $this->autoQuoteColumn( $grid->Column( $columnName ), $new );
 				}
 			}
 			if( count( $declarations ) < 1 ){
@@ -349,7 +341,7 @@ abstract class ANSISQLDataStore {
 				}
 			} else {
 				if(
-					$this->query(
+					$result = $this->query(
 						( $new
 							? $this->generateInsertSQL( $grid, $declarations )
 							: $this->generateUpdateSQL( $grid, $declarations )
@@ -357,7 +349,7 @@ abstract class ANSISQLDataStore {
 					)
 				){
 					if( $new ){
-						if( $this->affected_rows() != 1 ){
+						if( $this->affected_rows( $result ) != 1 ){
 							$this->throwException( $grid->_getObjName().' insert failed' );
 						}
 						$published = true;
@@ -496,7 +488,7 @@ abstract class ANSISQLDataStore {
 		if( $grid instanceof Grid ){
 			$from = $this->gridTableName( $grid );
 			foreach( $grid->ColumnNames() as $columnName ){
-				$declarations[] = $grid->Column( $columnName )->getDataName()
+				$declarations[] = $this->escapeDataName( $grid->Column( $columnName )->getDataName() )
 				.' '.$this->asColumnOperator.' '
 				.$this->escapeDataNameAlias( $grid->Column( $columnName )->_getObjName() );
 			}
@@ -545,6 +537,7 @@ abstract class ANSISQLDataStore {
 				$selectStatement,
 				1
 			);
+			$countStatement = preg_replace( '/ ORDER BY .*$/', '', $countStatement );
 			$countResult = $this->query( $countStatement );
 			if( is_resource( $countResult ) ){
 				$countRow = $this->fetch_row( $countResult );
@@ -1088,7 +1081,7 @@ abstract class ANSISQLDataStore {
 	public function columnEqualsData( Column $column, $compare = false ){
 		return(
 			$this->escapeDataName( $column->getDataName() )
-			.(
+			.' '.(
 				$compare
 				&& (
 					!$column->hasData()
@@ -1227,16 +1220,17 @@ abstract class ANSISQLDataStore {
 		return( $this->escapeDataName( $grid->Torpor()->dataNameForGrid( $grid ) ) );
 	}
 
-	public function autoQuoteColumn( Column $column ){
+	public function autoQuoteColumn( Column $column, $localOnly = false ){
 		$return = null;
+		$localOnly = ( !$column->isLinked() && $localOnly );
 		if( $column->hasData() ){
-			if( is_null( $column->getPersistData() ) ){
+			if( is_null( $column->getPersistData( $localOnly ) ) ){
 				$return = 'NULL';
 			} else {
 				$return = (
 					$this->isQuotedType( $column )
-					? '\''.$this->escape( $column->getPersistData() ).'\''
-					: $column->getPersistData()
+					? '\''.$this->escape( $column->getPersistData( $localOnly ) ).'\''
+					: $column->getPersistData( $localOnly )
 				);
 			}
 		} else {
