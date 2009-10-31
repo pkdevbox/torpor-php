@@ -335,7 +335,14 @@ class Torpor {
 				$cacheXml = $xmlObj->Repository->Cache;
 				$cacheClass = (string)$cacheXml->attributes()->class;
 				if( !class_exists( $cacheClass ) ){
-					$this->throwException( 'Cache class "'.$cacheClass.'" is not defined' );
+					// Attempt to load
+					if( $file = self::getFileInPath( $cacheClass.'.php' ) ){
+						include( $file );
+					}
+					// Check one more time
+					if( !class_exists( $cacheClass ) ){
+						$this->throwException( 'Cache class "'.$cacheClass.'" is not defined' );
+					}
 				}
 				$settings = array();
 				foreach( $cacheXml->Parameter as $parameterXml ){
