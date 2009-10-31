@@ -3,7 +3,7 @@
 source common.sh
 IGNORE;
 
-// $Rev: 50 $
+// $Rev$
 
 require( 'common.php' );
 

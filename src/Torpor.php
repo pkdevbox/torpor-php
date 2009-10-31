@@ -10,7 +10,7 @@ require_once( 'Grid.php' );
 require_once( 'GridSet.php' );
 require_once( 'GridColumnCollection.php' );
 require_once( 'Column.php' );
-require_once( 'Cache.php' );
+require_once( 'TorporCache.php' );
 require_once( 'DataStore.php' );
 
 // TODO: phpdoc
@@ -800,7 +800,7 @@ class Torpor {
 	protected function &_getUniqueKeys( $grid = null ){ return $this->_getInitX( self::ARKEY_UNIQUEKEYS, $grid ); }
 
 	public function isCacheEnabled(){ return( is_object( $this->Cache() ) ); }
-	public function Cache( Cache $cache = null ){
+	public function Cache( TorporCache $cache = null ){
 		if( !is_null( $cache ) ){
 			$this->_cache = $cache;
 		}

@@ -1,6 +1,6 @@
 <?PHP
 // $Rev$
-interface Cache {
+interface TorporCache {
 	public static function createInstance( Torpor $torpor );
 	public function initialize( array $settings );
 	public function writeGrid( Grid $grid );
@@ -9,7 +9,7 @@ interface Cache {
 	public function purgeGrid( Grid $grid );
 }
 
-class ThreadCache implements Cache {
+class ThreadCache implements TorporCache {
 	private static $_instance;
 	private $_torpor;
 	private $_cache = array();
