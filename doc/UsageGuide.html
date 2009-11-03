@@ -511,12 +511,49 @@ Also see [[AdvancedOptions]]</pre>
 </div>
 <!--POST-SHADOWAREA-->
 <div id="storeArea">
+<div title="Advanced Usage" modifier="Paul Tomlinson" created="200911021538" modified="200911021850" changecount="4">
+<pre>!!Sessions
+
+[[TypedGrids|TypedGrid]]
+[[Exceptions]]
+[[Extension]]</pre>
+</div>
 <div title="Alternatives" modifier="Paul Tomlinson" created="200910312313" changecount="1">
 <pre>Other PHP ORM abstractions similar to Torpor include:
 * [[Doctrine|http://www.doctrine-project.org/]]
 * [[Propel|http://propel.phpdb.org/]]
 * [[Qcodo|http://www.qcodo.com/]]
 * [[WikiPedia list of PHP ORM|http://en.wikipedia.org/wiki/List_of_object-relational_mapping_software#PHP]]</pre>
+</div>
+<div title="Appendix" modifier="Paul Tomlinson" created="200911030624" modified="200911030654" changecount="5">
+<pre># Class / Interface References
+** [[Column|Class: Column]]
+** [[CriteriaBase|Calss: CriteriaBase]]
+*** [[Criteria|Class: Criteria]]
+*** [[CriteriaSet|Calss: CriteriaSet]]
+** [[DataStore|Interface: DataStore]]
+*** [[ANSISQLDataStore|Class: ANSISQLDataStore]]
+*** [[MSSQLDataStore|Class: MSSQLDataStore]]
+*** [[MySQLDataStore|Class: MySQLDataStore]]
+*** [[OracleDataStore|Class: OracleDataStore]]
+*** [[SQLiteDataStore|Class: SQLiteDataStore]]
+** [[Grid|Class: Grid]]
+*** [[GridColumnCollection|Class: GridColumnCollection]]
+*** [[GridSet|Class: GridSet]]
+*** [[TypedGrid|Class: TypedGrid]]
+** [[PersistableContainer|Class: PersistableContainer]]
+** [[PersistenceCommand|Class: PersistenceCommand]]
+** [[Torpor|Class: Torpor]]
+** [[TorporCache|Interface: TorporCache]]
+*** [[TorporMemcache|Class: TorporMemcache]]
+# [[Supported Persistence Engines]]</pre>
+</div>
+<div title="CRUD" modifier="Paul Tomlinson" created="200911021745" changecount="1">
+<pre>An acronym for the 4 main activities of any repository or persistence layer in dealing with a record:
+*''C''reate
+*''R''ead
+*''U''pdate
+*''D''elete</pre>
 </div>
 <div title="ColorPalette" modifier="Paul Tomlinson" created="200910311917" modified="200910311918" changecount="2">
 <pre>Background: #fff
@@ -536,6 +573,310 @@ TertiaryDark: #666
 Error: #f88
 </pre>
 </div>
+<div title="Config: Cache" modifier="Paul Tomlinson" created="200911021429" modified="200911030547" changecount="11">
+<pre>''Optional.'' At most one entry is allowed, and with a single required {{{class}}} attribute to specify the PHP class which implements the {{{TorporCache}}} interface (one of the few classes to sport a prefix due to the probability of clashing with other common generic names).  This may either be a self-closing tag:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Cache&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;class&lt;/font&gt;=&lt;font color=&quot;#ff6060&quot;&gt;&amp;quot;TorporMemcache&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;/span&gt;&lt;/html&gt;
+Or contain {{{Parameter}}} entities used to pass named arguments to the {{{Cache}}} class instance:
+
+&lt;html&gt;&lt;span style=&quot;font-family:monospace;&quot;&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Cache&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;class&lt;/font&gt;=&lt;font color=&quot;#ff6060&quot;&gt;&amp;quot;TorporMemcache&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br/&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Parameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;name&lt;/font&gt;=&lt;font color=&quot;#ff6060&quot;&gt;&amp;quot;server_192.168.0.100&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;value&lt;/font&gt;=&lt;font color=&quot;#ff6060&quot;&gt;&amp;quot;11211&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Parameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;name&lt;/font&gt;=&lt;font color=&quot;#ff6060&quot;&gt;&amp;quot;ttl&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;10800&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Parameter&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Cache&amp;gt;&lt;/font&gt;&lt;/font&gt;&lt;/span&gt;&lt;/html&gt;
+
+The {{{name}}} attribute of {{{Parameter}}} entities is required, but the {{{value}}} may either be provided as an attribute or as the interior content between open and closing tags.  This holds true for this same generic {{{Parameter}}} entity wherever it's found.
+
+There is no limit to the number of {{{Parameter}}} entities that can be used, nor restriction on the content of {{{name}}} or {{{value}}} as far as the XML concerned (so long as it fits well-formed constraints - some content may need to be wrapped in {{{&lt;![CDATA[]]&gt;}}} qualifiers).  The meaning of the parameters and their contents is up to the particular {{{Cache}}} class, and should be explained in the corresponding documentation (more information can also be found in the [[Extension]] documentation).
+
+Up: [[Configuration]]
+Previous: [[Repository|Config: Repository]]
+Next: [[Repository|Config: Repository]] / [[DataStore|Config: DataStore]]</pre>
+</div>
+<div title="Config: Columns" modifier="Paul Tomlinson" created="200911021434" modified="200911021443" changecount="2">
+<pre>Up: [[Configuration]]
+Previous: [[Grids|Config: Grids]]
+Next: [[Grids|Config: Grids]] / [[Commands|Config: Commands]]</pre>
+</div>
+<div title="Config: Commands" modifier="Paul Tomlinson" created="200911021435" modified="200911021444" changecount="3">
+<pre>Up: [[Configuration]]
+Previous: [[Grids|Config: Grids]] / [[Columns|Config: Columns]]
+Next: [[Grids|Config: Grids]] / [[DataTypeMap|Config: DataTypeMap]]</pre>
+</div>
+<div title="Config: DataStore" modifier="Paul Tomlinson" created="200911021430" modified="200911030704" changecount="17">
+<pre>There are 2 possible sets of elements comprising the {{{DataStore}}} definition - either a single {{{DataStore}}} entry, or a pair of {{{ReadDataStore}}} and {{{WriteDataStore}}} elements similar in structure.  This allows for differentiated connection types, which is especially useful in master / slave replication setups.
+
+The {{{type}}} attribute is required and technically unrestricted, though this is intended to correspond with one of the [[natively supported adapter|Supported Persistence Engines]] names:
+* ~MySQL
+* Oracle (or OCI)
+* ~SQLite
+* ~SQLServer (or MSSQL)
+(as of the 1.0 release)
+
+...or the special value &quot;Custom&quot;, which should be used when a employing a user-defined ~DataStore class. The {{{class}}} attribute is optional unless {{{type}}} is set to &quot;Custom&quot; or any other non-native data store type.  If provided it will override the auto-detection used to map {{{type}}} to the corresponding Torpor ~DataStore class; essentially, {{{type}}} is a shortcut in describing native storage types so you don't have to remember or look up the corresponding class names (or files for inclusion).
+
+No effort will be made to auto load non-native class files; if a Custom class has been requested, it had better exist or be made available via PHP's {{{__autoload}}}.
+
+Interior to the actual {{{DataStore}}} element (regardless of {{{Read}}}, {{{Write}}}, or absent prefixes) are optional simple {{{name}}} / {{{value}}} pair {{{Parameter}}} entities to provide named arguments to the ~DataStore object instance.  The actual names and content of these entries are up to the ~DataStore class being used, and documentation can be found with each in turn (additional useful information can also be found in the [[Extension]] documentation).  {{{//DataStore/Parameter}}} entities (to use the ~XPath notation) feature an additional optional boolean attribute {{{encrypted}}}, which defaults to ''false''.  The intent is to indicate when the {{{value}}} of a {{{Parameter}}} is stored enciphered or otherwise obfuscated, requiring the ~DataStore class to extract the source value before it's actually useful.  This feature is not yet active in native Torpor classes, but is made available here in anticipation of future implementation and to be useful to any user extensions.
+
+{{{DataStore}}} may either be a self-closing tag:
+
+&lt;html&gt;&lt;font face=&quot;monospace&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;DataStore&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;MySQL&amp;quot;&lt;/font&gt;/&amp;gt;&lt;/font&gt;&lt;/font&gt;&lt;/html&gt;
+
+Or fully populated:
+
+&lt;html&gt;&lt;font face=&quot;monospace&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;ReadDataStore&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;MySQL&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;class&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;MySQLDataStore&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Parameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;name&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;host&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;localhost&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Parameter&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Parameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;name&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;user&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;value&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;testuser&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Parameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;encrypted&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;true&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;name&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;password&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;value&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;ac56d8e742&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/ReadDataStore&amp;gt;&lt;/font&gt;&lt;/font&gt;
+&lt;/html&gt;
+
+
+Up: [[Configuration]]
+Previous: [[Repository|Config: Repository]] / [[Cache|Config: Cache]]
+Next: [[Grids|Config: Grids]]</pre>
+</div>
+<div title="Config: DataTypeMap" modifier="Paul Tomlinson" created="200911021425" modified="200911030438" changecount="12">
+<pre>The {{{DataTypeMap}}} entry is completely optional.  It may be used either as the last entity in [[Options|Config: Options]] entity where it will apply to every mapped Column type on every Grid, or it may be defined per-Grid or as the second-to-last member of the [[Grid|Config: Grids]] entity.  Its purpose is to instruct Torpor to instantiate every Column of a specific data type as a particular class.  This is especially useful for providing additional handlers, hooks (such as the {{{PersistData}}} hooks), validation, or other generally useful utility routines to particular data types (transparent encryption/decryption is a good example).
+
+Whatever class name is provided here will be created as a new object using the PHP {{{new}}} keyword with the following arguments:
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;&lt;span style=&quot;color: #007700&quot;&gt;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$class&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&lt;br /&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Torpor&amp;nbsp;$torporInstance&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;,&lt;br /&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;(string)&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$columnName&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;,&lt;br /&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;SimpleXML&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$columnXml&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;,&lt;br /&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Grid&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$grid&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+The intent of these arguments and making changes generally are covered under [[Extension]] in [[Advanced Usage]].  It is generally recommended to inherit from {{{Column}}}, override just what's needed, and otherwise leave the constructor alone.
+
+There are no defaults for {{{DataTypeMap}}} - those provided below are for illustration only.  Any type not appearing here will default to the value of the {{{ColumnClass}}} [[option|Config: Options]].
+
+{{{DataMap}}} entries consist of a PHP class name and the Column data type to which that class name applies.  The same class name may appear multiple times, but only a single mapping per data type is supported.  If multiple are provided, only the last will be used.  The same class may be used multiple times without ill effects.
+
+&lt;html&gt;
+&lt;span style=&quot;font-family: monospace;&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;DataTypeMap&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;DataMap&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;class&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;DateTime&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;date&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;DataMap&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;class&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;DateTime&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;datetime&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;DataMap&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;class&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;DateTime&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;time&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/DataTypeMap&amp;gt;&lt;/font&gt;&lt;/span&gt;
+&lt;/html&gt;
+
+Up: [[Configuration]]
+Previous: [[Options|Config: Options]]
+Next: [[Repository|Config: Repository]] or [[Grids|Config: Grids]] / [[Keys|Config: Keys]]</pre>
+</div>
+<div title="Config: Grids" modifier="Paul Tomlinson" created="200911021432" modified="200911021443" changecount="3">
+<pre>Up: [[Configuration]]
+Previous: [[Repository|Config: Repository]] / [[DataStore|Config: DataStore]]
+Next: [[Grids|Config: Grids]] / [[Columns|Config: Columns]]</pre>
+</div>
+<div title="Config: Keys" modifier="Paul Tomlinson" created="200911021436" modified="200911021444" changecount="2">
+<pre>Up: [[Configuration]]
+Previous: [[Grids|Config: Grids]] / [[DataTypeMap|Config: DataTypeMap]]
+Next: [[Grids|Config: Grids]] / [[Keys|Config: Keys]] / [[Foreign|Config: Keys: Foreign]]</pre>
+</div>
+<div title="Config: Keys: Foreign" modifier="Paul Tomlinson" created="200911021436" modified="200911021444" changecount="2">
+<pre>Up: [[Configuration]]
+Previous: [[Grids|Config: Grids]] / [[Keys|Config: Keys]]
+Next: [[Grids|Config: Grids]] / [[Keys|Config: Keys]] / [[Primary|Config: Keys: Primary]]</pre>
+</div>
+<div title="Config: Keys: Primary" modifier="Paul Tomlinson" created="200911021437" modified="200911021445" changecount="3">
+<pre>Up: [[Configuration]]
+Previous: [[Grids|Config: Grids]] / [[Keys|Config: Keys]] / [[Foreign|Config: Keys: Foreign]]
+Next: [[Grids|Config: Grids]] / [[Keys|Config: Keys]] / [[Unique|Config: Keys: Unique]]</pre>
+</div>
+<div title="Config: Keys: Unique" modifier="Paul Tomlinson" created="200911021438" modified="200911021445" changecount="2">
+<pre>Up: [[Configuration]]
+Previous: [[Grids|Config: Grids]] / [[Keys|Config: Keys]] / [[Primary|Config: Keys: Primary]]
+Next: [[Examples]]</pre>
+</div>
+<div title="Config: Namespace" modifier="Paul Tomlinson" created="200911021424" modified="200911030201" changecount="15">
+<pre>Namespaces are a convention of XML used to group elements under a common name.  It is required to be a URI, but not necessarily required to correspond with any real or resolvable address.  The standard convention that has evolved out of convenience is to use a name which identifies the vendor or controller, and often a real location where information (or a schema) describing the format or its associated use can be found online.  Torpor is no exception, using a domain name the [[author|Paul Tomlinson]] had handy which links directly to the schema: http://www.tricornersoftware.com/Products/Torpor/Config/0.1
+
+Within an XML document, this is linked to a namespace prefix by using a standard {{{xmlns}}} prefix as a qualifier (prefixes for prefixes is a little obscure, but a starting point needs to be established somewhere).  In the below example the new namespace declared associated with the URI above is the rather terse {{{trpr}}}; in reality this could be just about anything.  When this namespace prefix is affixed to an element name, it explicitly associates that element with the namespace and its definition.  In the case of the Torpor configuration schema, all of the member elements belong to the root {{{TorporConfig}}} element without any other namespaces or potential ambiguity of where an element might be defined.  Because of this, {{{trpr}}} (or whatever you use) need only be provided for the first element, after which everything else is implied:
+
+&lt;html&gt;
+&lt;font face=&quot;monospace&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;?&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;xml&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;version&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;1.0&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;?&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#ff40ff&quot;&gt;trpr&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;:&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;TorporConfig&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;version&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;0.1&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;xmlns&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;:&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;trpr&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;&lt;a href=&quot;http://www.tricornersoftware.com/Products/Torpor/Config/0.1&quot;&gt;http://www.tricornersoftware.com/Products/Torpor/Config/0.1&lt;/a&gt;&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;/font&gt;
+&lt;/html&gt;
+
+Because it's the root element it can define the {{{xmlns}}} to which it belongs at the same time it's invoking it.
+
+The {{{version}}} attribute belongs to the {{{trpr}}} namespace in this example, and is a required attribute of {{{TorporConfig}}}.  It's used to tell Torpor what version of the configuration is in play in order to determine if it is compatible with the current installation and what feature set may be available.  Note that there is not a direct correlation between the Torpor release number and the configuration version number.
+
+It's possible to explicitly declare the schema and its location (not just a namespace which happens to do the same, which doesn't really mean much to the interpreter) using additional XML conventions, but these aren't required unless standalone validation is being performed without explicitly specifying the schema against which the validation should be checked.  The [[repository extraction scripts|Repository Extraction]] scripts use this advanced output by default for convenience, but it doesn't change the standard approach or the schema location against which it is finally validated.
+
+Up: [[Configuration]]
+Next: [[Options|Config: Options]]</pre>
+</div>
+<div title="Config: Options" modifier="Paul Tomlinson" created="200911021425" modified="200911022143" changecount="36">
+<pre>Located directly below the {{{&lt;TorporConfig&gt;}}} opening element, {{{Options}}} is one of the  few elements out-of-place with regard to it's order in the alphabet (almost all elements are provided in their alphabetical order for convenience, and will be enforced as such by the schema - deviations from this standard will be noted where they occur).  This is for convenience in editing, since it contains global configuration values that in many ways will dictate the nature of other content in the document.  Putting it in a logical order, easily located at the top of the document, makes a certain amount of sense from this perspective.  Under {{{Options}}}, individual settings are provided using simple-content XML entities where the value is placed between opening and closing tags with no attributes: &lt;html&gt;&lt;span style=&quot;font-family: monospace; white-space: nowrap;&quot;&gt;
+&lt;span style=&quot;color:#55C;&quot;&gt;&amp;lt;SampleSetting&amp;gt;&lt;/span&gt;value&lt;span style=&quot;color:#55C;&quot;&gt;&amp;lt;/SampleSetting&amp;gt;&lt;/font&gt;&lt;/span&gt;&lt;/html&gt;
+
+These are ordered alphabetically with the next exception of [[DataTypeMap|Config: DataTypeMap]], which is placed at the end of the list so as to avoid visual clutter in editing since it does not follow the simple-content entity standard of all the others.  The {{{Options}}} XML entity output by the [[repository extraction scripts|Repository Extraction]] is a self closing tag ({{{&lt;Options/&gt;}}}) with no values, indicating that defaults will be used for all settings.
+
+!!{{{CacheReferencedGrids}}}
+Default: ''true''
+Type: ''boolean''
+
+If set to true, when one Grid is used as the source for fetching another related Grid, the source Grid will cache a reference in that context (meaning using any alias name under which the related Grid is fetched) to the resulting object.  This means that not only will repeated calls produce the same Grid record, they will produce it as represented by the the same object reference.  This is a performance enhancement which allows for useful repeat call patterns such as:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;&lt;span style=&quot;color: #007700&quot;&gt;if(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$someGrid&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getRelatedRecord&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;()-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Load&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;()&amp;nbsp;){&lt;br /&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;doSomethingTo&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$someGrid&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getRelatedRecord&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;()&amp;nbsp;);&lt;br /&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+Note that it is possible for a single record from the repository to be represented by multiple different object instances, and even in different states as making alteration to one does not propagate to the other.  This behavior is intentional, but comes with a caution of being sure you know what you're doing if you really want more than one.  The {{{PublishAllColumns}}} setting outline below can act as a partial safeguard in these situations as well.
+
+!!{{{CacheReferencedGridSets}}}
+Default: ''false''
+Type: ''boolean''
+
+Similar in purpose to {{{CacheReferencedGrids}}}, this determines whether or not to do the same with ~GridSet objects.  This is off by default, as the relationship between a Grid and resulting ~GridSet is less tightly coupled than from one Grid to another (examples of the loose coupling include differing Criteria, pagination, or otherwise restricted or qualified sub-set of records that may not always be the intent).
+
+!!{{{ColumnClass}}}
+Default: ''Column''
+Type: ''string''
+
+This is the PHP class name which will be used as the base prototype for every Grid's Column (unless overridden by [[DataTypeMap|Config: DataTypeMap]] or [[Column|Config: Columns]] settings), and must correspond to a legitimate class name (preferably something which extends Column).
+
+!!{{{Debug}}}
+Default: ''false''
+Type: ''boolean''
+
+May cause more {{{E_USER_NOTICE}}} events to be produced.  Debug //classes// are a wiser choice, allowing more granularly targeted hooks under user control.
+
+!!{{{GridClass}}}
+Default: ''Grid''
+Type: ''string''
+
+PHP class name for all Grid prototypes unless overridden per-[[Grid|Config: Grids]] later on.
+
+!!{{{LinkUnpublishedReferenceColumns}}}
+Default: ''true''
+Type: ''boolean''
+
+This rather long-named option controls whether or not, when using a Grid as a factory for a related Grid, or associating two Grids in a specific context, whether or not to automatically link the corresponding reference Columns between the two in situations where:
+# A referenced Column does not currently have data
+# That Column has {{{generatedOnPublish}}} set to ''true''
+This allows Grid types which have late-binding keys established by the repository to still be associated to one another without having to summarily publish everything just to get that key.  Once established, any request to the source Column for data will be redirected to the now linked target Column to retrieve it's data (if it has any), which will then be stored locally (with the source Column) and finally returned to the calling interface.
+
+Such a pattern allows objects with repository-generated-keys to be associated with one another prior to publishing, which in turn improves performance and prevents partial records from being written to the repository for the sole purpose of generating keys or making some other key-determining round trip (e.g., fetch from a sequence) for resources which may not even be used if the objects are never published.
+
+This has bearing on {{{PublishDependencies}}}: these are the dependencies it's referring to.  If a linked Column is encountered with no data of its own, and the target of that link is {{{generatedOnPublish}}}, that target will be published first and the resulting key propagated to the requesting object. See {{{PerpetuateAutoLinks}}} too.
+
+!!{{{OverwriteOnLoad}}}
+Default: ''true''
+Type: ''boolean''
+
+Determines when loading an object from the repository whether to overwite any data which was set on the object prior to that fetch or prior to the Grid's ability to load.  When true, any data already set (which does not correspond to the loaded data) will be wiped out.  This will also generate an {{{E_USER_NOTICE}}} warning to indicate somebody's data is going missing, in case this results in aberrant or unexpected behavior.
+
+!!{{{PageSize}}}
+Default: ''-1''
+Type: ''integer'' (greater than or equal to ''-1'')
+
+The number of records to fetch from the repository for ~GridSet type objects where the local {{{GridSet::setPageSize()}}} has not been explicitly set.  A negative number corresponds to &quot;all available records,&quot; and is not recommended (especially for web apps) unless you really need all records.  However, this is the default in order to avoid nasty surprises in the form of failing to operate on all records matching requested criteria.
+
+!!{{{PermitDDL}}}
+Default: ''false''
+Type: ''boolean''
+
+Whether or not any data description language (modifications to repository structure) will be permitted.  Disabled by default, and probably only useful if one plans on working with temporary tables and the like.  Whether or not something is DDL is up to the repository handler to figure out, and for that handler to query this setting - it is not pushed to the handler, nor does anything else introspect incoming queries.  General behavior when set to ''false'' is to throw an [[exception|Exceptions]] when DDL is encountered.
+
+!!{{{PerpetuateAutoLinks}}}
+Default: ''false''
+Type: ''boolean''
+
+Used together with {{{LinkUnpublishedReferenceColumns}}}, this setting indicates whether or not to maintain that linked relationship after data has been retrieved from the target Column.  When set to false, as soon as some data has been retrieved from the target Column the link will be severed and the 2 will go their separate ways.  This is the default, since reference keys between records are not expected to change with sufficient frequency to warrant continuing the link.  If set to true, however, the 2 objects will continue to operate in tandem; useful if keys are expected to be changing for some reason.
+
+''NOTE:'' The source Column data is not pushed to by the target Column; the link relationship is one strictly of pull to source from target when the source Column's data is requested.  Thus it's possible to change the target Column's data many times before the source Column ever wises up.  Just FYI.
+
+!!{{{PublishAllColumns}}}
+Default: ''false''
+Type: ''boolean''
+
+Determines whether or not to publish all Columns, or just those which have changed since it was loaded.  Applies to loaded Grids only (since all newly created records will be published in their entirety anyway), and is not recommended as ''false'' for use with distributed caching unless {{{ReloadAfterPublish}}} is also ''true'', since the Cache interface is &quot;all or nothing&quot; rather than a delta set.  This feature helps optimize repository performance and can assist in reducing incidental data overwrites at the final repository level in the event that multiple references to the same record are in play at the same time.
+
+If only a few values are changing on a larger Grid object, and especially if this happens with any frequency, there will be a decrease in overall network traffic and database load.  This is most useful in for repositories (or their ~DatatStore adapters) which do not support pre-compiled queries and bind variables for performance,  since it does require that custom queries be assembled and parsed each time which negate any pre-compilation performance gain.  
+
+!!{{{PublishDependencies}}}
+Default: ''true''
+Type: ''boolean''
+
+If a required Column does not have data, and is linked to a Column which also does not have data but is set to generatedOnPublish, this setting determines whether to publish the linked target Column in order to retrieve its data for use in the source Column we're intending to publish which requires it.  This is a recursive-safe operation in that it will detect circular references, but only in that it will detect them - it will throw an exception rather than segfaulting, and it's up to the calling code to determine how to handle the error.
+
+!!{{{ReloadAfterPublish}}}
+Default: ''true''
+Type: ''boolean''
+
+Once a Grid has been published, this setting determines whether to mark the Grid as not yet having loaded, such that subsequent requests for data will cause the standard just-in-time load to fire.  Though this slightly decreases performance (by increasing repository communication), it's useful in those circumstances where data may have been altered once it hit the repository (precision truncation, formatting, etc.) in order to ensure everything stays in agreement.  If set to ''false'',however, the data as constituted in that Grid at the moment of publish will persist, both locally and in any Cache configuration.  It is recommended to test the Column data type handling as it corresponds to resulting publish operations in the database to ensure that, in whatever environment you're using things, it all lines up before setting this to ''false'' (which can result in a significant decrease in database load).
+
+''NOTE:'' This has no bearing on {{{generatedOnPublish}}} columns, which will //always// be populated from the repository as a part of the whole publish operation.
+
+!!{{{TypedGridClasses}}}
+Default: ''false''
+Type: ''boolean''
+
+If set to true, instead of using Torpor's {{{Grid}}} class for all record instances, a new class will be created as an extension to the class {{{TypedGrid}}}.  The new class name will correspond to the sanitized Torpor key name for the Grid (e.g., {{{User}}} becomes {{{USER}}}, {{{order_item}}} becomes {{{ORDERITEM}}}, etc.) - due to PHP case handling these can still be accessed case insensitively for convenience ({{{User}}}, {{{OrderItem}}})
+
+This is most useful in a singleton environment, but can also be used with Torpor as an instance if that instance is passed as an argument in the construction of the object: &lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;User&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$torpor&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+''NOTE:'' Torpor must either already have been initialized from the configuration file, or be used with appropriate hooks in the lazy loader ({{{__autoload}}} function) in order for this pattern to be used. See also {{{TypedGridClassesPrefix}}} and [[TypedGrids|TypedGrid]].
+
+!!{{{TypedGridClassesPrefix}}}
+Default: ''(empty)''
+Type: ''string''
+
+Empty by default, any string used here will be prefixed to the class names constructed when {{{TypedGridClasses}}} is ''true''.  For example, if this contained {{{Torpor}}} and a Grid {{{User}}} was defined, the new class would be named {{{TorporUser}}} (technically {{{TorporUSER}}} due to the key sanitation, but for readability Pascal case is used - class names are thankfully case insensitive in PHP).
+
+
+Up: [[Configuration]]
+Previous: [[Namespace|Config: Namespace]]
+Next: [[Options|Config: Options]] / [[DataTypeMap|Config: DataTypeMap]]</pre>
+</div>
+<div title="Config: Repository" modifier="Paul Tomlinson" created="200911021427" modified="200911030419" changecount="5">
+<pre>The {{{Repository}}} element has no attributes or extra values itself, instead serving only as a functional container for the [[Cache|Config: Cache]] and [[DataStore|Config: DataStore]] definitions.
+
+Up: [[Configuration]]
+Previous: [[Options|Config: Options]] / [[DataTypeMap|Config: DataTypeMap]]
+Next: [[Repository|Config: Repository]] / [[Cache|Config: Cache]]</pre>
+</div>
+<div title="Configuration" modifier="Paul Tomlinson" created="200911021423" modified="200911022048" changecount="15">
+<pre>All configuration files are validated against the {{{TorporConfig.xsd}}} schema to ensure valid structure and content.  If you are unfamiliar with schema validation or XML nuances in general I recommend the excellent [[ZVON.org|http://www.zvon.org/]] resources and tutorials.  If you follow then conventions outlined in this guide you should be just fine regardless.
+
+The smallest successfully validating example is not especially useful:
+&lt;html&gt;
+&lt;font face=&quot;monospace&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;?&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;xml&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;version&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;1.0&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;?&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#ff40ff&quot;&gt;trpr&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;:&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;TorporConfig&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;version&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;0.1&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;xmlns&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;:&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;trpr&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;&lt;a href=&quot;http://www.tricornersoftware.com/Products/Torpor/Config/0.1&quot;&gt;http://www.tricornersoftware.com/Products/Torpor/Config/0.1&lt;/a&gt;&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Grids&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Grid&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;Example&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Grids&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/&lt;/font&gt;&lt;font color=&quot;#ff40ff&quot;&gt;trpr&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;:&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;TorporConfig&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;/font&gt;
+&lt;/html&gt;
+This is still allowed to pass because the majority of the configuration values are optional.  The above example will allow Torpor to act as a factory for an {{{Example}}} pseudo-class that has no column members, and will not be able to load or publish because there's no [[repository|Config: Repository]] defined (but then, there's no data to load or publish either so that's hardly consequential).
+
+Any option or setting omitted from the XML will use a default setting instead.  These are defined in the schema for those using it to assist in the generation of the configuration file (or to act as a near-at-hand reference and correspond to the default values in the {{{Torpor}}} class.  There is also an included {{{TorporConfig.sample.xml}}} file annotated with the same content found here using inline {{{&lt;!-- XML comments --&gt;}}}.
+
+By default a new {{{Torpor}}} instance (singleton or otherwise) will attempt a just-in-time initialization the first time it's asked to do something that requires an internal data structure.  It will look in the PHP include path for a file name {{{TorporConfig.xml}}}, stopping at the first one it finds, and use that as the basis of operation.  This behavior can be overridden by calling the {{{Torpor::initialize()}}} method and specifying the desired XML contents as a string, the name of the configuration file, a file handle, ~SimpleXML instance, or URI as the first parameter (or left empty to explicitly perform the default-~XML-initialization already described).  Regardless of how the XML gets there, it all needs to follow the same rules.
+
+# [[Namespace|Config: Namespace]]
+# [[Options|Config: Options]]
+## [[DataTypeMap|Config: DataTypeMap]]
+# [[Repository|Config: Repository]]
+## [[Cache|Config: Cache]]
+## [[DataStore|Config: DataStore]]
+# [[Grids|Config: Grids]]
+## [[Columns|Config: Columns]]
+## [[Commands|Config: Commands]]
+## [[DataTypeMap|Config: DataTypeMap]]
+## [[Keys|Config: Keys]]
+### [[Foreign|Config: Keys: Foreign]]
+### [[Primary|Config: Keys: Primary]]
+### [[Unique|Config: Keys: Unique]]
+
+Previous: [[Getting Started|Getting Started with Torpor]]
+Next: [[Namespace|Config: Namespace]] (or [[Examples]])</pre>
+</div>
 <div title="DefaultTiddlers" modifier="Paul" created="200910311905" changecount="1">
 <pre>[[Introduction]]</pre>
 </div>
@@ -543,16 +884,16 @@ Error: #f88
 <pre>Distribution packages are maintained via the [[Torpor Project Page|http://code.google.com/p/torpor-php/]] on [[Google Code|http://code.google.com]]:
 * http://code.google.com/p/torpor-php/downloads/list</pre>
 </div>
-<div title="Features" modifier="Paul Tomlinson" created="200911010408" modified="200911010455" changecount="16">
+<div title="Features" modifier="Paul Tomlinson" created="200911010408" modified="200911022043" changecount="19">
 <pre>Torpor is categorized by the following features:
 !!!Dynamic Factories
-There is no code generation step for setting up and using Torpor.  It is necessary to create a [[configuration|Configuration]] file which describes the Grid structure(s) and the underlying repository via XML, but once that's done (and it can be done automatically using [[repository extraction scripts|Repository Extraction]]) it is not necessary to generate any PHP code for classes: everything happens from that configuration on-the-fly (though cached after just-in-time analysis as appropriate for performance).
+There is no code generation step for setting up and using Torpor.  It is necessary to create a [[configuration|Configuration]] file which describes the Grid structure(s) and the underlying repository via XML, but once that's done (and it can be done automatically using the included [[repository extraction scripts|Repository Extraction]]) it is not necessary to generate any PHP code for classes: everything happens from that configuration on-the-fly (though cached after just-in-time analysis as appropriate for performance).
 !!!Relational Factories
 Any Grid with a defined relationship to any other Grid type can be used to retrieve or create instances of the related Grid.  For example (as laid out in [[simple_sample.xml]] and illustrated in [[Getting Started|Getting Started with Torpor]]), a {{{User}}} Grid is referenced by {{{Order}}}, which implies a one-to-many relationship.  This means that {{{User}}} can be used to retrieve a set ({{{GridSet}}}) of {{{Order}}} instances directly, or to spawn new {{{Order}}} objects as desired.  The reciprocal operates predictably: any {{{Order}}} can be used to retrieve the associated {{{User}}} object from the repository.
 
 Also as illustrated in this example, it's possible to have as many relationships between Grids as there are Columns, including multiple relationships between the same types under different aliases.  Multiple-column keys and relationships are also supported out of the box, as are self referential relationships (as with {{{User}}} to {{{User-as-ReferringUser}}}).
 !!!Loose Typing With Attitude
-Torpor makes extensive use of the special {{{__call}}}, {{{__get}}}, and {{{__set}}} PHP methods.  These allow for on-the-fly analysis and redirection of the requested methods or variables, which are used in lieu of attempting to create getters and setters for all related objects, columns, etc.  It also means that relaxed (one might say undisciplined) access patterns still benefit from all the rigor and control that went in to making the framework {{{E_ALL|E_STRICT}}} friendly, if not encourages them outright (though discipline is still urged for the sake of consistency and maintainability; whatever style you're going to use, pick that and stick with it) by making all accessors case-insensitive.
+Torpor makes extensive use of the special {{{__call}}}, {{{__get}}}, and {{{__set}}} PHP methods.  These allow for on-the-fly analysis and redirection of the requested methods or variables, which are used in lieu of attempting to create getters and setters for all related objects, columns, etc.  It also means that relaxed (one might say undisciplined) access patterns still benefit from all the rigor and control that went in to making the framework {{{E_ALL|E_STRICT}}} friendly, if not encouraging them outright (though discipline is still urged for the sake of consistency and maintainability; whatever style you're going to use, pick that and stick with it) by making all accessors case-insensitive.  It's also completely indifferent to the placement of underscores, which are commonly used in case-insensitive RDBMS definitions: {{{$x = $object-&gt;getTheColumn();}}} is the same as {{{$x = $object-&gt;getTHE_COLUMN();}}} is the same as {{{$x = $object-&gt;TheColumn;}}} or {{{$x = $object-&gt;THE_COLUMN;}}} (and likewise the reverse for {{{set}}} operations).
 
 Behind this very malleable facade it's still necessary to play nice with the repository, which is almost never as forgiving as PHP (~SQLite is an outlying exception).  String/Byte length, character set encoding, numeric precision, date formats, etc., are all strictly controlled and validated so there should be no surprises down the line.  {{{E_USER_WARNING}}} notices are provided whenever precision is lost or truncation occurs, making debugging unanticipated data management issues from real-world scenarios much easier.
 !!!Just In Time
@@ -560,16 +901,18 @@ Information is not loaded from the repository until it's needed, keeping objects
 
 Thus, individual objects which are likely to comprise the majority of an applications operations keep things nimble where they can, and bulk operations more likely to strain the repository or network do their part as well, each in their own way.  The end developer and user experience is seamless.
 !!!Caching
-Read- and Write- Through caching means that every Grid instance as it moves from or to the repository can optionally be made available in a nearby location for quick retrieval next time it's needed.  By dedicating a limited amount of memory to simple hash-based access it's possible to negate many round trips to the repository.  Not every situation can benefit from caching, but those with a heavy reliance of frequently accessed and infrequently changing data (such as content management, eCommerce, and many web applications) can see significant performance boosts.  This is especially true with distributed caching (such as via the included Memcache adapter), which will allow multiple threads on the same machine or multiple machines in the same cluster to share that hash, providing lateral scalability at the application layer with a much lower increase in demand on the repository which is otherwise a typical bottleneck in N-tier strategies.
+Read- and Write- Through caching means that every Grid instance as it moves from or to the repository can optionally be made available in a nearby location for quick retrieval next time it's needed.  By dedicating a limited amount of memory to simple hash-based access it's possible to negate many round trips to the repository.  Not every situation can benefit from caching, but those with a heavy reliance on frequently accessed and infrequently changing data (such as content management, eCommerce, and many web applications) can see significant performance boosts.  This is especially true with distributed caching (such as via the included Memcache adapter), which will allow multiple threads on the same machine or multiple machines in the same cluster to share that hash, providing lateral scalability at the application layer with a much lower increase in demand on the repository which is otherwise a typical bottleneck in N-tier strategies.
 !!!Extensibility
 Every component of Torpor can be readily extended or modified with very little overhead.  By extending the set of intelligent and adaptable primitives, business logic or other enhancements can be encapsulated in simple deltas to modify or expand the existing functionality as necessary.  Complete replacement is also possible, and in many cases encouraged by the use of basic Interfaces for plug-in components.
 
 Combining that class-based extensibility with flexible configuration means that one Column on one Grid can be enhanced just as easily as all Columns of a given data type (or all Grids) across the entire installation.  New ~DataStore or Cache adapters can readily be fit into the existing architecture.
+!!!Virtual Entities
+While the XML configuration is strictly enforced, it need not be founded in reality.  Grids or Columns best not exposed to the application layer (such as trigger provided last-modified timestamp or identities) can simply be omitted.  Along with their descriptive hints, alias names can be used to smooth out or obscure underlying repository design.  Perhaps more powerfully, any standard [[CRUD]] operations can be overridden with the custom [[Command]] entry, which works with the ~DataStore adapter to enhance or completely replace standard accessors.  Stored Procedures can be used for any, all, or none, and even entire views (and as many update statements as you want) or virtual triggers can be defined directly within Torpor for those instances where the repository cannot or should not (or the DBA's are just picky) be provided.
 
 Previous: [[Introduction]]
 Next: [[Getting Started|Getting Started with Torpor]]</pre>
 </div>
-<div title="Getting Started with Torpor" modifier="Paul Tomlinson" created="200910312317" modified="200911010357" changecount="29">
+<div title="Getting Started with Torpor" modifier="Paul Tomlinson" created="200910312317" modified="200911022048" changecount="38">
 <pre>!!Installation
 After [[downloading a distribution package|Downloads]] the relevant PHP files will be extracted to a folder like {{{torpor/src}}}.
 
@@ -579,32 +922,40 @@ It is recommended to run the provided {{{torpor/src/test/test.php}}} in your tar
 !![[Configuration]]
 All configuration is performed via XML, including optional settings, data engine access, and descriptions of the data objects themselves. This XML must be prepared according to the specifications outlined in the more exhaustive [[Configuration]] section of this documentation and will be validated against the included {{{TorporConfig.xsd}}} schema file prior to loading. It is recommended to test this validation manually during development in order to ensure successful loading (which will separate syntax errors from logic errors, making debugging easier). The included {{{torpor/tools/validate}}} script is provided for this purpose.
 
-Torpor will look in the PHP include path for the file {{{TorporConfig.xml}}} by default, unless something else is passed as an argument to the {{{Torpor::initialize()}}} method.  This can be passed either as a string containing the XML, a file pointer, file name, or URI. For the best performance it is recommended to use file based access rather than reading from ~URIs over the network.  The easiest way to establish the configuration file is by using one of the data repository extraction scripts (available under {{{torpor/tools}}}), which will to the best of its abilities describe the layout of your repository in compatible XML - each comes with its own instructions regarding parameters for invocation.  More details can be found under the [[Configuration]] section.
+Torpor will look in the PHP include path for the file {{{TorporConfig.xml}}} by default, unless something else is passed as an argument to the {{{Torpor::initialize()}}} method.  This can be passed either as a string containing the XML, a file pointer, file name, ~SimpleXML instance, or URI. For the best performance it is recommended to use file based access rather than reading from ~URIs over the network.  The easiest way to establish the configuration file is by using one of the [[data repository extraction scripts|Repository Extraction]] (available under {{{torpor/tools}}}), which will to the best of its abilities describe the layout of your repository in compatible XML - each comes with its own instructions regarding parameters for invocation.  More details can be found under the [[Configuration]] section.
 !!Invocation
 Torpor can be used in either instance or singleton modes (although making use of the TypedGrid classes __requires__ singleton operation), and initialization is similar in either case:
 !!!Instance
 &lt;html&gt;
+&lt;span style=&quot;font-family: monospace;&quot;&gt;
 &lt;span style=&quot;color: #0000BB&quot;&gt;$torpor&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Torpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$torpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;initialize&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'TorporConfig.xml'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;/span&gt;
+&lt;/span&gt;
 &lt;/html&gt;
 !!!Singleton
 &lt;html&gt;
+&lt;span style=&quot;font-family: monospace;&quot;&gt;
 &lt;span style=&quot;color: #0000BB&quot;&gt;Torpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;::&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getInstance&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;()-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;initialize&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'TorporConfig.xml'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;/span&gt;
+&lt;/span&gt;
 &lt;/html&gt;
 
 From there it's a matter of setting up your first object through the {{{Torpor}}} factory.  Assuming the configuration file is [[simple_sample.xml]] and Torpor is being used without the aid of TypedGrid classes (note that after something like {{{$MyTorpor = new Torpor();}}} and {{{$MyTorpor = Torpor::getInstance();}}} everything is the same; in this usage pattern singleton just guarantees initialization only happens once, and uses less memory for repeat instance acquisitions):
 
 &lt;html&gt;
 &lt;div style=&quot;font-family: monospace;&quot;&gt;
-&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Torpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;::&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getInstance&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;initialize&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'simple_sample.xml'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;get&amp;lt;Object&amp;gt;ById:&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getUserById&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;12345&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;******************************&lt;br /&gt;//&amp;nbsp;**&amp;nbsp;&amp;nbsp;Related&amp;nbsp;Object&amp;nbsp;Factory&amp;nbsp;&amp;nbsp;**&lt;br /&gt;//&amp;nbsp;******************************&lt;br /&gt;//&amp;nbsp;get&amp;lt;Object&amp;gt;Set&amp;nbsp;(implicit&amp;nbsp;&quot;...FromUser&quot;):&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$orderHistory&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getOrderSet&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;foreach(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$orderHistory&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;as&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;){&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;/*&amp;nbsp;...&amp;nbsp;*/&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;}&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;new&amp;lt;Object&amp;gt;&amp;nbsp;(implicit&amp;nbsp;&quot;...FromUser&quot;):&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newOrder&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;***********************************&lt;br /&gt;//&amp;nbsp;**&amp;nbsp;&amp;nbsp;Alternate&amp;nbsp;Access&amp;nbsp;Mechanisms&amp;nbsp;&amp;nbsp;**&lt;br /&gt;//&amp;nbsp;***********************************&lt;br /&gt;//&amp;nbsp;Automatic&amp;nbsp;relationship&amp;nbsp;column&amp;nbsp;traversal&amp;nbsp;and&amp;nbsp;set&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setSeller&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getUserById&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;67890&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;)&amp;nbsp;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;Identical&amp;nbsp;to:&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setSellerId&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;67890&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;The&amp;nbsp;following&amp;nbsp;are&amp;nbsp;equivalent:&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setDate&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;date&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'Y-m-d&amp;nbsp;H:i:s'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;)&amp;nbsp;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Date&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;date&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'Y-m-d&amp;nbsp;H:i:s'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;DATE&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;date&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'Y-m-d&amp;nbsp;H:i:s'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;**********************************&lt;br /&gt;//&amp;nbsp;**&amp;nbsp;&amp;nbsp;Late&amp;nbsp;binding&amp;nbsp;relationships&amp;nbsp;&amp;nbsp;**&lt;br /&gt;//&amp;nbsp;**********************************&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$secondUser&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$secondUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setReferringUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;$secondUser&amp;nbsp;does&amp;nbsp;not&amp;nbsp;yet&amp;nbsp;exist&amp;nbsp;in&amp;nbsp;the&amp;nbsp;repository,&lt;br /&gt;//&amp;nbsp;so&amp;nbsp;this&amp;nbsp;sets&amp;nbsp;up&amp;nbsp;an&amp;nbsp;implicit&amp;nbsp;relationship&amp;nbsp;that&lt;br /&gt;//&amp;nbsp;will&amp;nbsp;retrieve&amp;nbsp;the&amp;nbsp;relational&amp;nbsp;column&amp;nbsp;values&amp;nbsp;when&lt;br /&gt;//&amp;nbsp;they&amp;nbsp;become&amp;nbsp;available.&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$secondUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newOrder&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setSeller&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setDate&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;date&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'Y-m-d&amp;nbsp;H:i:s'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;)&amp;nbsp;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;Neither&amp;nbsp;ShippingAddress&amp;nbsp;nor&amp;nbsp;ShippingType&amp;nbsp;are&amp;nbsp;set&lt;br /&gt;//&amp;nbsp;up&amp;nbsp;in&amp;nbsp;this&amp;nbsp;example,&amp;nbsp;but&amp;nbsp;you&amp;nbsp;get&amp;nbsp;the&amp;nbsp;idea.&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setShippingAddressId&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;15243&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setShippingTypeId&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;34251&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;This&amp;nbsp;causes&amp;nbsp;$secondUser&amp;nbsp;to&amp;nbsp;publish&amp;nbsp;in&amp;nbsp;order&amp;nbsp;to&lt;br /&gt;//&amp;nbsp;acquire&amp;nbsp;a&amp;nbsp;primary&amp;nbsp;key&amp;nbsp;because&amp;nbsp;generatedOnPublish&lt;br /&gt;//&amp;nbsp;is&amp;nbsp;set&amp;nbsp;to&amp;nbsp;true&amp;nbsp;(meaning&amp;nbsp;we&amp;nbsp;can&amp;nbsp;get&amp;nbsp;this&amp;nbsp;from&amp;nbsp;the&lt;br /&gt;//&amp;nbsp;repository)&amp;nbsp;for&amp;nbsp;the&amp;nbsp;related&amp;nbsp;Column,&amp;nbsp;and&amp;nbsp;because&lt;br /&gt;//&amp;nbsp;the&amp;nbsp;default&amp;nbsp;Torpor&amp;nbsp;configuration&amp;nbsp;setting&amp;nbsp;of&lt;br /&gt;//&amp;nbsp;PublishDependencies&amp;nbsp;is&amp;nbsp;also&amp;nbsp;true.&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Publish&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;Publishes&amp;nbsp;$secondUser&amp;nbsp;first.
+&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Torpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;::&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getInstance&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;initialize&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'simple_sample.xml'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;get&amp;lt;Object&amp;gt;ById:&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getUserById&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;12345&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;******************************&lt;br /&gt;//&amp;nbsp;**&amp;nbsp;&amp;nbsp;Related&amp;nbsp;Object&amp;nbsp;Factory&amp;nbsp;&amp;nbsp;**&lt;br /&gt;//&amp;nbsp;******************************&lt;br /&gt;//&amp;nbsp;get&amp;lt;Object&amp;gt;Set&amp;nbsp;(implicit&amp;nbsp;&quot;...From&amp;lt;Object&amp;gt;&quot;):&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$orderHistory&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getOrderSet&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;foreach(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$orderHistory&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;as&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;){&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;/*&amp;nbsp;...&amp;nbsp;*/&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;}&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;new&amp;lt;Object&amp;gt;&amp;nbsp;(implicit&amp;nbsp;&quot;...From&amp;lt;Object&amp;gt;&quot;):&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newOrder&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;***********************************&lt;br /&gt;//&amp;nbsp;**&amp;nbsp;&amp;nbsp;Alternate&amp;nbsp;Access&amp;nbsp;Mechanisms&amp;nbsp;&amp;nbsp;**&lt;br /&gt;//&amp;nbsp;***********************************&lt;br /&gt;//&amp;nbsp;Automatic&amp;nbsp;relationship&amp;nbsp;column&amp;nbsp;traversal&amp;nbsp;and&amp;nbsp;set&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setSeller&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getUserById&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;67890&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;)&amp;nbsp;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;Identical&amp;nbsp;to:&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setSellerId&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;67890&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;The&amp;nbsp;following&amp;nbsp;are&amp;nbsp;equivalent:&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setDate&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;date&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'Y-m-d&amp;nbsp;H:i:s'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;)&amp;nbsp;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Date&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;date&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'Y-m-d&amp;nbsp;H:i:s'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;DATE&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;date&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'Y-m-d&amp;nbsp;H:i:s'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;**********************************&lt;br /&gt;//&amp;nbsp;**&amp;nbsp;&amp;nbsp;Late&amp;nbsp;binding&amp;nbsp;relationships&amp;nbsp;&amp;nbsp;**&lt;br /&gt;//&amp;nbsp;**********************************&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$secondUser&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$secondUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setReferringUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;$secondUser&amp;nbsp;does&amp;nbsp;not&amp;nbsp;yet&amp;nbsp;exist&amp;nbsp;in&amp;nbsp;the&amp;nbsp;repository,&lt;br /&gt;//&amp;nbsp;so&amp;nbsp;this&amp;nbsp;sets&amp;nbsp;up&amp;nbsp;an&amp;nbsp;implicit&amp;nbsp;association&amp;nbsp;that&lt;br /&gt;//&amp;nbsp;will&amp;nbsp;retrieve&amp;nbsp;the&amp;nbsp;relational&amp;nbsp;column&amp;nbsp;values&amp;nbsp;when&lt;br /&gt;//&amp;nbsp;they&amp;nbsp;become&amp;nbsp;available.&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$secondUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newOrder&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setSeller&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setDate&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;date&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'Y-m-d&amp;nbsp;H:i:s'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;)&amp;nbsp;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;Neither&amp;nbsp;ShippingAddress&amp;nbsp;nor&amp;nbsp;ShippingType&amp;nbsp;are&amp;nbsp;set&lt;br /&gt;//&amp;nbsp;up&amp;nbsp;in&amp;nbsp;this&amp;nbsp;example,&amp;nbsp;but&amp;nbsp;you&amp;nbsp;get&amp;nbsp;the&amp;nbsp;idea.&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setShippingAddressId&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;15243&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setShippingTypeId&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;34251&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;This&amp;nbsp;causes&amp;nbsp;$secondUser&amp;nbsp;to&amp;nbsp;publish&amp;nbsp;in&amp;nbsp;order&amp;nbsp;to&lt;br /&gt;//&amp;nbsp;acquire&amp;nbsp;a&amp;nbsp;primary&amp;nbsp;key&amp;nbsp;because&amp;nbsp;generatedOnPublish&lt;br /&gt;//&amp;nbsp;is&amp;nbsp;set&amp;nbsp;to&amp;nbsp;true&amp;nbsp;(meaning&amp;nbsp;we&amp;nbsp;can&amp;nbsp;get&amp;nbsp;this&amp;nbsp;from&amp;nbsp;the&lt;br /&gt;//&amp;nbsp;repository)&amp;nbsp;for&amp;nbsp;the&amp;nbsp;related&amp;nbsp;Column,&amp;nbsp;and&amp;nbsp;because&lt;br /&gt;//&amp;nbsp;the&amp;nbsp;default&amp;nbsp;Torpor&amp;nbsp;configuration&amp;nbsp;setting&amp;nbsp;of&lt;br /&gt;//&amp;nbsp;PublishDependencies&amp;nbsp;is&amp;nbsp;also&amp;nbsp;true.&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Publish&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;Publishes&amp;nbsp;$secondUser&amp;nbsp;first.
 &lt;/div&gt;
 &lt;/html&gt;
 
-This is a fairly dense first example, but it should be noted that (assuming the {{{test}}} database specified exists according to the [[simple_sample.xml]] definition) this is all it takes to use Torpor: there is no code generation or series of includes or manual overhead; the factory pattern goes right to work dynamically typing instances of [[Grid]] objects to match the definition and relating them to one another.
+[[TypedGrids|TypedGrid]] omit the need to make use of a {{{$torpor}}} instance directly, replacing the {{{new}}} and {{{...ById}}} commands with standard PHP constructor operations:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;Identical&amp;nbsp;to&amp;nbsp;-&amp;gt;getUserById(&amp;nbsp;12345&amp;nbsp;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;User&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;12345&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;Identical&amp;nbsp;to&amp;nbsp;-&amp;gt;newUser()&amp;nbsp;or&amp;nbsp;-&amp;gt;newUserSet();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;User&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;UserSet&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+This is a fairly dense first example, but it should be noted that (assuming the {{{test}}} database specified exists according to the [[simple_sample.xml]] definition) this is all it takes to use Torpor: there is no code generation or series of includes or manual overhead; the factory pattern goes right to work dynamically typing instances of [[Grid]] objects to match the definitions and relating them to one another.
 
 Previous: [[Features]]
 Next: [[Configuration]] (or [[Examples]] if you're impatient)</pre>
 </div>
-<div title="Introduction" modifier="Paul Tomlinson" created="200910311914" modified="200911010525" changecount="10">
+<div title="Introduction" modifier="Paul Tomlinson" created="200910311914" modified="200911011713" changecount="11">
 <pre>Torpor is a persistence layer abstraction in PHP, providing a form of object-relational mapping derived from the design of the database (and encouraging good design principles). It is written entirely in PHP, and has been designed with ease of implementation and performance as primary goals. 
 !!Objective
 Torpor was created to perform all the legwork between the design of a database and the most common patterns of access and manipulation to it. This comes from several years of working with database abstractions in numerous languages and scopes of implementation, from simple one-off scripts up through major infrastructure for insurance, web hosting, and ecommerce retailers. In almost all cases, regardless of the tools in play, the ways in which data is accessed, combined, and published, follow very predictable patterns. There are [[dozens of projects|Alternatives]] in their respective languages which seek to encapsulate those patterns into common abstractions, each enforcing their own pragmatism on the implementation.
@@ -619,24 +970,25 @@ Heavy reliance is made on factory patterns, using one object as the gateway to t
 !!Requirements
 Torpor is written entirely in PHP and requires version 5.1.0 or greater, with the ~SimpleXML and DOM extensions, and support for the data engine of your choice. This target version was chosen in order to get the best overlap between capabilities and availability - some of the nicer conventions and features of later versions (such as name spaces and some dynamic execution mechanisms such as {{{__callStatic}}}) have been omitted in order to maintain this compatibility. As a result, all classes are declared in the global namespace and it is up to the end user to ensure collisions do not occur.
 !!License
-Torpor is offered under the [[MIT license|http://en.wikipedia.org/wiki/MIT_License]], which allows for inclusion in paid projects and unrestricted extension of the code so long as others are afforded the same right. We would ask that any useful modification be propagated back to the project, and will even say &quot;pretty please&quot; - but you're otherwise completely unrestricted in the use and distribution of this software. 
+Torpor is offered under the [[MIT license|http://en.wikipedia.org/wiki/MIT_License]], which allows for inclusion in paid projects and unrestricted extension of the code so long as others are afforded the same rights. We would ask that any useful modification be propagated back to the project, and will even say &quot;pretty please&quot; - but you're otherwise completely unrestricted in the use and distribution of this software. 
 
 Next: [[Features]]</pre>
 </div>
-<div title="MainMenu" modifier="Paul Tomlinson" created="200910311907" modified="200910311912" changecount="5">
+<div title="MainMenu" modifier="Paul Tomlinson" created="200910311907" modified="200911030705" changecount="8">
 <pre>[[Introduction]]
 [[Features]]
 [[Getting Started|Getting Started with Torpor]]
 [[Configuration]]
 [[Examples]]
-[[Advanced Usage]]</pre>
+[[Advanced Usage]]
+[[Appendix]]</pre>
 </div>
 <div title="MarkupPostBody" modifier="Paul Tomlinson" created="200911010514" changecount="1">
 <pre></pre>
 </div>
-<div title="PageTemplate" modifier="Paul Tomlinson" created="200911010500" modified="200911010503" changecount="5">
+<div title="PageTemplate" modifier="Paul Tomlinson" created="200911010500" modified="200911011530" changecount="6">
 <pre>&lt;!--{{{--&gt;
-&lt;div class='header' macro='gradient vert [[ColorPalette::PrimaryLight]] [[ColorPalette::PrimaryMid]]'&gt;
+&lt;div class='header' macro='gradient vert [[ColorPalette::PrimaryLight]] [[ColorPalette::PrimaryDark]]'&gt;
 &lt;div class='headerShadow'&gt;
 &lt;span class='siteTitle' refresh='content' tiddler='SiteTitle'&gt;&lt;/span&gt;&amp;nbsp;
 &lt;span class='siteSubtitle' refresh='content' tiddler='SiteSubtitle'&gt;&lt;/span&gt;
@@ -674,8 +1026,20 @@ Home page: [[paultomlinson.net|http://paultomlinson.net]]</pre>
 <div title="SiteTitle" modifier="Paul" created="200910311901" changecount="1">
 <pre>Torpor</pre>
 </div>
-<div title="StyleSheet" modifier="Paul Tomlinson" created="200911010521" modified="200911010522" changecount="3">
-<pre>.tiddler { border: 1px solid [[ColorPalette::TertiaryLight]]; margin-bottom: 1em; padding-bottom: 0.5em; }</pre>
+<div title="StyleSheet" modifier="Paul Tomlinson" created="200911010521" modified="200911011526" changecount="5">
+<pre>.tiddler { border: 1px solid [[ColorPalette::TertiaryLight]]; margin-bottom: 1em; padding-bottom: 0.5em; }
+.footer { color: [[ColorPalette::TertiaryMid]]; text-align: center; }</pre>
+</div>
+<div title="Supported Persistence Engines" modifier="Paul Tomlinson" created="200911030615" modified="200911030647" changecount="12">
+<pre>| !Repository Type | ~Repository Version | !Torpor Name* | !Torpor Version | !Torpor Class(.php) |h
+| ~MySQL | 5.0+ | ~MySQL | 1.0 | [[MySQLDataStore|Class: MySQLDataStore]] |
+|~|~| ~MySQLi | //future// | -- |
+| Postgres | * | Postgres | 1.0.x (&gt; 1.0) | -- |
+| ODBC | * | ODBC | //future// | -- |
+| Oracle | 10g+ | Oracle&lt;br/&gt;OCI | 1.0 | [[OracleDataStore|Class: OracleDataStore]] |
+| ~SQLite | 3 | ~SQLite | 1.0 | [[SQLiteDataStore|Class: SQLiteDataStore]] |
+| SQL Server | 2005+ | ~SQLServer&lt;br/&gt;MSSQL | 1.0 | [[MSSQLDataStore|Class: MSSQLDataStore]] |
+ *Names are case-insensitive in XML settings.</pre>
 </div>
 <div title="simple_sample.xml" modifier="Paul Tomlinson" created="200911010320" modified="200911010332" changecount="2">
 <pre>&lt;html&gt;
