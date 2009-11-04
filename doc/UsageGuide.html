@@ -525,7 +525,7 @@ Also see [[AdvancedOptions]]</pre>
 * [[Qcodo|http://www.qcodo.com/]]
 * [[WikiPedia list of PHP ORM|http://en.wikipedia.org/wiki/List_of_object-relational_mapping_software#PHP]]</pre>
 </div>
-<div title="Appendix" modifier="Paul Tomlinson" created="200911030624" modified="200911030654" changecount="5">
+<div title="Appendix" modifier="Paul Tomlinson" created="200911030624" modified="200911030710" changecount="6">
 <pre># Class / Interface References
 ** [[Column|Class: Column]]
 ** [[CriteriaBase|Calss: CriteriaBase]]
@@ -546,6 +546,7 @@ Also see [[AdvancedOptions]]</pre>
 ** [[Torpor|Class: Torpor]]
 ** [[TorporCache|Interface: TorporCache]]
 *** [[TorporMemcache|Class: TorporMemcache]]
+# [[Document Revision|Revision]]
 # [[Supported Persistence Engines]]</pre>
 </div>
 <div title="CRUD" modifier="Paul Tomlinson" created="200911021745" changecount="1">
@@ -594,13 +595,212 @@ Up: [[Configuration]]
 Previous: [[Repository|Config: Repository]]
 Next: [[Repository|Config: Repository]] / [[DataStore|Config: DataStore]]</pre>
 </div>
-<div title="Config: Columns" modifier="Paul Tomlinson" created="200911021434" modified="200911021443" changecount="2">
-<pre>Up: [[Configuration]]
+<div title="Config: Columns" modifier="Paul Tomlinson" created="200911021434" modified="200911032209" changecount="13">
+<pre>Like {{{Grids}}}, the {{{Columns}}} element only serves to contain individual {{{Column}}} entities.
+
+{{{Column}}} entities are the data / field members of the owning {{{Grid}}}.  It also has more attributes than any other element in the entire document (though all but 2 are optional):
+&lt;html&gt;&lt;font face=&quot;monospace&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Column&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;class&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;PasswordColumn&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;PASSWORD&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;default&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;encoding&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;ISO-8859-1&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;generatedOnPublish&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;false&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;length&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;32&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;name&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;Password&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;nullable&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;false&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;precision&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;0&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;readOnly&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;false&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;varchar&amp;quot;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;/font&gt;&lt;/html&gt;
+
+Not all of these apply in every situation ({{{precision}}} has no bearing on non-numeric {{{type}}} values, for instance), but there's no harm in providing them in those cases - they will simply be ignored.  {{{Column}}} elements contain no other entities and no simple content (as contained between opening and closing tags).  Only the attributes matter, and their definition is as follows:
+
+!!{{{dataName}}} and {{{name}}}
+These follow the same conventions described for {{{//Grid@dataName}}} (see [[Grids|Config: Grids]]), both in construction and meaning to Torpor.
+
+!!{{{class}}}
+Default: ''(empty)''
+Type: ''string''
+Usage: ''optional'' (''required'' if {{{type}}} is set to &quot;''class''&quot;)
+
+This is the PHP class which should be instantiated for this {{{Column}}} when the containing {{{Grid}}} is created.  This will override all other class settings if provided, whether from a {{{DataTypeMap}}} or the overarching {{{ColumnClass}}}.  This must be a valid PHP class name or the special keyword &quot;''none''&quot; which opts the Column out of all {{{DataTypeMap}}} specifications, whereupon it will make use of the global {{{ColumnClass}}} definition.
+
+!!{{{default}}}
+Default: ''(empty)''
+Type: ''string''
+Usage: ''optional''
+
+The contents of &quot;default&quot; will be the initial data value of this column upon instantiation.  Note that this //does// count as a data assignment event and the column //will// be marked as modified for publishing purposes.  This value will also be used if {{{reset()}}} is called on the column, rather than moving all the way to a null value (and will again be marked as having been modified in that state).
+
+!!{{{encoding}}}
+Default: ''(empty)''
+Type: ''string''
+Usage: ''optional''
+
+This specifies the  encoding into which the contents of a string should be translated upon assignment in PHP.  
+With no value set, no encoding translation will take place beyond PHP internal defaults, and strlen will be used for all length assessments.  If provided, the ''Multibyte String'' extension must be available to be useful (otherwise the value will be ignored, and an {{{E_USER_WARNING}}} generated), and this value must correspond to one of the values returned by {{{mb_list_encodings()}}}.  All incoming data will be subjected to {{{mb_convert_encoding()}}} to be explicitly set the internal encoding in order to be safe for use with the repository.  Note that in order to be used properly, some encoding types require that the locale be set prior to use and will affect the outcome of the conversion.
+
+!!{{{generatedOnPublish}}}
+Default: ''false''
+Type: ''boolean''
+Usage: ''optional''
+
+Indicates late-binding data, potentially populated only once the record is published to the data store.  This special designation allows the repository adapter to populate the column value, and for Grid objects to associate with one another prior to publishing, maintain that association (this time with data) after publishing, and use it to trace dependencies to publish in a cascade fashion (assuming {{{PublishDependencies}}} is set to true).  It is still possible to manually populate this data as well.  This designation can be used for multiple columns in the same {{{Grid}}}, and columns of any data type.
+
+!!{{{length}}}
+Default: ''-1''
+Type: ''integer'' (greater than or equal to ''-1'')
+Usage: ''optional''
+
+Values less than zero indicate &quot;unlimited.&quot; zero-length strings are essentially useless and not recommended.  This attribute is enforced during assignment in PHP: data beyond this length will be truncated and an {{{E_USER_WARNING}}} will be generated.  If {{{encoding}}} is set and the ''Multibyte String'' extension is available, {{{mb_strlen()}}} is used to measure data length in number of characters; otherwise this will fall back to {{{strlen()}}}, which will almost certainly measure multi-byte strings in bytes instead of characters and may thus result in unintentional truncation for strings of sufficient length that are multi-byte encoding.
+
+This attribute applies only to {{{binary}}}, {{{char}}}, {{{varchar}}}, and {{{text}}} type {{{Column}}} elements.
+
+!!{{{nullable}}}
+Default: ''true''
+Type: ''boolean''
+Usage: ''optional''
+
+This indicates whether the {{{Column}}} may be assigned a literal PHP null.  Note that 0 (zero) or &quot;&quot; (empty string) do not count as null values during assignment.  Regardless of this setting, a newly instantiated Column object (or a linked column to another Column which has not yet been provided with its data) may contain null by virtue of not having yet been assigned.  In order to differentiate between a {{{nullable}}} {{{Column}}} which has not been assigned and one that has been assigned with a null value, the {{{Column::hasData()}}} method may be used.
+
+!!{{{precision}}}
+Default: ''0'' (zero)
+Type: ''integer'' (signed)
+Usage: ''optional''
+
+This only has bearing on numeric {{{Column}}} types, and will simply be ignored in other contexts.  This refers to the number of decimal places OR the order of magnitude available to the data.  Order of magnitude is specified by making this negative (a precision of -2 for example will convert a number like ''12345'' to ''12300'' - with rounding at the point of truncation).  The default value is 0, so it is imperative that this be explicitly set for all floating point numeric data types.  {{{E_USER_WARNING}}} messages will be generated whenever truncation or loss of precision of incoming data occurs.
+
+!!{{{type}}}
+Default: ''(none)''
+Type: ''enumeration'' (see below)
+Usage: ''required''
+
+This describes the data type as it will be represented within PHP.  It is possible, through the use of {{{Column::*PersistData}}} hooks, to support a disconnect between the repository data type and PHP data type.  Examples would include a database column of {{{CHAR(1)}}} or {{{INT}}} being used as a logical boolean, which can be treated within Torpor and PHP as a literal boolean but correctly filter/map back to the database conventions and limitations.  More on this can be found in the [[Extension]] documentation.
+
+There are several different types allowed:
+* ''binary:'' validates content byte length only, used to store raw data or file contents
+* ''bool:'' literal boolean value, evaluates to/from true/false in PHP
+* ''char:'' character/text data of variable encoding
+* ''class:'' specifies that a different class will be used to represent this {{{Column}}}, sufficient to perform all necessary validation.  It is not required to have this value for any {{{Column}}} definitions with a {{{class}}} attribute defined. It should only be used when there is no need for extra type-hinted or controlled validation (including content length) outside of what the specified {{{class}}} will provide (which is a required attribute when this is set)
+* ''date:'' stores date content in {{{YYYY-MM-DD}}} (PHP {{{date()}}} function argument {{{Y-m-d}}} is equivalent) format (where '-' may be omitted or any one of of {{{, . -}}} or {{{/}}} ).  Note that while structure will be validated, it is possible to specify out of range dates (such as February 31st) that may fail when it reaches the data store.  For full validation and useful utility methods it is highly recommended to wrap this in a {{{Column}}} extending class to expose/provide those features
+* ''datetime:''' A concatenation of the {{{date}}} and {{{time}}} validations, separated by a single optional whitespace character
+* ''float:'' floating point number, enforced as native {{{float}}} in PHP
+* ''integer:'' signed integer number, enforced as native {{{int}}} in PHP
+* ''text:'' character/text data of variable encoding, synonymous with char or varchar types
+* ''time:'' 24-hour formatted time value with leading zeros, accepting {{{, :}}} or {{{-}}} as the separator: {{{HH:MI:SS}}} (PHP {{{date()}}} function argument {{{H:i:s}}} is equivalent).  Valid times are required, but beyond that there are no native utility operations for manipulating this value or translating it into other formats.  It is highly recommended to wrap this in an extending clss to expose/provide those features.
+* ''unsigned:'' unsigned integer number, used as the native PHP {{{int}}} with the addition of the unsigned enforcement (greater than or equal to zero)
+* ''varchar:'' character/text data of variable encoding, synonymous with char or text types
+
+
+Up: [[Configuration]]
 Previous: [[Grids|Config: Grids]]
 Next: [[Grids|Config: Grids]] / [[Commands|Config: Commands]]</pre>
 </div>
-<div title="Config: Commands" modifier="Paul Tomlinson" created="200911021435" modified="200911021444" changecount="3">
-<pre>Up: [[Configuration]]
+<div title="Config: Commands" modifier="Paul Tomlinson" created="200911021435" modified="200911040647" changecount="21">
+<pre>The {{{Commands}}} element is yet another simple plural-entity container that has no features or attributes in and of itself, and it is the {{{Command}}} that proves worthwhile.
+
+All qualifying {{{Command}}} entries will be executed by the ~DataStore in the order in which they are defined based on {{{type}}}, and conditionally on {{{context}}}.  This is an operation of the native ~DataStore implementations, but not a hard rule - other extensions or custom classes may implement this differently.
+
+''NOTE:'' this only applies to the generic {{{Delete}}}, {{{Load}}}, and {{{Publish}}} operations.  ~DataStore operations based on custom criteria and the like are still dynamically assembled.  In order to override that behavior individual [[PersistenceCommand|Class: PersistenceCommand]] objects or custom views should be used.
+
+!Attributes
+{{{Command}}} has 2 enclosed element types and 2 attributes, only 1 of which is required:
+!!{{{type}}}
+Default: ''(none)''
+Type: ''enumeration: delete, load, publish''
+Usage: ''required''
+
+This tells the ~DataStore handler the operations this {{{Command}}} is intended to replace (future releases are planning to support an optional augmentation pattern rather than replacement, which will be backward compatible).  For each of these enumerations the corresponding ~DataStore will rely on this (or these) elements instead.  There may be an unlimited number of {{{delete}}} and {{{publish}}} operations, however only a single {{{load}}} element is supported.  This is enforced within the ~DataStore class rather than the XML, and while this is a limitation of the [[native DataStore handlers|Supported Persistence Engines]] it is not a constraint on their implementation per se - extensions or alternate handlers may work differently.
+
+''NOTE:'' any command returning results are expected to do so according to the Torpor naming conventions for the populated {{{Columns}}}.  Even if the {{{dataName}}} is used, it will still need to be represented in the sanitized key version: {{{UserName}}} or {{{USER_NAME}}} both become {{{USERNAME}}} in this case.  See ''Examples'' below.
+
+!!{{{context}}}
+Default: ''(none)''
+Type: ''enumeration: all, existing, new''
+Usage: ''optional''
+
+This differentiates between the ''Create'' and/or ''Update'' operations (of standard [[CRUD]] options) for any {{{Command}}} where {{{type=&quot;publish&quot;}}}.  {{{new}}} applies only to ''Create'' activity, likewise {{{existing}}} applies only to ''Update'' operations, while ''all'' applies to both equally.  While technically optional, the native ~DataStore adapters examine this values to determine whether or not to include the {{{Command}}} in the list to execute.  An absent attribute will cause it to be omitted.  {{{context}}} is ignored when {{{type}}} is {{{delete}}} or {{{load}}}.
+
+!Elements
+!!{{{CommandText}}}
+This contains the body of the {{{Command}}} to be executed by the ~DataStore as simple content, which in some cases may make sense to encapsulate as {{{&lt;![CDATA[]]&gt;}}}.  It also maintains 2 optional attributes:
+!!!{{{placeholder}}}
+Default: ''?''
+Type: ''string''
+Usage: ''optional''
+
+The {{{placeholder}}} is the generic character found within the {{{CommandText}}} simple content that the ~DataStore will search for when making replacements or insertions based on unnamed {{{CommandParameter}}} elements.
+!!!{{{type}}}
+Default: ''(none)''
+Type: ''string''
+Usage: ''optional''
+
+Provided only for convenience, in case the ~DataStore needs to differentiate between invocation styles (SQL versus stored procedures, for example).  There are no pre-set values, and none of the native ~DataStore adapters use this - it is purely for convenience in extension.
+
+!!{{{CommandParameter}}}
+An optional, unlimited list of parameters to be combined with the {{{CommandText}}} via named (and/ordered) placeholders to compose the final command and/or its arguments.  This has no content in and of itself and should be treated as a self closing tag with 2 attributes:
+!!!{{{column}}}
+Default: ''(none)''
+Type: ''string''
+Usage: ''required''
+
+The name of a {{{Column}}} (corresponding to either the {{{dataName}}} or {{{name}}} fo the {{{Column}}}, depending on which has been defined) which is to be the stand-in object (for bind variables) or the source of data (for simple parsing) when the {{{CommandText}}} is evaluated for execution.
+!!!{{{placeholder}}}
+Default: ''?''
+Type: ''string''
+Usage: ''optional''
+
+If provided, this is the value which will be replaced (or the point at which the insertion will take place) by the specified {{{column}}} during preparation or execution.  If this is not distinct (such as is the case with the default ''?'' value) it will be inserted at the Nth placeholder corresponding to its order in the list.  If this //is// distinct, the insertion will take place at specifically that location without other qualification.  Note that the native ~DataStore adapters do simple pattern matching and expect but do not force word boundaries, thus is would be unwise to use {{{placeholder}}} values which are potentially sub-strings of other {{{CommandText}}} content.
+
+!Examples
+!!!~MySQL, simple order-based explicit placeholder {{{load}}} type
+&lt;html&gt;&lt;font style=&quot;font-family: monospace;&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Command&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;load&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;CommandText&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;placeholder&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;?&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;SELECT&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Id AS USERID,&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Name AS USERNAME,&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Password AS PASSWORD&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;FROM merged_user_view&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;WHERE Id = HEX( ? );&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/CommandText&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;CommandParameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;UserID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Command&amp;gt;&lt;/font&gt;&lt;/font&gt;&lt;/html&gt;
+
+!!!~MySQL, simple order-based implicit placeholder {{{publish}}} type
+&lt;html&gt;&lt;font style=&quot;font-family: monospace;&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Command&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;publish&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;context&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;all&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;CommandText&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;&amp;lt;![&lt;/font&gt;&lt;font color=&quot;#CCCC00&quot;&gt;CDATA&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;[&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;REPLACE INTO users SET&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Id&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; = HEX( ? ),&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Name&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; = ?,&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Password = ?;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;]]&amp;gt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/CommandText&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;CommandParameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;UserID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;CommandParameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;UserName&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;CommandParameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;Password&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Command&amp;gt;&lt;/font&gt;&lt;/font&gt;&lt;/html&gt;
+
+!!!~MySQL, named placeholder {{{publish}}} type of restricted {{{context}}}
+&lt;html&gt;&lt;font style=&quot;font-family: monospace;&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Command&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;public&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;context&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;existing&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;CommandText&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;&amp;lt;![&lt;/font&gt;&lt;font color=&quot;#CCCC00&quot;&gt;CDATA&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;[&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;UPDATE users SET&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Id&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; = HEX( :id ),&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Name&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; = :name,&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Password = :password&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;ON DUPLICATE KEY UPDATE&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Id = Id + VALUE( Id );&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#990000&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;]]&amp;gt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/CommandText&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;CommandParameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;UserID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;placeholder&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;:id&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;CommandParameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;UserName&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;placeholder&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;:name&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;CommandParameter&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;Password&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;placeholder&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;:password&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Command&amp;gt;&lt;/font&gt;&lt;/font&gt;&lt;/html&gt;
+
+While these examples are ~MySQL specific (and not especially efficient in what they propose to do), they do at least serve to illustrate the utility of being able to specify custom structures and approaches to the ~DataStore internals for repository management, especially when one keeps in mind that multiple {{{delete}}} or {{{publish}}} entries may exist, chaining a series of commands together or acting as virtual triggers.  Stored procedure execution would follow a similar vein as outlined above.
+
+Up: [[Configuration]]
 Previous: [[Grids|Config: Grids]] / [[Columns|Config: Columns]]
 Next: [[Grids|Config: Grids]] / [[DataTypeMap|Config: DataTypeMap]]</pre>
 </div>
@@ -665,8 +865,62 @@ Up: [[Configuration]]
 Previous: [[Options|Config: Options]]
 Next: [[Repository|Config: Repository]] or [[Grids|Config: Grids]] / [[Keys|Config: Keys]]</pre>
 </div>
-<div title="Config: Grids" modifier="Paul Tomlinson" created="200911021432" modified="200911021443" changecount="3">
-<pre>Up: [[Configuration]]
+<div title="Config: Grids" modifier="Paul Tomlinson" created="200911021432" modified="200911031630" changecount="13">
+<pre>The required {{{Grids}}} element's sole purpose is to contain one or more {{{Grid}}} entities.  It has no attributes or other options, and does not matter if there's only one {{{Grid}}}; this is where it goes.
+
+Individual {{{Grid}}} entries are far more interesting:
+&lt;html&gt;&lt;font face=&quot;monospace&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Grid&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;class&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;MyUserClass&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;USERS&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;name&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;User&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;readOnly&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;false&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;data&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;/font&gt;&lt;/html&gt;
+
+Of course this isn't much use without [[Columns|Config: Columns]], and not every attribute is required, but this is where we start to get into the substance of the Torpor object factory.  Definitions and requirements of the attributes follow:
+!!{{{dataName}}}
+Default: ''(none)''
+Type: ''string''
+Usage: ''required''
+
+This is the only required attribute of {{{Grid}}}, used to identify the source of records of this Grid type to the ~DataStore engine.  This will also serve as the object type name in PHP unless {{{name}}} is also provided.
+
+!!{{{class}}}
+Default: ''(none)''
+Type: ''string''
+Usage: ''optional''
+
+A name of a PHP class that will overwrite the {{{GridClass}}} optional value for all instances of this grid, such that whenever new instances are created they will be manufactured as this type of object.  Note that this is not the same as {{{TypedGridClasses}}}, as this class name will not be automatically created by Torpor.  Nor is it required when using {{{TypedGridClasses}}} to place an entry here for every {{{Grid}}} corresponding to the grid-cum-class name, unless you want to override the automatically inferred class name.
+
+!!{{{name}}}
+Default: ''(none)''
+Type: ''string''
+Usage: ''optional''
+
+This is used to differentiate this {{{Grid}}} by something other than the {{{dataName}}} value.  It is recommended that this be a singular name, in order to avoid confusion in the API invocations.  If provided, this is the name by which it will be identified throughout the remainder of the configuration as well: any reference keys identifying this {{{Grid}}} need to use this value.  The Torpor style key, derived from either this or {{{dataName}}}, must be unique among all grids.
+
+Eample: a recommended {{{name}}} value for a {{{Grid}}} with a name like {{{USER_ACCOUNTS}}} would be along the lines of {{{UserAccount}}}, in order to make the instantiation more explicit:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
+&lt;span style=&quot;color: #0000BB&quot;&gt;$user_account&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;UserAccount&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$all_accounts&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;UserAccountSet&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user_account&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$torpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newUserAccount&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;etc.&lt;br /&gt;//&amp;nbsp;vs.&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user_account&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;UserAccounts&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$all_accounts&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;UserAccountsSet&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user_account&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$torpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newUserAccountsSet&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;//&amp;nbsp;etc.&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+Pluralities are very distracting generally.  The new {{{name}}} need not have anything to do with the {{{dataName}}} either - these may be completely differentiated.
+
+!!{{{readOnly}}}
+Default: ''false''
+Type: ''boolean''
+Usage: ''optional''
+
+Indicates that this grid will only be populated by the ~DataStore (and only from {{{&lt;Object&gt;Set}}} operations), and will never be published; attempting to do so will result in an exception).
+
+''This feature is not fully implemented, and is here as a placeholder for future development.''
+
+!!{{{type}}}
+Default: ''data''
+Type: ''enumeration: data, map''
+Usage: ''optional''
+
+Describes whether this {{{Grid}}} will contain pertinent records in their own right, or whether it serves solely as the glue between other {{{Grids}}} in a one- or many- to-many relationships.  Valid values are ''data'' (individual records) or ''map''.  For a ''map'' type Grid, all columns must either comprise the {{{Primary}}} key and be used in some {{{Foreign}}} key definition, or have suitable default values  Only under these circumstances is it possible to automatically maintain the contents based on Torpor activity.
+
+''This feature is not fully implemented, and is here as a placeholder for future development.''
+
+
+Up: [[Configuration]]
 Previous: [[Repository|Config: Repository]] / [[DataStore|Config: DataStore]]
 Next: [[Grids|Config: Grids]] / [[Columns|Config: Columns]]</pre>
 </div>
