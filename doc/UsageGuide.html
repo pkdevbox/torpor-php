@@ -840,8 +840,8 @@ Up: [[Configuration]]
 Previous: [[Repository|Config: Repository]] / [[Cache|Config: Cache]]
 Next: [[Grids|Config: Grids]]</pre>
 </div>
-<div title="Config: DataTypeMap" modifier="Paul Tomlinson" created="200911021425" modified="200911030438" changecount="12">
-<pre>The {{{DataTypeMap}}} entry is completely optional.  It may be used either as the last entity in [[Options|Config: Options]] entity where it will apply to every mapped Column type on every Grid, or it may be defined per-Grid or as the second-to-last member of the [[Grid|Config: Grids]] entity.  Its purpose is to instruct Torpor to instantiate every Column of a specific data type as a particular class.  This is especially useful for providing additional handlers, hooks (such as the {{{PersistData}}} hooks), validation, or other generally useful utility routines to particular data types (transparent encryption/decryption is a good example).
+<div title="Config: DataTypeMap" modifier="Paul Tomlinson" created="200911021425" modified="200911051409" changecount="13">
+<pre>The {{{DataTypeMap}}} entry is completely optional.  It may be used either as the last entity in [[Options|Config: Options]] where it will apply to every mapped Column type on every Grid, or it may be defined per-Grid or as the second-to-last member of the [[Grid|Config: Grids]] entity.  Its purpose is to instruct Torpor to instantiate every Column of a specific data type as a particular class.  This is especially useful for providing additional handlers, hooks (such as the {{{PersistData}}} hooks), validation, or other generally useful utility routines to particular data types (transparent encryption/decryption is a good example).
 
 Whatever class name is provided here will be created as a new object using the PHP {{{new}}} keyword with the following arguments:
 &lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;&lt;span style=&quot;color: #007700&quot;&gt;new&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$class&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&lt;br /&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Torpor&amp;nbsp;$torporInstance&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;,&lt;br /&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;(string)&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$columnName&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;,&lt;br /&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;SimpleXML&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$columnXml&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;,&lt;br /&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;Grid&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$grid&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
@@ -924,13 +924,111 @@ Up: [[Configuration]]
 Previous: [[Repository|Config: Repository]] / [[DataStore|Config: DataStore]]
 Next: [[Grids|Config: Grids]] / [[Columns|Config: Columns]]</pre>
 </div>
-<div title="Config: Keys" modifier="Paul Tomlinson" created="200911021436" modified="200911021444" changecount="2">
-<pre>Up: [[Configuration]]
+<div title="Config: Keys" modifier="Paul Tomlinson" created="200911021436" modified="200911051418" changecount="3">
+<pre>Keys are used to define how one {{{Grid}}} may relate to others and the repository.  The main {{{Keys}}} element is simply a container for each of the different individual key types that may defined, and has no options or attributes itself.  It is considered optional, but is highly recommended - a {{{Grid}}} without any {{{Keys}}} defined can only be retrieved by constructing Criteria for searching, and any object that is retrieved will not be able to update.
+
+There are 3 different key types supported:
+* [[Foreign|Config: Keys: Foreign]]
+* [[Primary|Config: Keys: Primary]]
+* [[Unique|Config: Keys: Unique]]
+
+Up: [[Configuration]]
 Previous: [[Grids|Config: Grids]] / [[DataTypeMap|Config: DataTypeMap]]
 Next: [[Grids|Config: Grids]] / [[Keys|Config: Keys]] / [[Foreign|Config: Keys: Foreign]]</pre>
 </div>
-<div title="Config: Keys: Foreign" modifier="Paul Tomlinson" created="200911021436" modified="200911021444" changecount="2">
-<pre>Up: [[Configuration]]
+<div title="Config: Keys: Foreign" modifier="Paul Tomlinson" created="200911021436" modified="200911051523" tags="example" changecount="14">
+<pre>The {{{Foreign}}} element has no attributes nor simple-content of its own, and serves only as a container for one or more {{{Key}}} elements here defined.
+
+{{{Foreign}}} type {{{Key}}} entries determine how this {{{Grid}}} can relate to any others that have been defined.  This is done by listing one or more {{{Key}}} elements indicating what {{{Column}}} here refers to what {{{Column}}} on another {{{Grid}}}, and optionally in what context.
+
+For a reference to be viable, all {{{Key}}} elements referring to a target {{{Grid}}} must fully satisfy a unique identification of that {{{Grid}}}.  This is the case when either the {{{Primary}}} definition is fully represented here, or at least one complete {{{Unique}}} key definition.  This includes multiple-column keys: if a referenced {{{Grid}}} has a multi-column {{{Primary}}} key definition, this {{{Grid}}} would require multiple {{{Foreign}}} type {{{Key}}} entries, one per {{{Column}}}, to satisfy the relationships.  Same goes for {{{Unique}}} keys.
+
+Note that this is grouped by context as well: a multi-column reference to another {{{Grid}}} as a particular {{{referenceGridAlias}}} would require that all {{{Key}}} entries share the same {{{referenceGridAlias}}} value.
+
+There is no simple-content (as enclosed between starting and ending tags), and only 4 possible attributes (2 of which are optional).  This should be treated as a self-closing tag.
+
+!Attributes
+!!{{{column}}}
+Default: ''(none)''
+Type: ''string''
+Usage: ''required''
+
+This must match the {{{dataName}}} (or {{{name}}}, if defined) of a {{{Column}}} on this {{{Grid}}} and indicates the starting point of the reference.
+
+!!{{{referenceColumn}}}
+Default: ''(none)''
+Type: ''string''
+Usage: ''optional''
+
+This must match the {{{dataName}}} (or {{{name}}}, if defined) or a {{{Column}}} on the {{{Grid}}} to which this {{{Key}}} refers.  It is only optional when the source {{{Column}}} and target {{{Column}}} are identically named and so the rest of the relationship can be inferred.
+
+!!{{{referenceGrid}}}
+Default: ''(none)''
+Type: ''string''
+Usage: ''required''
+
+This must match the {{{dataName}}} (or {{{name}}}, if defined) of the {{{Grid}}} to which this {{{Key}}} refers.
+
+!!{{{referenceGridAlias}}}
+Default: ''(none)''
+Type: ''string''
+Usage: ''required''
+
+One of the more powerful features of Torpor, this allows the referenced {{{Grid}}} to adopt a named context for access.  This means that, for example, an {{{Order}}} object can have a reference key to {{{User}}} without qualification, in which case {{{$order-&gt;getUser();}}} will product a {{{User}}} object, and at the same time may also have a reference key to {{{User}}} with a {{{referenceGridAlias}}} value of {{{Seller}}}, in which case {{{$order-&gt;getSeller();}}} will //also// produce a {{{User}}} object though this time corresponding to the different key (the reciprocal {{{set}}} methods also work in this fashion).
+
+!Examples
+
+These 2 simple {{{Grid}}} definitions show simple relationship definitions, from ''credit'' to ''entity''.  Note that the ''~SourceID'' reference to ''entity.~EntityID'' does //not// include a {{{referenceGridAlias}}} attribute.  This means both that {{{$credit-&gt;getEntity();}}} will automatically use ''~SourceID'' to find the related ''entity'' record, and that {{{$credit-&gt;getSource();}}} will ''//not//'' work because there is no ''source'' type {{{Grid}}} referenced nor alias defined by which to find such an object.
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace; white-space: nowrap;&quot;&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Grid&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;credit&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Columns&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Column&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;CreditID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;integer&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;generatedOnPublish&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;true&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Column&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;SourceID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;integer&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Column&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;RecipientID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;integer&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Column&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;Amount&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;float&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;precision&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;2&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Column&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;DateDeposited&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;date&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Columns&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Keys&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Foreign&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Key&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;SourceID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;referenceGrid&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;entity&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;referenceColumn&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;EntityID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Key&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;RecipientID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;referenceGrid&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;entity&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;referenceGridAlias&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;Recipient&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;referenceColumn&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;EntityID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Foreign&amp;gt;&lt;/font&gt;&lt;br&gt;
+
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Primary&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Key&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;CreditID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Primary&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Keys&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Grid&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Grid&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;entity&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Columns&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Column&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;EntityID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;integer&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;precision&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;10&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;generatedOnPublish&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;true&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Column&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;Name&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;varchar&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;length&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;50&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;nullable&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;true&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;encoding&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;ISO-8859-1&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Column&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;dataName&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;Description&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;type&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;text&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;nullable&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;true&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;length&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;65535&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;encoding&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;ISO-8859-1&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Columns&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Keys&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Primary&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;Key&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;font color=&quot;#009900&quot;&gt;column&lt;/font&gt;=&lt;font color=&quot;#990000&quot;&gt;&amp;quot;EntityID&amp;quot;&lt;/font&gt;&lt;font color=&quot;#5555CC&quot;&gt;/&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Primary&amp;gt;&lt;/font&gt;&lt;br&gt;
+&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Keys&amp;gt;&lt;/font&gt;&lt;br&gt;
+&lt;font color=&quot;#5555CC&quot;&gt;&amp;lt;/Grid&amp;gt;&lt;/font&gt;&lt;/span&gt;&lt;/html&gt;
+
+Automatically available operations from this relationship:
+
+&lt;html&gt;&lt;span style=&quot;color: #000000; font-family: monospace;&quot;&gt;
+&lt;span style=&quot;color: #0000BB&quot;&gt;$entity&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$credit&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getEntity&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$entity&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$credit&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getRecipient&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$entity&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$credit&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newEntity&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$entity&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$credit&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newRecipient&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$credit&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$entity&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newCredit&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$credit&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$entity&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newCreditFromRecipient&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;br/&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$creditSet&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$entity&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getCreditSet&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$creditSet&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$entity&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getCreditSetFromRecipient&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+
+
+Up: [[Configuration]]
 Previous: [[Grids|Config: Grids]] / [[Keys|Config: Keys]]
 Next: [[Grids|Config: Grids]] / [[Keys|Config: Keys]] / [[Primary|Config: Keys: Primary]]</pre>
 </div>
@@ -1240,7 +1338,7 @@ Next: [[Features]]</pre>
 <div title="MarkupPostBody" modifier="Paul Tomlinson" created="200911010514" changecount="1">
 <pre></pre>
 </div>
-<div title="PageTemplate" modifier="Paul Tomlinson" created="200911010500" modified="200911011530" changecount="6">
+<div title="PageTemplate" modifier="Paul Tomlinson" created="200911010500" modified="200911051408" changecount="9">
 <pre>&lt;!--{{{--&gt;
 &lt;div class='header' macro='gradient vert [[ColorPalette::PrimaryLight]] [[ColorPalette::PrimaryDark]]'&gt;
 &lt;div class='headerShadow'&gt;
@@ -1261,9 +1359,8 @@ Next: [[Features]]</pre>
 &lt;div id='messageArea'&gt;&lt;/div&gt;
 &lt;div id='tiddlerDisplay'&gt;&lt;/div&gt;
 &lt;/div&gt;
-&lt;div class='footer' style='margin: 2em; clear: all;'&gt;
-All content provided under the &lt;a href=&quot;http://www.opensource.org/licenses/mit-license.php&quot;&gt;MIT License&lt;/a&gt;, without warranty or other restriction.  Use at your own risk, as you see fit, and allow others to do the same.&lt;br/&gt;
-Visit the &lt;a ref=&quot;http://code.google.com/p/torpor-php&quot;&gt;Torpor home page&lt;/a&gt;.
+&lt;div class='footer' style='margin: 2em; clear: all; width: 50%; margin: 0px auto;'&gt;
+All content provided under the &lt;a href=&quot;http://www.opensource.org/licenses/mit-license.php&quot;&gt;MIT License&lt;/a&gt;, without warranty or other restriction.  Use at your own risk, as you see fit, and allow others to do the same. // Visit us at the &lt;a ref=&quot;http://code.google.com/p/torpor-php&quot;&gt;Torpor home page&lt;/a&gt;.
 &lt;/div&gt;
 &lt;!--}}}--&gt;</pre>
 </div>
