@@ -511,12 +511,14 @@ Also see [[AdvancedOptions]]</pre>
 </div>
 <!--POST-SHADOWAREA-->
 <div id="storeArea">
-<div title="Advanced Usage" modifier="Paul Tomlinson" created="200911021538" modified="200911021850" changecount="4">
+<div title="Advanced Usage" modifier="Paul Tomlinson" created="200911021538" modified="200911071525" changecount="5">
 <pre>!!Sessions
 
-[[TypedGrids|TypedGrid]]
 [[Exceptions]]
-[[Extension]]</pre>
+[[Extension]]
+[[Garbage Collection]]
+[[TypedGrids|TypedGrid]]
+</pre>
 </div>
 <div title="Alternatives" modifier="Paul Tomlinson" created="200910312313" changecount="1">
 <pre>Other PHP ORM abstractions similar to Torpor include:
@@ -556,14 +558,14 @@ Also see [[AdvancedOptions]]</pre>
 *''U''pdate
 *''D''elete</pre>
 </div>
-<div title="ColorPalette" modifier="Paul Tomlinson" created="200910311917" modified="200910311918" changecount="2">
+<div title="ColorPalette" modifier="Paul Tomlinson" created="200910311917" modified="200911071647" changecount="5">
 <pre>Background: #fff
 Foreground: #000
 PrimaryPale: #fc8
 PrimaryLight: #f81
 PrimaryMid: #b40
 PrimaryDark: #410
-SecondaryPale: #cff
+SecondaryPale: #ffd
 SecondaryLight: #fe8
 SecondaryMid: #db4
 SecondaryDark: #841
@@ -1323,7 +1325,7 @@ Next: [[Namespace|Config: Namespace]] (or [[Examples]])</pre>
 <pre>Distribution packages are maintained via the [[Torpor Project Page|http://code.google.com/p/torpor-php/]] on [[Google Code|http://code.google.com]]:
 * http://code.google.com/p/torpor-php/downloads/list</pre>
 </div>
-<div title="Examples" modifier="Paul Tomlinson" created="200911061343" modified="200911061626" changecount="33">
+<div title="Examples" modifier="Paul Tomlinson" created="200911061343" modified="200911071653" changecount="37">
 <pre>The examples in this section will be done using an explicit instance of Torpor as the basis of all operations.  In the [[Advanced Usage]] section the possibility of object instantiation without an explicit factor base is discussed; though it might simplify the examples to use a similar syntax here, the initial configuration and the caveats surrounding TypedGrid use warrant separate consideration and treatment.  The initialization and instantiation of Torpor in the context shown here is simpler and safer, and so will act as the foundation for these examples.
 
 All these examples assume that one of the following has taken place:
@@ -1337,7 +1339,25 @@ All these examples assume that one of the following has taken place:
 &lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
 &lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;initialize&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #DD0000&quot;&gt;'simple_sample.xml'&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
 
-Examples:
+!!A Note About Keywords
+Torpor operations are composed of keywords and modifiers which identify what one is attempting to do, what it's being done to, and the context or manner in which that should be done. This follows a simple syntax such as:
+{{{
+&lt;verb&gt;&lt;ObjectType&gt;[Set][From&lt;ObjectType&gt;]
+}}}
+
+Where {{{&lt;verb&gt;}}} can be any of:
+* {{{add}}}
+* {{{can}}}*
+* {{{get}}}
+* {{{is}}}*
+* {{{map}}}*
+* {{{new}}}
+* {{{set}}}
+({{{can}}} and {{{is}}}, and {{{map}}} don't follow the full syntactical expansion described above and have their own use cases explored elsewhere).
+
+It is recommended to avoid using keywords in object names solely for the purpose of avoiding confusion; the intended operations can still be performed on the target objects successfully, but only by repeating the keywords in the appropriate places which may make some code less readable.  It's also recommended because while Torpor primatives can assure this kind of correct operation, developer or third-party extensions may not provide the same guarantee.
+
+!!Examples:
 # [[The Basics|Examples: Basics]]
 # [[Related Objects|Examples: Related Objects]]
 # [[Collections and Criteria|Examples: Collections and Criteria]]
@@ -1345,7 +1365,7 @@ Examples:
 Previous: [[Configuration]]
 Next: [[The Basics|Examples: Basics]]</pre>
 </div>
-<div title="Examples: Basics" modifier="Paul Tomlinson" created="200911061529" modified="200911061713" changecount="25">
+<div title="Examples: Basics" modifier="Paul Tomlinson" created="200911061529" modified="200911071700" changecount="27">
 <pre>All Torpor operations are based on a simple vocabulary that identifies an action, the object(s) on which to perform the action, and any related object to use in that operation.  This applies to both to {{{Grid}}} objects and any {{{Column}}} members.
 
 !!Your First Object
@@ -1381,6 +1401,13 @@ Again, completely case insensitive and underscore agnostic.  This is because PHP
 
 &lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
 &lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;ID&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;54321&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;ID&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;++;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;ID&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;--;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;ID&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;%=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;4&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;;&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+There are 2 special extensions to the standard access patterns for {{{Column}}} objects of type {{{boolean}}}.  Assuming that we extended {{{User}}} to include a boolean member variable {{{Active}}}, it would be possible to do the following:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
+&lt;span style=&quot;color: #007700&quot;&gt;if(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;IsActive&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;()&amp;nbsp;){&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #FF8000&quot;&gt;/*...*/&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;}&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setActive&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+Where the {{{is&lt;ColumnName&gt;()}}} returns the {{{boolean}}} value of the {{{Column}}}, and the {{{set&lt;ColumnName&gt;()}}} method //with no arguments// (and this is critical, in case the italics didn't give it away) will default to {{{true}}}; a literal //null// or otherwise empty variable still counts as an argument and will be evaluated as a {{{boolean}}} in making the assignment.
 
 !!Working with Column Objects
 Any time one of the {{{get}}} or {{{set}}} operations is invoked, the Grid object (in this case {{{User}}}) determines the intended operation and its member Column object against which to apply that operation by calling the corresponding method no the Column itself.  Direct developer access to Column objects is also possible and encouraged.  This example shows the {{{Grid::hasColumn()}}} method, the {{{Grid::Column()}}} accessor, and the {{{array}}} style iterator interface, all working with Column objects directly ({{{$user-&gt;$columnName}}} is technically a simple {{{get}}} accessor, but fits well with the example).  Note that the Column object also supports the {{{__toString()}}} magical method, implicitly calling {{{getData()}}} to provide the results:
@@ -1449,6 +1476,92 @@ Any attempt to access a member variable which does not exist, in any context, wi
 
 Previous: [[Examples]]
 Next: [[Related Objects|Examples: Related Objects]]</pre>
+</div>
+<div title="Examples: Related Objects" modifier="Paul Tomlinson" created="200911071429" modified="200911071643" changecount="22">
+<pre>Torpor's biggest strength comes not from its automation of [[CRUD]] operations, but it s ability to intelligently associate related objects to one another based on the [[foreign key|Config: Keys: Foreign]] mapping in the configuration file.  Any [[Grid]] that references or is referenced by any other [[Grid]] can be used as a factory to fetch existing or create new instances.
+
+A word of caution: related object fetches //always// work; that is, they always return a {{{Grid}}} object of the appropriate time, and match up any related values between the objects.  That does not mean that the new object is capable of loading (if the column thus referencing it is null, for example) or will be populated with any data.  It's up to the implementing code to make a determination whether or not the new object is viable (the {{{canLoad()}}} method is a good candidate for that).
+
+!!~One-to-One Fetch
+The relationships defined for {{{Order}}} (see [[simple_sample.xml]]) indicate that it maps directly to {{{User}}} based on primary key.  Because of this, {{{Order}}} can refer to at most a single {{{User}}} object (at least in {{{User}}} context; see below for alias handling), and can be used to fetch a single {{{Grid}}} object matching that description.
+
+This makes sense not only from a convenience perspective, but also in terms of safe enforcement of operations.  The following is perfectly valid code:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace&quot;&gt;
+&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getOrderById&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;15243&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setId&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getUserId&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;()&amp;nbsp;);&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+But it's not especially pleasant.  It requires manual instantiation of the new object type and explicit population of the related keys; in contexts where multi-column keys are in use this gets tedious very quickly.  The preferred method of the above is:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
+&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getOrderById&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;15243&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+This is a special use of the {{{get}}} operation.  The Torpor code determines that a {{{get}}} is desired and analyzes the suffix to determine that we're getting something //other// than a {{{Column}}} belonging to this {{{Grid}}} (which means that it is the user's/developer's responsibility to ensure that no {{{Column}}} entries share names with related {{{Grid}}} objects; it's an unlikely collision, but you have been warned), and seeks to determine if the requested object is known to Torpor and a component of the relationships defined for this {{{Grid}}}.  If not, it will throw a {{{TorporException}}}; otherwise, it will pass the call up the stack to the main Torpor instance and request that a {{{Grid}}} matching the description and the association criteria be produced.  No {{{Key}}} columns need be explicitly populated, and out pops our {{{User}}} object on the other end.
+
+Assuming {{{CacheReferencedGrids}}} is set to {{{true}}} in the [[configuration|Config: Options]], {{{Order}}} will also have an internal member variable set aside for {{{User}}}, and repeated calls to {{{getUser()}}} will return the exact same object instance every time.
+
+!!Using Aliases
+{{{Order}}} has a second mapping to {{{User}}}, this time with the {{{referenceGridAlias}}} attribute set to {{{Seller}}}.  This setting provides an alternate name (or context) for this relationship, which is reflected in the invocation pattern:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
+&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getOrderById&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;15243&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getSeller&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+Again with a special {{{get}}} operation, and this time it's for something other than a {{{Column}}} as well as a any known {{{Grid}}} object; but it //does// match the {{{referenceGridAlias}}} setting, that tells us they {{{Key}}} columns involved and ultimately the type of underlying {{{Grid}}} to fetch.
+
+The {{{User}}} object makes a similar reference, this time to itself:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
+&lt;span style=&quot;color: #0000BB&quot;&gt;$userToo&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getReferringUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+Something like this makes it possible to traverse a hierarchy with a simple loop:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace&quot;&gt;
+&lt;span style=&quot;color: #007700&quot;&gt;while(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getReferringUserId&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;()&amp;nbsp;){&lt;br /&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getReferringUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+Note however that this is ''A.'' not very efficient since a repository fetch operation must take place for every object, which then hangs around in memory (see [[Garbage Collection]] in the [[Advanced Usage]] section), and ''B.'' provides no protection against recursion.  The former can be solved in part with a temporary object and an explicit {{{destroy()}}} call, but the latter will require maintaining an identifying list of the {{{Id}}} values traversed to ensure we halt if we encounter a duplicate.
+
+Very few repositories natively support hierarchical queries, and while Torpor does [[support|Supported Persistence Engines]] the data engines themselves, it has no mechanisms for the retrieval of hierarchical data as yet.  Just FYI.
+
+!!Assignment
+As is typical, assignment works in the reverse of retrieval, making use of the {{{set}}} keyword in place of {{{get}}}.  It's a simple practice to assign two objects to one another, where Torpor will set all appropriate {{{Column}}} data between the two based on the relationship:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
+&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setReferringUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$userToo&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setSeller&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$userToo&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+Note that aliases continue to work in these methods as well.
+
+An inevitable question in this type of pattern though, is &quot;What about new objects?&quot;  In most modern persistence layers the {{{Primary}}} key of any record is coupled with the repository itself, and is usually not available until after the object has been {{{Publish()}}}'d.  In Torpor, this is indicated by setting a {{{Column}}}'s {{{generatedOnPublish}}} attribute to {{{true}}}.  This allows us to treat it as though it will eventually have data and maintain the intended relationships even if it's between identities just now (but it's prospects will pick up in the future, it swears).  In order for this to work, the global {{{LinkUnpublishedReferenceColumns}}} must also be set to {{{true}}} (which is also the default):
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
+&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$MyTorpor&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newOrder&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;setUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;(&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;);&lt;span&gt;&lt;/span&gt;&lt;/html&gt;
+
+This works.  A call to {{{$order-&gt;getUser()}}} will return our selfsame {{{User}}} object.  However, a call to {{{$order-&gt;getUserId()}}} will return //null//, because it does not yet have data.  The important thing here is that the //null// it returns belongs to {{{User}}}; because the reference columns have been linked, {{{$order-&gt;UserId}}} implicitly pulls data from {{{$user-&gt;Id}}} to get its answer.  When it has no data as well, //null// is returned.  If, however, it has been populated (through whatever means), then not only does {{{$order-&gt;UserId}}} retrieve that new data but it also sets it for itself and severs the automatic link between the two (assuming that the data is unlikely to change there's no reason to keep redirecting; this can be overridden by setting {{{PerpetuateAutoLinks}}} to {{{true}}}; more information about column-linking can be found in the [[Appendix]] under ''Class References / [[Column|Class: Column]]'').
+
+More importantly, not only does it work, but assuming that the {{{PublishDependencies}}} option is set to {{{true}}} (default), calling {{{$order-&gt;Publish()}}} will flush the entire thing to the repository in the necessary order to satisfy those late-binding data assumptions.  This kind of operation //is// recursive save - if recursion is detected in the process a {{{TorporException}}} will be thrown and the process aborted.  A similar exception will also be thrown if one of the items in the dependency hierarchy cannot publish (lacking required data members, for example).
+
+!!Factories
+Instead of manually creating new objects to associate with one another, just as with the fetch ({{{get}}}) and assignment ({{{set}}}) operations it's possible to create new objects from the relationships themselves ({{{new}}}):
+
+This works from both sides of a &quot;one-to-many&quot; relationship such as we've already been using:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
+&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newSeller&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$userToo&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newReferringUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;/span&gt;&lt;br/&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$userTpp&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newUserFromReferringUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;/span&gt;&lt;br/&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newOrder&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$order&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;newOrderFromSeller&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+Note that the use of aliases is well supported here as well.  In addition to the {{{new}}} keyword, we have also introduced the {{{From}}} modifier keywork.  Since a {{{User}}} type {{{Grid}}} will always be typed as a {{{User}}}, the way to indicate that it should be treated in the {{{Seller}}} context for the creation of a new {{{Order}}} is by concatenating the modifier and the alias-context together: {{{...FromSeller}}}.  Technically it would also be possible to say {{{newOrderFromUser}}}, in case that level of redundancy were desired; however, since the {{{Order}}} -- {{{User}}} relationship is already defined without alias-context qualifier this is purely optional. 
+
+For all objects created using the {{{new}}} methods, those which already contain the referring data will be assigned over to the related columns in the new object automatically.  Those marked as {{{generatedOnPublish}}}, with the global {{{LinkUnpublishedReferenceColumns}}} option set to {{{true}}}, will be associated as linked dependencies just as in the prior example.
+
+!!Sets
+So far all of our examples have dealt with single objects, where the corresponding object on the other side of the operation was unambiguous.  Since we're dealing with one-to-many relationships however, it only makes sense to explore the retrieval of object collections.  A collection of objects in Torpor is referred to as a {{{Set}}}, and is instantiated as a {{{GridSet}}} object (or {{{TypedGridSet}}}, if {{{TypedGridClasses}}} are enabled).  This is not to be confused with the {{{set}}} assignment verb, which will only ever take place at the very beginning of a method.  As referring to a collection, {{{Set}}} will always follow a {{{Grid}}} object name qualifier or alias:
+
+&lt;html&gt;&lt;span style=&quot;font-family: monospace;&quot;&gt;
+&lt;span style=&quot;color: #0000BB&quot;&gt;$orderSet&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getOrderSet&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$orderSet&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getOrderSetFromSeller&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;br /&gt;&lt;br /&gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$userToo&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;=&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;$user&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;-&amp;gt;&lt;/span&gt;&lt;span style=&quot;color: #0000BB&quot;&gt;getUserSetFromReferringUser&lt;/span&gt;&lt;span style=&quot;color: #007700&quot;&gt;();&lt;/span&gt;&lt;/span&gt;&lt;/html&gt;
+
+In these examples, not only are aliases supported, but the {{{From}}} modifier can also be used as with the prior examples.
+
+The use and treatment of collections is covered more extensively in the [[next|Examples: Collections and Criteria]] section, which contain examples for retrieving and manipulating the contents, as well as restricting them to specific subsets.
+
+Previous: [[The Basics|Examples: Basics]]
+Next: [[Collections and Criteria|Examples: Collections and Criteria]]</pre>
 </div>
 <div title="Features" modifier="Paul Tomlinson" created="200911010408" modified="200911022043" changecount="19">
 <pre>Torpor is categorized by the following features:
