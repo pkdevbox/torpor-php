@@ -508,17 +508,13 @@ abstract class ANSISQLDataStore {
 			$orderClauses = array();
 			foreach( $orderBy as $sortSpec ){
 				list( $gridName, $columnName, $order ) = $sortSpec;
-				$orderClauses[] = $this->escapeDataName( $gridName )
-					.'.'.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ) )
-					.' '.(
-							$order == GridSet::ORDER_DESCENDING
-							? 'DESC'
-							: (
-								$order == GridSet::ORDER_RANDOM
-								? 'RANDOM'
-								: 'ASC' 
-							)
-						);
+				if( $order == GridSet::ORDER_RANDOM ){
+					$orderClauses[] = 'RAND()';
+				} else {
+					$orderClauses[] = $this->escapeDataName( $gridName )
+						.'.'.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ) )
+						.' '.( $order == GridSet::ORDER_DESCENDING ? 'DESC' : 'ASC' );
+				}
 			}
 			$sql.= ' ORDER BY '.implode( ', ', $orderClauses );
 		}
@@ -694,9 +690,13 @@ abstract class ANSISQLDataStore {
 			$orderClauses = array();
 			foreach( $orderBy as $sortSpec ){
 				list( $gridName, $columnName, $order ) = $sortSpec;
-				$orderClauses[] = $this->escapeDataName( $gridName )
-					.'.'.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ) )
-					.' '.( $order == GridSet::ORDER_DESCENDING ? 'DESC' : 'ASC' );
+				if( $order == GridSet::ORDER_RANDOM ){
+					$orderClauses[] = 'RAND()';
+				} else {
+					$orderClauses[] = $this->escapeDataName( $gridName )
+						.'.'.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ) )
+						.' '.( $order == GridSet::ORDER_DESCENDING ? 'DESC' : 'ASC' );
+				}
 			}
 			$sql.= ' ORDER BY '.implode( ', ', $orderClauses );
 		}
