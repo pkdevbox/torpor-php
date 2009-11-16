@@ -23,6 +23,7 @@ class TorporMemcache implements TorporCache {
 	public function initialize( array $settings ){
 		$servers = array();
 		foreach( $settings as $key => $value ){
+			$key = strtolower( $key );
 			if( preg_match( '/^server_/', $key ) ){
 				$key = preg_replace( '/^server_(.*)$/', '$1', $key );
 				if( !is_numeric( $value ) ){

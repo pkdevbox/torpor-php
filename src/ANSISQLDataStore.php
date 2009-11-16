@@ -857,7 +857,7 @@ abstract class ANSISQLDataStore {
 						// and use that as a sub-select inclusion/exclusion, eg. $grid.$column [NOT] IN ( SELECT ... )
 						// Need to specify which column of the SET pertains to this column...
 						list( $gridSet ) = $criteria->getArguments();
-						if( !$gridSet->canLoad() && $gridSet->getGridCount() < 1 ){
+						if( !$gridSet->canLoad() && $gridSet->isEmpty() ){
 							$this->throwException( 'GridSet lacks valid content or criteria, cannot continue' );
 						}
 
@@ -904,9 +904,9 @@ abstract class ANSISQLDataStore {
 							$this->throwException( 'Could not determine ideal column to column map between '.$criteriaGridType.' and '.$gridSet->gridType().' in '.$criteria->getType().' criteria' );
 						}
 
-						if( $criteria->isExclusive() && $gridSet->getGridCount() < 1 ){
+						if( $criteria->isExclusive() && $gridSet->isEmpty() ){
 							$gridSet->Load();
-							if( $gridSet->getGridCount() < 1 ){
+							if( $gridSet->isEmpty() ){
 								// Exclusive criteria failed to yield any results; using it as a subselect
 								// would also yield zero results; therefor we need to return either a boolean
 								// TRUE or FALSE condition based on whether or not we have been negated.
@@ -929,13 +929,13 @@ abstract class ANSISQLDataStore {
 								.' FROM '.$this->CriteriaToJoinClause( $gridSet->gridType(), $gridSetCriteria )
 								.( count( $gridSetCriteria->getCriteria() ) > 0 ? ' '.$this->CriteriaToConditions( $gridSet->gridType(), $gridSetCriteria ) : '' );
 						} else {
-							if( !$gridSet->isLoaded() && $gridSet->getGridCount() < 1 ){
+							if( !$gridSet->isLoaded() && $gridSet->isEmpty() ){
 								$gridSet->Load();
 							}
 						}
-						if( $gridSet->getGridCount() > 0 ){
+						if( !$gridSet->isEmpty() ){
 							$columnValues = array();
-							for( $i = 0; $i < $gridSet->getGridCount(); $i++ ){
+							for( $i = 0; $i < $gridSet->getGridCount( false, false ); $i++ ){
 								$columnValues[] = $this->escape( $gridSet->getGrid( $i )->Column( $criteria->getColumnName() )->getPersistData(), true );
 							}
 							$loadedSQL = implode( ', ', $columnValues );
@@ -948,7 +948,7 @@ abstract class ANSISQLDataStore {
 								.'( '
 									.$sql.( $criteria->isNegated() ? ' NOT' : '' ).' ( '.$inclusiveSQL.' )'
 									.' ) AND ( '
-									.$sql.( $critiera->isNegated() ? ' NOT' : '' ).' ( '.$loadedSQL.' )'
+									.$sql.( $criteria->isNegated() ? ' NOT' : '' ).' ( '.$loadedSQL.' )'
 								.' )'
 							.' )';
 						} else {
