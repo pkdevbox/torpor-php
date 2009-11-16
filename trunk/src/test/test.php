@@ -53,7 +53,7 @@ $xmlConfig = <<<XML
 	<Grids>
 		<Grid name="User" dataName="USERS" class="User">
 			<Columns>
-				<Column name="Id" dataName="USER_ID" type="unsigned"/>
+				<Column name="Id" dataName="USER_ID" generatedOnPublish="true" type="unsigned"/>
 				<Column name="ReferringUserId" dataName="REFERRING_USER_ID" type="unsigned"/>
 				<Column name="UserName" dataName="USER_NAME" type="varchar" length="255"/>
 				<Column name="Email" dataName="EMAIL_ADDRESS" type="varchar" length="255"/>
@@ -76,7 +76,7 @@ $xmlConfig = <<<XML
 		</Grid>
 		<Grid name="Order" dataName="ORDERS">
 			<Columns>
-				<Column name="Id" dataName="ORDER_ID" type="unsigned"/>
+				<Column name="Id" dataName="ORDER_ID" generatedOnPublish="true" type="unsigned"/>
 				<Column name="UserId" dataName="USER_ID" type="unsigned"/>
 				<Column name="SellerId" dataName="SELLER_ID" type="unsigned"/>
 				<Column name="Date" dataName="ORDER_DATE" type="datetime"/>
@@ -127,6 +127,7 @@ var_dump( $user->getId() );
 var_dump( $user->getUserName() );
 var_dump( $user->getEmail() );
 var_dump( $user->getPasswordHash() );
+var_dump( $user->GET_PASSWORD_HASH() );
 print( "\n" );
 
 // TODO: test juggling multiple instances or Torpor.
@@ -144,6 +145,8 @@ foreach( $userToo->columnNames() as $column ){
 }
 foreach( $userToo as $columnName => $column ){
 	var_dump( $columnName.' = '.var_export( $column->getData(), true ) );
+	var_dump( $columnName.' = '.$column );
+	var_dump( "$columnName: $column\n" );
 }
 
 print_r( $userToo->dumpArray() );
@@ -182,10 +185,13 @@ foreach( $orderSet as $order ){
 	var_dump( $order->SellerID );
 }
 
+$orderSet = $userToo->getOrderSetFromSeller();
+
 $order = Torpor()->newOrder();
 
 // One-to-one fetch
 $userThree = $order->getUser();
+$userFour = $order->newSeller();
 
 var_dump( get_class( Torpor()->newUser() ) );
 
