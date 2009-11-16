@@ -510,7 +510,15 @@ abstract class ANSISQLDataStore {
 				list( $gridName, $columnName, $order ) = $sortSpec;
 				$orderClauses[] = $this->escapeDataName( $gridName )
 					.'.'.$this->escapeDataName( $this->getTorpor()->dataNameForColumn( $gridName, $columnName ) )
-					.' '.( $order == GridSet::ORDER_DESCENDING ? 'DESC' : 'ASC' );
+					.' '.(
+							$order == GridSet::ORDER_DESCENDING
+							? 'DESC'
+							: (
+								$order == GridSet::ORDER_RANDOM
+								? 'RANDOM'
+								: 'ASC' 
+							)
+						);
 			}
 			$sql.= ' ORDER BY '.implode( ', ', $orderClauses );
 		}
