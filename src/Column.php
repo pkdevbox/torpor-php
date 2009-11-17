@@ -278,7 +278,7 @@ class Column extends PersistableContainer
 			if( !$localOnly ){
 				if( $this->getLinkedColumn()->hasData() ){
 					// Setting data automatically destroys links unless it is instructed otherwise.
-					$this->setData( $this->getLinkedColumn()->getData(), $this->perpetuateLink() );
+					$this->setData( $this->getLinkedColumn()->getData(), $this->perpetuateLink(), true );
 				}
 			}
 		} else {
@@ -477,7 +477,7 @@ class Column extends PersistableContainer
 	}
 
 	// Returns bool to indicate whether data has changed.
-	public function setData( $data, $preserveLink = false ){
+	public function setData( $data, $preserveLink = false, $fromGetData = false ){
 		// TODO: Need a way to set data on an unloaded object without
 		// causing it to getData(), in the event that we're working on
 		// a new object and have nothing to actually fetch.
@@ -488,7 +488,7 @@ class Column extends PersistableContainer
 		$return = false;
 		$data = $this->validate( $data );
 
-		if( $data == $this->getData( true ) ){
+		if( !$fromGetData && $data == $this->getData() ){
 			// If we're setting a null value, even though it's identical to what's
 			// already there it's now because of our intent rather than our convenience
 			// that the data is as it is.  Thus it is only appropriate to indicate that
