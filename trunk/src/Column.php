@@ -342,9 +342,7 @@ class Column extends PersistableContainer
 				: null
 			)
 		);
-		if( $this->hasDefaultData() ){
-			$this->_setDirty();
-		}
+		$this->_setDirty( $this->hasDefaultData() );
 	}
 
 	protected function _setDirty( $bool = true ){
