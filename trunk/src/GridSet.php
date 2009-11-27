@@ -510,6 +510,13 @@ class GridSet extends PersistableContainer implements Iterator {
 		);
 	}
 
+	public function destroy(){ return( $this->__destruct() ); }
+	public function __destruct(){
+		for( $i = 0; $i < $this->getGridCount( false, false ); $i++ ){
+			$this->getGrid( $i )->destroy();
+		}
+		return( true );
+	}
 
 	// Iterator interface implementation for accessing grids
 	public function rewind(){

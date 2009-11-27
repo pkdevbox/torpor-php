@@ -81,4 +81,45 @@ class ThreadCache implements TorporCache {
 		return( serialize( $cacheKey ) );
 	}
 }
+
+class SessionCache extends ThreadCache {
+	public function initialize( array $settings ){
+		if( !session_id() ){
+			if( headers_sent() ){
+				$this->Torpor()->throwExecption( 'Cannot start session for cache management' );
+			}
+			if( !session_start() ){
+				$this->Torpor()->throwException( 'Session registration failed, cannot continue' );
+			}
+		}
+	}
+	public function writeGrid( Grid $grid ){
+		if( !$grid->isLoaded() ){
+			$this->Torpor()->throwException( $this->Torpor()->containerKeyName( $grid ).' grid not loaded (can only cache loaded grids)' );
+		}
+		if( !isset( $_SESSION{ $this->Torpor()->containerKeyName( $grid ) } ) ){
+			$_SESSION{ $this->Torpor()->containerKeyName( $grid ) } = array();
+		}
+		$_SESSION{ $this->Torpor()->containerKeyName( $grid ) }{ $this->makeGridKey( $grid ) } = $grid->dumpArray( true );
+	}
+	public function fetchGrid( Grid $grid ){
+		$return = null;
+		if( $this->hasGrid( $grid ) ){
+			$return = $_SESSION{ $this->Torpor()->containerKeyName( $grid ) }{ $this->makeGridKey( $grid ) };
+		}
+		return( $return );
+	}
+	public function hasGrid( Grid $grid ){
+		return(
+			isset( $_SESSION{ $this->Torpor()->containerKeyName( $grid ) } )
+			&& isset( $_SESSION{ $this->Torpor()->containerKeyName( $grid ) }{ $this->makeGridKey( $grid ) } )
+		);
+	}
+	public function purgeGrid( Grid $grid ){
+		$key = $this->makeGridKey( $grid );
+		if( $this->hasGrid( $grid ) ){
+			unset( $_SESSION{ $this->Torpor()->containerKeyName( $grid ) }{ $key } );
+		}
+	}
+}
 ?>
