@@ -48,6 +48,7 @@ class Torpor {
 	const VERSION = 0.1;
 	const DEFAULT_CONFIG_FILE = 'TorporConfig.xml';
 	const DEFAULT_CONFIG_SCHEMA = 'TorporConfig.xsd';
+	const ENVIRONMENT_CONFIG = 'TORPOR_CONFIG';
 
 	// Options
 	const OPTION_CACHE_REFERENCED_GRIDS  = 'CacheReferencedGrids';
@@ -208,6 +209,9 @@ class Torpor {
 		}
 
 		$xml = '';
+		if( empty( $config ) && getenv( self::ENVIRONMENT_CONFIG ) !== false ){
+			$config = getenv( self::ENVIRONMENT_CONFIG );
+		}
 		if( empty( $config ) ){
 			$config = $this->getFileInPath( self::DEFAULT_CONFIG_FILE );
 		}
@@ -1318,11 +1322,16 @@ class Torpor {
 		// on object inheriting Grid which contain their own references.
 		if( !$this->cachedPrototype( $gridName ) ){
 			$class = ( !is_null( $className ) ? $className : $this->gridClass( $gridName ) );
-			$grid = new $class();
-			$grid->_setTorpor( $this );
-			$grid->_setObjName( $gridName );
-			$this->_newGridColumns( $grid );
-			$this->_newGridParameters( $grid );
+			$grid = null;
+			if( $this->typedGridClasses() ){
+				$grid = new $class( $this );
+			} else {
+				$grid = new $class();
+				$grid->_setTorpor( $this );
+				$grid->_setObjName( $gridName );
+				$this->_newGridColumns( $grid );
+				$this->_newGridParameters( $grid );
+			}
 			$this->cachePrototype( $grid );
 		}
 		$grid = clone( $this->cachedPrototype( $gridName ) );
