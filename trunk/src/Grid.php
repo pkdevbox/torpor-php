@@ -558,6 +558,7 @@ class TypedGrid extends Grid {
 		foreach( array_values( $args ) as $index => $arg ){
 			$primaryKey[ $index ]->setData( $arg );
 		}
+		$this->OnNew();
 	}
 }
 ?>
