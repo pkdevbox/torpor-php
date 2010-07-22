@@ -10,11 +10,11 @@ interface TorporCache {
 }
 
 class ThreadCache implements TorporCache {
-	private static $_instance;
-	private $_torpor;
-	private $_cache = array();
+	protected static $_instance;
+	protected $_torpor;
+	protected $_cache = array();
 
-	private function __construct( Torpor $torpor ){
+	protected function __construct( Torpor $torpor ){
 		$this->_torpor = $torpor;
 	}
 
@@ -56,8 +56,8 @@ class ThreadCache implements TorporCache {
 		}
 	}
 
-	private function Torpor(){ return( $this->_torpor ); }
-	private function makeGridKey( Grid $grid ){
+	protected function Torpor(){ return( $this->_torpor ); }
+	protected function makeGridKey( Grid $grid ){
 		// 1. Get all keys for the grid
 		// 2. Concatenate them together in order
 		//    2.1 All values are prefixed w/-, separated by _
@@ -72,7 +72,8 @@ class ThreadCache implements TorporCache {
 			$keys = $this->Torpor()->allKeysForGrid( $grid );
 		}
 		if( $keys ){
-			foreach( $keys as $key ){
+			for( $i = 0; $i < count( $keys ); $i++ ){
+				$key = $keys[$i];
 				$cacheKey[] = ( $grid->Column( $key )->hasData() ? $grid->Column( $key )->getData() : null );
 			}
 		} else {
@@ -93,6 +94,14 @@ class SessionCache extends ThreadCache {
 			}
 		}
 	}
+
+	public static function createInstance( Torpor $torpor ){
+		if( !( self::$_instance instanceof SessionCache ) ){
+			self::$_instance = new SessionCache( $torpor );
+		}
+		return( self::$_instance );
+	}
+
 	public function writeGrid( Grid $grid ){
 		if( !$grid->isLoaded() ){
 			$this->Torpor()->throwException( $this->Torpor()->containerKeyName( $grid ).' grid not loaded (can only cache loaded grids)' );
