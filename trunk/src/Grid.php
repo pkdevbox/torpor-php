@@ -163,8 +163,7 @@ class Grid extends PersistableContainer implements Iterator
 	public function Reset(){
 		$return = false;
 		if( $this->isLoaded() && $this->isDirty() ){
-			$columns = &$this->_getColumns();
-			foreach( $columns as $column ){
+			foreach( $this->Columns() as $columnName =>  $columnObj ){
 				$column->Reset();
 			}
 			$this->_setDirty( false );
