@@ -8,6 +8,8 @@ class Grid extends PersistableContainer implements Iterator
 	private $_columns = array();
 	private $_parameters = array();
 
+	private $_keyHash = '';
+
 	// TODO:
 	// [ ] Provide secondary criteria to getX methods (criteria, ID, etc.)
 	private $_referencedObjectCache = array();
@@ -120,7 +122,7 @@ class Grid extends PersistableContainer implements Iterator
 		return( $keyColumns );
 	}
 
-	public function KeyColumnNames( $flat = true ){
+	public function keyColumnNames( $flat = true ){
 		$keys = $this->Torpor()->allKeysForGrid( $this );
 		if( $flat ){
 			$flatArray = array();
@@ -136,6 +138,20 @@ class Grid extends PersistableContainer implements Iterator
 		}
 		return( array_unique( $keys ) );
 	}
+
+	protected function generateKeyHash(){
+		$keys = $this->keyColumnNames();
+		sort( $keys );
+		$data = $this->dumpArray( true, false );
+		$hash_data = array();
+		foreach( $keys as $key ){
+			$hash_data[] = $key.'='.$data[ $key ];
+		}
+		return md5( implode( '|', $hash_data ) );
+	}
+
+	protected function _getkeyHash(){ return $this->_keyHash; }
+	protected function _setKeyHash( $hash ){ return $this->_keyHash = $hash; }
 
 	public function canLoad(){
 		$pass = true;
@@ -175,7 +191,13 @@ class Grid extends PersistableContainer implements Iterator
 	public function Load( $refresh = false ){
 		if( $this->canLoad() ){
 			if( !$this->isLoaded() || $refresh ){
-				$this->Torpor()->Load( $this, $refresh );
+				// Only attempt to load if it appears that we can:
+				// 1. explicit refresh
+				// 2. NOT explicit refresh AND our key hash is different from last time
+				if( $refresh || $this->_getKeyHash() != $this->generateKeyHash() ){
+					$this->Torpor()->Load( $this, $refresh );
+				}
+				$this->_setKeyHash( $this->generateKeyHash() ); // New hash, if we loaded data
 				if( !$this->isLoaded() ){
 					// $this->throwException( 'Load of '.$this->_getObjName().' failed' );
 				}
