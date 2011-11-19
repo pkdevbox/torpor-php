@@ -54,8 +54,11 @@ $db_version = quickFetch( $connection, 'SELECT VERSION() FROM DUAL', 0 );
 */
 
 $dataTypeMap = array(
+	'bit'            => 'bool',
 	'char'           => 'char',
+	'nchar'          => 'char',
 	'varchar'        => 'varchar',
+	'nvarchar'       => 'varchar',
 	'tinyint'        => 'integer',
 	'smallint'       => 'integer',
 	'mediumint'      => 'integer',
@@ -68,11 +71,14 @@ $dataTypeMap = array(
 	'timestamp'      => 'datetime',
 	'text'           => 'text',
 	'enum'           => 'varchar', // Torpor does not currently support enum.
+	'enumeration'    => 'varchar', // Torpor does not currently support enum.
 	'double'         => 'double',
 	'tinytext'       => 'varchar',
 	'mediumint'      => 'integer',
 	'float'          => 'float',
 	'float unsigned' => 'float',
+	'numeric'        => 'float',
+	'money'          => 'float',
 	'mediumtext'     => 'text',
 	'set'            => 'varchar', // Torpor does not currently support set.
 	'time'           => 'time',
@@ -100,7 +106,8 @@ $charSetMap = array(
 	'mac'      => '8bit',
 	'roman8'   => '8bit',
 	'sjis'     => 'SJIS',
-	'utf8'     => 'UTF-8'
+	'utf8'     => 'UTF-8',
+	'UNICODE'  => 'UTF-8'
 );
 
 $sql = 'SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = "'.$db.'" AND TABLE_TYPE = "BASE TABLE"';

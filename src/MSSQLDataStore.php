@@ -156,7 +156,7 @@ class MSSQLDataStore extends ANSISQLDataStore implements DataStore {
 				$selectStatement = preg_replace( '/\bFROM\b/', ', ROW_NUMBER() OVER ( '.$orderBy.' ) AS [__ROWNUM] FROM', $selectStatement, 1 );
 				// Order has already been applied by windowing function
 				$selectStatement = preg_replace( '/ FROM (.*) ORDER BY .*?$/', ' FROM $1', $selectStatement );
-				$selectStatement = 'SELECT * FROM ( '.$selectStatement.' ) AS [derived_table] WHERE [__ROWNUM] BETWEEN '.(int)$offset.' AND '.( (int)$offset + (int)$limit ); 
+				$selectStatement = 'SELECT * FROM ( '.$selectStatement.' ) AS [derived_table] WHERE [__ROWNUM] BETWEEN '.( (int)$offset ?(int)$offset + 1 : (int)$offset ).' AND '.( (int)$offset + (int)$limit ); 
 			}
 		}
 		return( array( $this->query( $selectStatement ), $count ) );
