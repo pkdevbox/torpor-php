@@ -1,4 +1,4 @@
-#!/usr/local/bin/bash
+#!/bin/bash
 #<?PHP $ignore = <<<IGNORE
 source common.sh
 IGNORE;
@@ -72,7 +72,7 @@ $dataTypeMap = array(
 	'timestamp'      => 'datetime',
 	'text'           => 'text',
 	'enum'           => 'varchar', // Torpor does not currently support enum.
-	'double'         => 'double',
+	'double'         => 'float',
 	'tinytext'       => 'varchar',
 	'mediumint'      => 'integer',
 	'float'          => 'float',

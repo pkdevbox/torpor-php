@@ -747,6 +747,10 @@ abstract class ANSISQLDataStore {
 							$sql = ( $criteria->isNegated() ? 'NOT ' : '' ).'( '.$sql.' > '.$lowRange.' AND '.$sql.' < '.$highRange.' )';
 						}
 						break;
+					case Criteria::TYPE_BITAND:
+					case Criteria::TYPE_BITOR:
+					case Criteria::TYPE_BITXOR:
+						break;
 					case Criteria::TYPE_CONTAINS:
 						list( $target ) = $criteria->getArguments();
 						if( $criteria->isColumnTarget() ){
