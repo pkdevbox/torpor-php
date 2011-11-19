@@ -15,6 +15,21 @@ class Criteria extends CriteriaBase {
 	const TYPE_NOT_BETWEEN        = 'NOT_BETWEEN';
 	const TYPE_NOT_BETWEEN_COLUMN = 'NOT_BETWEEN_COLUMN';
 
+	const TYPE_BITAND            = 'BITAND';
+	const TYPE_BITAND_COLUMN     = 'BITAND_COLUMN';
+	const TYPE_NOT_BITAND        = 'NOT_BITAND';
+	const TYPE_NOT_BITAND_COLUMN = 'NOT_BITAND_COLUMN';
+
+	const TYPE_BITOR            = 'BITOR';
+	const TYPE_BITOR_COLUMN     = 'BITOR_COLUMN';
+	const TYPE_NOT_BITOR        = 'NOT_BITOR';
+	const TYPE_NOT_BITOR_COLUMN = 'NOT_BITOR_COLUMN';
+
+	const TYPE_BITXOR            = 'BITXOR';
+	const TYPE_BITXOR_COLUMN     = 'BITXOR_COLUMN';
+	const TYPE_NOT_BITXOR        = 'NOT_BITXOR';
+	const TYPE_NOT_BITXOR_COLUMN = 'NOT_BITXOR_COLUMN';
+
 	const TYPE_CONTAINS            = 'CONTAINS';
 	const TYPE_CONTAINS_COLUMN     = 'CONTAINS_COLUMN';
 	const TYPE_NOT_CONTAINS        = 'NOT_CONTAINS';
@@ -423,6 +438,18 @@ class CriteriaBetween extends Criteria {};
 class CriteriaBetweenColumn extends Criteria {};
 class CriteriaNotBetween extends Criteria {};
 class CriteriaNotBetweenColumn extends Criteria {};
+class CriteriaBitwiseAnd extends Criteria {};
+class CriteriaBitwiseAndColumn extends Criteria {};
+class CriteriaNotBitwiseAnd extends Criteria {};
+class CriteriaNotBitwiseAndColumn extends Criteria {};
+class CriteriaBitwiseOr extends Criteria {};
+class CriteriaBitwiseOrColumn extends Criteria {};
+class CriteriaNotBitwiseOr extends Criteria {};
+class CriteriaNotBitwiseOrColumn extends Criteria {};
+class CriteriaBitwiseXOr extends Criteria {};
+class CriteriaBitwiseXOrColumn extends Criteria {};
+class CriteriaNotBitwiseXOr extends Criteria {};
+class CriteriaNotBitwiseXOrColumn extends Criteria {};
 class CriteriaContains extends Criteria {};
 class CriteriaContainsColumn extends Criteria {};
 class CriteriaNotContains extends Criteria {};

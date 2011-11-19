@@ -87,7 +87,7 @@ class SessionCache extends ThreadCache {
 	public function initialize( array $settings ){
 		if( !session_id() ){
 			if( headers_sent() ){
-				$this->Torpor()->throwExecption( 'Cannot start session for cache management' );
+				$this->Torpor()->throwException( 'Cannot start session for cache management' );
 			}
 			if( !session_start() ){
 				$this->Torpor()->throwException( 'Session registration failed, cannot continue' );
