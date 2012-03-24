@@ -16,6 +16,15 @@ class Grid extends PersistableContainer implements Iterator
 
 	public function OnNew(){ return( true ); }
 
+	protected function _setLoaded( $bool = true )
+	{
+		if( !$bool )
+		{
+			$this->_setKeyHash( false );
+		}
+		return parent::_setLoaded( $bool );
+	}
+
 	public function _getColumn( $columnName ){
 		$columnName = $this->Torpor()->makeKeyName( $columnName );
 		if( !$this->hasColumn( $columnName ) ){
