@@ -361,7 +361,7 @@ class GridSet extends PersistableContainer implements Iterator {
 	// provided fo convenience and ease of documentation.
 	public function getFirstGrid(){
 		$this->rewind();
-		return( $this->current() );
+		return $this->current();
 	}
 	public function getCurrentGrid(){ return( $this->current() ); }
 	public function getNextGrid(){
@@ -529,10 +529,10 @@ class GridSet extends PersistableContainer implements Iterator {
 		}
 		reset( $this->_grids );
 	}
-	public function current(){ return( current( $this->_grids ) ); }
-	public function key(){ return( key( $this->_grids ) ); }
-	public function next(){ return( next( $this->_grids ) ); }
-	public function valid(){ return( $this->current() !== false ); }
+	public function current(){ return current( $this->_grids ); }
+	public function key(){ return key( $this->_grids ); }
+	public function next(){ return next( $this->_grids ); }
+	public function valid(){ return key( $this->_grids ) !== false && key( $this->_grids) !== null; }
 }
 
 class TypedGridSet extends GridSet {

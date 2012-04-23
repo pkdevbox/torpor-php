@@ -835,7 +835,7 @@ class Torpor {
 	protected function _getAllGridKeys( $gridName ){
 		$gridName = $this->containerKeyName( $gridName );
 		if( !$this->supportedGrid( $gridName ) ){
-			// This should only ever be called internall, so we shouldn't even hit this.
+			// This should only ever be called internally, so we shouldn't even hit this.
 			$this->throwException( 'Unknown grid "'.$gridName.'" requested in key collection fetch' );
 		}
 		$key_sets = array();
@@ -1385,7 +1385,17 @@ class Torpor {
 
 	// TODO: _newGridSetFromRecord
 	public function _newGridSet( $gridName = null, $sourceContent = null, $alias = false ){
-		return( new GridSet( $this, $gridName, $sourceContent, $alias ) );
+		if( $this->typedGridClasses() )
+		{
+			$class = $this->typedGridClassesPrefix().$gridName.self::OPERATION_GET_SET;
+			$set = new $class( $this );
+			if( !is_null( $sourceContent ) )
+			{
+				$set->setSourceGrid( $sourceContent, $alias );
+			}
+			return $set;
+		}
+		return new GridSet( $this, $gridName, $sourceContent, $alias );
 	}
 
 	// Guts

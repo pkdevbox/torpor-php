@@ -45,6 +45,7 @@ class Column extends PersistableContainer
 	private $_generatedOnPublish = false;
 	private $_dataName = null;
 	private $_attributes = array();
+	private $_inGetData = false; // Recursion indicator
 
 	private $_linkedColumn = null;
 	private $_linkedColumnContinual = true;
@@ -274,6 +275,22 @@ class Column extends PersistableContainer
 	// this.
 	public function getPersistData( $localOnly = false ){ return( $this->getData( $localOnly ) ); }
 	public function getData( $localOnly = false ){
+		// Look to see if we're already in the process of fetching data - if we are, and we
+		// end up here again, it means because there's an implicit load loop happening (there are
+		// only a few legitimate conditions that can generate this, such as setting data in
+		// a key field that has a default value, but rather than propagating the "localOnly" flag
+		// to be knowledgeable across a very large series of methods, it's cheaper and safer (even
+		// if it is a hack) to detect it here.
+
+		// Store the current value the _inGetData check.
+		$wasInGetData = $this->_inGetData;
+		if( $this->_inGetData )
+		{
+			$localOnly = true;
+		} else {
+			// Set to protect against recursion
+			$this->_inGetData = true;
+		}
 		if( $this->isLinked() ){
 			if( !$localOnly ){
 				if( $this->getLinkedColumn()->hasData() ){
@@ -305,6 +322,8 @@ class Column extends PersistableContainer
 				$this->Grid()->Load();
 			}
 		}
+		// Set this back to whatever it was before we got here.
+		$this->_inGetData = $wasInGetData;
 		return( $this->_data );
 	}
 

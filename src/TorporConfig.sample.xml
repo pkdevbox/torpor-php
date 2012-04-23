@@ -1,0 +1,426 @@
+<?xml version="1.0"?>
+<!-- Pre-amble here is just used to determine the conventions of this XML document  -->
+<!-- and the namespace to which it belongs.  "trpr" is the important namespace,     -->
+<!-- resolving to the URI which uniquely identifies this as a TorporConfig (version -->
+<!-- 0.1 in this case) document, and to be validated by that schema accordingly.    -->
+<!-- The schema document location is also specified for reference via               -->
+<!-- schemaLocation, and the xsi namespace is also established so that reference    -->
+<!-- can be made.  If you're familiar with XML and schemas this should be pretty    -->
+<!-- straightforward, if not you can feel safe to copy and paste.                   -->
+<!-- NOTE: The version indicator here is for the version of the configuration type  -->
+<!-- and does *not* correspond to Torpor release version necessarily.               -->
+<trpr:TorporConfig
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.tricornersoftware.com/Products/Torpor/Config/0.1 TorporConfig.xsd"
+	xmlns:trpr="http://www.tricornersoftware.com/Products/Torpor/Config/0.1"
+	version="0.1">
+
+	<!-- Complete list of supported options and their default values.  Any of these -->
+	<!-- settings may be omitted, and the default value (shown below) will be used  -->
+	<!-- instead.  The entire Options section may be omitted, and all defaults will -->
+	<!-- be used. -->
+	<Options>
+
+		<!-- If set to true, when one Grid is used as the source for fetching another -->
+		<!-- related Grid, the source Grid will cache a reference in that context to  -->
+		<!-- the resulting object.  This means that not only will repeated calls      -->
+		<!-- produce the same Grid record, they will produce it as represented by the -->
+		<!-- the same object reference.  This is a performance enhancement which      -->
+		<!-- allows for useful repeat call patterns such as:                          -->
+		<!--  if( $someGrid->getRelatedRecord()->Load() ){                            -->
+		<!--      doSoemthingTo( $someGrid->getRelatedRecord() );                     -->
+		<!--  } -->
+		<CacheReferencedGrids>true</CacheReferencedGrids>
+
+		<!-- Similar in purpose to <CacheReferencedGrids/>, this sets whether or not -->
+		<!-- to do the same with GridSet objects.  This is off by default, as the    -->
+		<!-- relationship between a Grid and resulting GridSet is less tightly       -->
+		<!-- tightly coupled than from one Grid to another (examples of the loose    -->
+		<!-- coupling include multiple source Grids and other Criteria settings).    -->
+		<CacheReferencedGridSets>false</CacheReferencedGridSets>
+
+		<!-- This is the PHP class name which will be used as the base prototype    -->
+		<!-- for every Grid's Column (unless overwridden further down in the line). -->
+		<ColumnClass>Column</ColumnClass>
+
+		<!-- May cause more E_USER_NOTICE values to be produced.  Debug classes are -->
+		<!-- a wiser choice, allowing more targetted hooks. -->
+		<Debug>false</Debug>
+
+		<!-- PHP class name for all Grid prototypes. -->
+		<GridClass>Grid</GridClass>
+		
+		<!--   This rather long-named option controls whether or not, when using a -->
+		<!-- Grid as a factory for a related Grid, or associating two Grids in a   -->
+		<!-- specific context, whether or not to automaticall "link" the           -->
+		<!-- corresponding reference Columns between the two in a situation where: -->
+		<!--    1. A reference Column does not currently have data                 -->
+		<!--    2. That Column is set to "GeneratedOnPublish"                      -->
+		<!--   This allows Grid types which have late-binding keys established by  -->
+		<!-- the repository to still be associated to one another without having   -->
+		<!-- to summarily publish everything just to get a key.  Once established, -->
+		<!-- any request to the source Column for data will be redirected to the   -->
+		<!-- now linked target Column to retrieve it's data (if it has any), which -->
+		<!-- which will then be stored locally (with the source Column) and        -->
+		<!-- finally returned to the calling interface.                            -->
+		<!--   Such a pattern allows objects with late binding primary keys, for   -->
+		<!-- example, to be associated with one another prior to publishing, which -->
+		<!-- in turn improves performance and prevents partial records from being  -->
+		<!-- written to the repository for the sole purpose of retrieving a key,   -->
+		<!-- or making some other key-determining round trip (e.g., fetch from a   -->
+		<!-- sequence) for resources which may not even be used, in the instance   -->
+		<!-- that the publish never actually takes place.                          -->
+		<!--   This has bearing on <PublishDependencies/>: these are the           -->
+		<!-- dependencies it's referring to.  If a linked Column is encountered    -->
+		<!-- with no data of its own, and the target of that link is generated on  -->
+		<!-- publish, that target will be published first and the resulting key    -->
+		<!-- propagated to the originating object. See <PerpetuateAutoLinks/> too. -->
+		<LinkUnpublishedReferenceColumns>true</LinkUnpublishedReferenceColumns>
+
+		<!-- Determines whether, when loading an object from persistence, whether -->
+		<!-- to overwite any data which was set prior to that Grid's ability to   -->
+		<!-- load (determined when one or more discrete sets of unique Columns    -->
+		<!-- has been set).  Defaults to true, as shown here, which means any     -->
+		<!-- data already set (which does not correspond to the loaded data) will -->
+		<!-- be wiped out.  This will also generate an E_USER_NOTICE to indicate  -->
+		<!-- somebody's data is going missing, in case this results in aberrant   -->
+		<!-- or unexpected behavior. -->
+		<OverwriteOnLoad>true</OverwriteOnLoad>
+
+		<!-- The number of records to fetch from the repository for GridSet type -->
+		<!-- objects where the local GridSet page size has not been explicitly   -->
+		<!-- set.  A negative number corresponds to "all available records," and -->
+		<!-- is not recommended (especially for web apps) unless you really need -->
+		<!-- all records.  However, this is the default in order to avoid nasty  -->
+		<!-- surprises in the form of failing to operate on all records matching -->
+		<!-- requested criteria. -->
+		<PageSize>-1</PageSize>
+
+		<!-- Whether or not any data description language (modifications to  -->
+		<!-- repository structure) will be permitted.  Disabled by default,  -->
+		<!-- and probably only useful if one plans on working with temporary -->
+		<!-- tables and the like.  Whether or not something is DDL is up to  -->
+		<!-- the repository handler to figure out, and for that handler to   -->
+		<!-- query this setting - it is not pushed, nor does Torpor intro-   -->
+		<!-- spect incoming queries. -->
+		<PermitDDL>false</PermitDDL>
+
+		<!-- Used together with <LinkUnpublishedReferenceColumns/>, this setting -->
+		<!-- indicates whether or not to maintain that linked relationship after -->
+		<!-- data has been retrieved from the target Column.  When set to false, -->
+		<!-- as soon as some data has been retrieved from the target Column the  -->
+		<!-- link will be severed and the 2 will go their separate ways.  This   -->
+		<!-- is the default, since reference keys between records are not        -->
+		<!-- expected to change with sufficient frequency to warrant contining   -->
+		<!-- the link.  If set to true, however, the 2 objects will continue to  -->
+		<!-- operate in tandem; useful if keys are expected to be changing for   -->
+		<!-- some reason. -->
+		<!-- NOTE: The source Column data is not pushed to by the target Column; -->
+		<!-- the link relationship is one strictly of pull to source from target -->
+		<!-- when the source Column's data is requested.  Thus it's possible to  -->
+		<!-- change the target Column's data many times before the source Column -->
+		<!-- ever wises up.  Just FYI. -->
+		<PerpetuateAutoLinks>false</PerpetuateAutoLinks>
+
+		<!-- Determines whether or not to publish all Columns, or just those which -->
+		<!-- have changed.  Applies to loaded Grids only (since all newly created  -->
+		<!-- records will be published in their entirey anyway), and is not        -->
+		<!-- recommended as "false" for use with distributed caching, since the    -->
+		<!-- Cache interface is an "all or nothing" rather than a delta set.  This -->
+		<!-- feature helps performance with small web apps and can assist in       -->
+		<!-- reducing incidental data overwrites at the final repository level,    -->
+		<!-- but as mentioned above would be largely superceded by the use of      -->
+		<!-- distributed caching and should be set to true in those environments.  -->
+		<!--   This is most useful in those data adapters which do not support     -->
+		<!-- pre-compiled queries (with data placeholders) for performance,  since -->
+		<!-- it does require that custom queries be assembled each time which      -->
+		<!-- negate any pre-compilation performance gain. -->
+		<PublishAllColumns>false</PublishAllColumns>
+
+		<!-- If a required Column does not have data, and is Linked to a Column which -->
+		<!-- also does not have data but is set to GeneratedOnPublish, this setting   -->
+		<!-- determines whether to publish the linked target Column in order to       -->
+		<!-- retrieve its data for use in the Column we're intending to publish which -->
+		<!-- requires it.  This is a recursive-safe operation in that it will detect  -->
+		<!-- circular references, but only in that it will detect them - it will end  -->
+		<!-- up throwing an exception rather than segfaultiing is all. -->
+		<PublishDependencies>true</PublishDependencies>
+
+		<!-- Once a Grid has been published, this setting determines whether to mark -->
+		<!-- the Grid as not yet having loaded, such that subsequent requests for    -->
+		<!-- data will cause the just-in-time load to fire.  Though this slightly    -->
+		<!-- decreases performance (by increasing repository communication), it's    -->
+		<!-- useful in those circumstances where data may have been altered once it  -->
+		<!-- hit the repository (precision truncation, formatting, etc.) in order to -->
+		<!-- ensure everything stays in agreement.  If set to "false," however, the  -->
+		<!-- data as constituted in that Grid at the moment of publish will persist, -->
+		<!-- both locally and in any Cache configuration. -->
+		<ReloadAfterPublish>true</ReloadAfterPublish>
+
+		<!-- If set to true, instead of using the Torpor Grid class as the basic  -->
+		<!-- prototype for all Grid record instances, a new class will be created -->
+		<!-- as an extension to the class "TypedGrid."  The new class name will   -->
+		<!-- correspond to the Torpor key name for the Grid (e.g., User becomes   -->
+		<!-- USER, order_item becomes ORDERITEM, etc.) - due to PHP case handling -->
+		<!-- these can still be accessed case insensitively (User, OrderItem).    -->
+		<!-- This is most useful in a singleton environment, but can also be used -->
+		<!-- with Torpor as an instance if it is passed as an argument in the     -->
+		<!-- construction of the object: $user = new User( $torpor );             -->
+		<!-- NOTE: Torpor must either already have been initialized from the      -->
+		<!-- configuration file, or be used with appropriate hooks in the lazy    -->
+		<!-- loader (__autoload function) in order for this pattern to be used.   -->
+		<!-- See als <TypedGridClassesPrefix/> -->
+		<TypedGridClasses>false</TypedGridClasses>
+
+		<!-- Empty by default, any string used here will be prepended to the class -->
+		<!-- names used by <TypedGridClasses/>.  For example, if this contained    -->
+		<!-- "Torpor," and a Grid "User" was defined, the new class would be named -->
+		<!-- "TorporUser" (technically TorporUSER due to the key sanitization, but -->
+		<!-- for readability Pascal case is used). -->
+		<TypedGridClassesPrefix></TypedGridClassesPrefix>
+
+		<!-- The DataTypeMap is completely optional.  It may be used either here, -->
+		<!-- where it will apply to every mapped Column type on every grid, or it -->
+		<!-- may be defined per-Grid.  Its purpose is to instruct Torpor to       -->
+		<!-- instantiate every Column of a specific data type as a particular     -->
+		<!-- class type.  This is especially useful for providing additional      -->
+		<!-- handlers, hooks (such as the PersistData hooks), validation, or      -->
+		<!-- other generally useful utility routines to particular data types.    -->
+		<!-- There are no defaults for DataTypeMap - those provided below are for -->
+		<!-- illustration only.  Any type not appearing here will default to the  -->
+		<!-- value of the <ColumnClass/> option. -->
+		<DataTypeMap>
+			<!-- DataMap entries consist of a class name, and the Column data type -->
+			<!-- to which that class name applies.  The same class name may appear -->
+			<!-- multiple times, but only a single mapping per data type is        -->
+			<!-- supported.  If multiple are provided, only the last will be used. -->
+			<DataMap class="DateTime" type="date"/>
+			<DataMap class="DateTime" type="datetime"/>
+			<DataMap class="DateTime" type="time"/>
+		</DataTypeMap>
+	</Options>
+
+	<!-- While technically optional, Torpor is not especially functional without -->
+	<!-- the ability to communicate with a database, and depending on what you   -->
+	<!-- would like to do with it may result in producing copious exceptions.    -->
+	<!-- The rationale for remaining optional is in order to provide Torpor      -->
+	<!-- object interface benefits to a range of environments, such as SOAP      -->
+	<!-- intermediaries. -->
+	<Repository>
+		<!-- There are 2 possible sets of elements for <Repository/> - either a -->
+		<!-- single <DataStore/> entry, or a pair of <ReadDataStore/> and       -->
+		<!-- <WriteDataStore/> elements.  This allows for differentiation for   -->
+		<!-- datastore connection types, which is especially useful in master / -->
+		<!-- slave replication setups.  No matter what kind of DataStore        -->
+		<!-- element is used, the attributes and structure are identical.       -->
+		<!-- NOTE: "type" is a required attribute, but the value is             -->
+		<!-- unrestricted.  This should be set to "Custom" (case insensitive)   -->
+		<!-- when using a user-defined DataStore class.                         -->
+		<!-- "class" is an optional attribute unless "type" is set to "Custom"  -->
+		<!-- or any other non-native data store type.  Native data store engine -->
+		<!-- types include:                                                     -->
+		<!--     MSSQL, MySQL, MySQLi (requires PHP 5.3.0 or higher), ODBC,     -->
+		<!--     OCI, Oracle, Postgres, and SQLite.                             -->
+		<DataStore type="MySQL" class="MySQLDataStore">
+
+			<!-- <Parameter/>s are freeform name/value pairings, the use of which -->
+			<!-- is solely between the developer and the DataStore class.  These  -->
+			<!-- will usually contain connection parameters or file descriptors,  -->
+			<!-- or extended settings applicable to the DataStore.  For listings  -->
+			<!-- of the parameters available (or required) by the native Torpor   -->
+			<!-- adapters see their corresponding individual documentation.       -->
+			<!-- The value can be provided either as content passed to the        -->
+			<!-- "value" attribute or as free text content to the interior of the -->
+			<!-- <Parameter/> tag (including <![CDATA[]]> escaping).              -->
+			<!-- NOTE: the use of the encrypted flag does not specify the         -->
+			<!-- the encryption style to be used.  This is set to an internal     -->
+			<!-- Torpor routine as of this release (version 1.0), which can be    -->
+			<!-- generated using the included utilities. -->
+			<Parameter name="host">localhost</Parameter>
+			<Parameter name="user" value="testuser"/>
+			<Parameter encrypted="true" name="password" value="ac56d8e742"/>
+		</DataStore>
+	</Repository>
+
+	<!-- Grids acts as the generic container for all defined <Grid/>s, and is the -->
+	<!-- first mandatory section of the TorporConfig configuration file.  It has  -->
+	<!-- no attributes, required or otherwise. -->
+	<Grids>
+
+		<!-- The only required attribute of Grid is "dataName", used to identify -->
+		<!-- the source of records of this Grid type to the DataStore engine.  A -->
+		<!-- Torpor style key (all non-alphabetic, non-numeric characters        -->
+		<!-- removed and the remaining string converted to upper case) will be   -->
+		<!-- derived from the "dataName" unless "name" is also provided ("name   -->
+		<!-- will receive the same conversion treatment; however, Torpor is more -->
+		<!-- lax than PHP in that it is also case insensitive, but also allows   -->
+		<!-- for the random insertion of underscore characters when accessing    -->
+		<!-- defined Grid or Column members, so this conversion is more for      -->
+		<!-- internal consistancy than as a user restriction).                   -->
+		<!--   "class", if provided, will overwrite the <GridClass/> optional    -->
+		<!-- value for all instances of this grid.                               -->
+		<!--   "name" is used to differentiate this Grid by something other than -->
+		<!-- the "dataName" value.  It is recommended that this be a singular    -->
+		<!-- name, in order to avoid confusion in the API invocations.  If       -->
+		<!-- provided, this is the name by which it will be identified through-  -->
+		<!-- out the remainder of the configuration as well; any reference keys  -->
+		<!-- identifying this Grid need to use this value (otherwise, the value  -->
+		<!-- of "dataName" will be the identifier).  The Torpor style key,       -->
+		<!-- derived from either this or "dataName", must be unique among all    -->
+		<!-- grids.                                                              -->
+		<!--   "readOnly" indicates that this grid will only be populated from   -->
+		<!-- the DataStore, and will never be published (attempting to do so     -->
+		<!-- will result in an exception).                                       -->
+		<!--   "type" describes whether this Grid will contain pertinent records -->
+		<!-- in their own right, or whether it serves solely as the glue between -->
+		<!-- other tables in a one- or many- to-many relationship.  Valid values -->
+		<!-- are "data" (individual records) or "map" (relationship mapping      -->
+		<!-- Grid).  For a "map" type Grid, all columns must comprise the        -->
+		<!-- <Primary/> key, and all columns must be used in some <Foreign/> key -->
+		<!-- definition.  Only under these circumstances is it possible to       -->
+		<!-- automatically maintain the contents based on Torpor activity.       -->
+		<!-- Default value is "data". -->
+		<Grid class="User" dataName="USERS" name="User" readOnly="false" type="data">
+			<!-- <Columns/> is the only required entity member of <Grid/>, and serves -->
+			<!-- only to contain <Column/> entities. -->
+			<Columns>
+
+				<!-- "dataName" and "name" follow the same conventions described for      -->
+				<!-- //Grid@dataName, both in construction and meaning to Torpor.         -->
+				<!--   "type" describes the data type as it will be represented within    -->
+				<!-- PHP.  It is possible, through the use of Column.*PersistData hooks,  -->
+				<!-- to support a disconnect between the two (examples would include      -->
+				<!-- a database column of CHAR(1) or INT being used in place of a literal -->
+				<!-- boolean, which can be treated within Torpor and PHP as a boolean but -->
+				<!-- correctly filter/map back to the database conventions and limitats). -->
+				<!--   There are several different types allowed:                         -->
+				<!--     binary: validates content byte length only, used to store raw    -->
+				<!--             data or file contents.                                   -->
+				<!--     bool: literal boolean value, evaluates to/from true/false in PHP -->
+				<!--     char: character/text data of variable encoding                   -->
+				<!--     class: specifies that a different class will be used to          -->
+				<!--            represent this Column, sufficient to perform all          -->
+				<!--            necessary validation.  It is not required to have this    -->
+				<!--            value for all Column definitions with a "class" defined.  -->
+				<!--            It should only be used when there is no need for extra    -->
+				<!--            type-hinted or controlled validation (including content   -->
+				<!--            length) outside of what the specified "class" will        -->
+				<!--            provide.  When this is set, the "class" attribute must    -->
+				<!--            also be provided                                          -->
+				<!--     date: Stores date content in 'YYYY-MM-DD' (where '-' may be      -->
+				<!--           omitted or any one of of , . - or / ).  Note that while    -->
+				<!--           structure will be validated, it is possible to specify out -->
+				<!--           of range dates (such as February 31st) that may fail when  -->
+				<!--           it reaches the data store.  For full validation and useful -->
+				<!--           utility methods it is highly recommended to wrap this in a -->
+				<!--           Column extending class to expose/provide those features    -->
+				<!--     datetime: A concatenation of the "date" data validation and the  -->
+				<!--               "time" validation, separated by a single optional      -->
+				<!--               whitespace character                                   -->
+				<!--     float: floating point number, enforced as native float in PHP    -->
+				<!--     integer: signed integer number, with native PHP enforcement      -->
+				<!--     text: character/text data of variable encoding, synonymous with  -->
+				<!--           char or varchar types                                      -->
+				<!--     time: 24-hour formatted time value with leading zeros, accepting -->
+				<!--           , : or - as the separator.  Requires Hours, Minutes, and   -->
+				<!--           Seconds                                                    -->
+				<!--     unsigned: unisgned integer number, used as the native PHP int    -->
+				<!--               with the addition of the signed (>= 0) enforcement     -->
+				<!--     varchar: character/text data of variable encoding, synonymous    -->
+				<!--              with char or text types                                 -->
+				<!--   "generatedOnPublish" indicates late-binding data, populated once   -->
+				<!-- the record is published to the data store.  This special designation -->
+				<!-- allows the repository adapter to populate the column, and for Grid   -->
+				<!-- objects to associate with one another prior to publishing, maintain  -->
+				<!-- that association (this time with data) after publishing, and use it  -->
+				<!-- to trace dependencies to publish in a cascade fashion (assuming      -->
+				<!-- <PublishDependencies/> is set to true).  It is still possible to     -->
+				<!-- manually populate this data as well.  This designation can be used   -->
+				<!-- for multiple columns, and columns of any data type.                  -->
+				<Column name="Id" dataName="USER_ID" type="unsigned" generatedOnPublish="true"/>
+
+				<!-- Default "length" attribute value is -1, indicating "unlimited."   -->
+				<!-- 0-length strings are essentially useless and not recommended.     -->
+				<!-- This attribute is enforced in the PHP: data beyond this length    -->
+				<!-- will be truncated and an E_USER_WARNING generated.  If "encoding" -->
+				<!-- is set and the Multibyte String extension is available, mb_strlen -->
+				<!-- is used to measure data length in number of characters; otherwise -->
+				<!-- this will fall back to strlen, which will almost certainly        -->
+				<!-- measure multi-byte strings in bytes instead and may thus result   -->
+				<!-- in unintentional truncation for strings with multi-byte encoding  -->
+				<!-- close to the same character length as "length".                   -->
+				<Column name="UserName" dataName="USER_NAME" type="varchar" length="255"/>
+
+				<!-- This column illustrates the only two required attributes, "dataName" -->
+				<!-- and "type". -->
+				<Column dataName="CREATED_DATE" type="datetime"/>
+
+				<!-- This column contains every possible option in alphabetical order. -->
+				<!-- Only those not previously discussed for Column will be defined.   -->
+				<!--  "class" is the class name which should be instantiated for this  -->
+				<!-- Column when the containing Grid is created.  This will override   -->
+				<!-- the //Column/parent::Columns/parent::Grid/DataTypeMap settings if -->
+				<!-- provided, as well as the //Options/DataTypeGrid.  This must be a  -->
+				<!-- valid PHP class name or the special keyword "none" which opts the -->
+				<!-- Column out of the //DataTypeMap specifications, whereupon it will -->
+				<!-- make use of the //Options/ColumnClass definition.                 -->
+				<!--  The contents of "default" will be the initial data value of this -->
+				<!-- column upon instantiation; however, this does count as a data     -->
+				<!-- assignment event and the column will be marked as modified for    -->
+				<!-- publish.  This value will also be used if reset() is called on    -->
+				<!-- the column, rather than moving all the way to a null value.       -->
+				<!--  "encoding" refers to the encoding into which the contents of a   -->
+				<!-- string should be translated in PHP.  Default value is empty/null, -->
+				<!-- which uses all PHP internal defaults and strlen for all length    -->
+				<!-- assessments.  If provided, the Mutlibyte String extension must be -->
+				<!-- available to be useful (otherwise the value will be ignored, and  -->
+				<!-- an E_USER_WARNING generated), and this value must correspond to   -->
+				<!-- one of the values returned by mb_list_encodings.  All incoming    -->
+				<!-- data will be subjected to mb_convert_encoding to be explicitly    -->
+				<!-- set the internal encoding in order to be safe for use with the    -->
+				<!-- repository.  Note that in order to be used properly, some         -->
+				<!-- encoding types require that the locale be set prior to use and    -->
+				<!-- will affect the outcome of the conversion.                        -->
+				<!--  "length" applies to "binary" or "char/varchar/text" type Columns -->
+				<!-- and is enforced in the PHP: all contents beyond this length are   -->
+				<!-- truncated during data assignment.  Length measurement for binary  -->
+				<!-- is in bytes, and for all text-related types as characters based   -->
+				<!-- on the "encoding" attribute.  If no encoding is set or if the     -->
+				<!-- Multibyte String extension is unavailable, the standard strlen    -->
+				<!-- function will be used.  Note that this will cause any multi-byte  -->
+				<!-- values to be considered as length-in-bytes rather than length-in- -->
+				<!-- characters, which may cause unexpected results; it's better to    -->
+				<!-- avoid that by either using all ISO-8859-1 (php default) or having -->
+				<!-- Multibyte String installed.                                       -->
+				<!--  "nullable" indicates whether the Column may be assigned a        -->
+				<!-- literal PHP null.  The default value is "true", so unless this is -->
+				<!-- explicitly set to false the assignment will succeed.  Note that   -->
+				<!-- 0 (zero) or '' (empty string) do not count as null.  Regardless   -->
+				<!-- of this setting, a newly instantiated column (or a linked column  -->
+				<!-- to another Column which has not yet been provided with its data)  -->
+				<!-- may contain null by virtue of not having yet been assigned.  In   -->
+				<!-- order to differentiate between a nullable Column which has not    -->
+				<!-- been assigned and one that has been assigned with a null value,   -->
+				<!-- the Column::hasData() method may be used.                         -->
+				<!--  "precision" only has bearing on numeric Column types, and will   -->
+				<!-- simply be ignored in other contexts.  This refers to the number   -->
+				<!-- of decimal places OR the order of magnitude available to the      -->
+				<!-- Column.  Order of magnitude is specified by making this negative. -->
+				<!-- The default value is 0, so it is imperative that this be          -->
+				<!-- explicitly set for all floating point numeric data types.         -->
+				<Column class="PasswordColumn" dataName="PASSWORD" default="" encoding="ASCII" generatedOnPublish="false" length="32" name="Password" nullable="false" precision="0" readOnly="false" type="varchar"/>
+
+
+			</Columns>
+			<Commands>
+			</Commands>
+			<DataStoreParameters/>
+			<DataTypeMap/>
+			<Keys>
+				<Foreign/>
+				<Primary/>
+				<Unique/>
+			</Keys>
+		</Grid>
+	</Grids>
+</trpr:TorporConfig>
