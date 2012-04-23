@@ -138,14 +138,29 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 				$this->throwException( 'Could not change database to '.$database.': '.$this->error() );
 			}
 			if( $character_set = $this->getParameter( 'character_set' ) ){
-				$this->query(
-					'SET NAMES '.$this->escape( $character_set, true )
-					.(
-						$this->getParameter( 'collation' )
-						? ' COLLATE '.$this->escape( $this->getParameter( 'collation' ), true )
-						: ''
-					)
-				);
+				try
+				{
+					$this->query(
+						'SET NAMES '.$this->escape( $character_set, true )
+						.(
+							$this->getParameter( 'collation' )
+							? ' COLLATE '.$this->escape( $this->getParameter( 'collation' ), true )
+							: ''
+						)
+					);
+				} catch( TorporException $e ){
+					// When using mysql_pconnect, it's not uncommon to encounter a connection
+					// that still has an error on the register, since having encountered one
+					// would have caused the prior thread to throw an exception.  Since MySQL
+					// only clears errors and warnings when a successful operation is
+					// undertaken on a *table*, and the above query is not acting on a table,
+					// we at most want to turn this into a mild warning.  This will allow
+					// further activities to take place on the same connection and flush out
+					// the error.  Or if we've encountered a real problem and the connection
+					// has gone away then the next query will blow up too, but at least that
+					// one isn't being trapped.
+					trigger_error( 'Stale error encountered in persistent MySQL connection?: '.$e->getMessage(), E_USER_NOTICE );
+				}
 			}
 		}
 	}
@@ -322,14 +337,36 @@ class MySQLDataStore extends ANSISQLDataStore implements DataStore {
 			$foundKeyColumn = false;
 			if( is_array( $primaryKey ) ){
 				foreach( $primaryKey as $keyColumn ){
-					if( !$keyColumn->isGeneratedOnPublish() || $keyColumn->hasData() ){ continue; }
+					if( !$keyColumn->isGeneratedOnPublish() || $keyColumn->hasData() )
+					{
+						continue;
+					}
 					$foundKeyColumn = $keyColumn;
 					break;
 				}
-			} else if( $primaryKey->isGeneratedOnPublish() && !$primaryKey->hasData() ){
+			} else if(
+				$primaryKey instanceof Column
+				&& $primaryKey->isGeneratedOnPublish()
+				&& !$primaryKey->hasData()
+			){
 				$foundKeyColumn = $primaryKey;
 			}
-			if( $foundKeyColumn ){
+			if(
+				$foundKeyColumn
+				&& in_array(
+					// AUTO_INCREMENT (or anything that sets LAST_INSERT_ID() values) can
+					// only be numeric in MySQL.  If you have a non-numeric auto-generated
+					// primary key field, it will need to be retrieved using other means
+					// (either by having a unique key configuration populated within the grid,
+					// or by generating that key before sending to the database).
+					$foundKeyColumn->getType(),
+					array(
+						Column::TYPE_FLOAT,
+						Column::TYPE_INTEGER,
+						Column::TYPE_UNSIGNED_INTEGER
+					)
+				)
+			){
 				// Executing the query directly, since the mysql_insert_id() command casts the return
 				// value to c(long), and may truncate.
 				$result = $this->query( 'SELECT LAST_INSERT_ID()' );
