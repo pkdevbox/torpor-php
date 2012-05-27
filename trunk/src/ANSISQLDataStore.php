@@ -502,12 +502,20 @@ abstract class ANSISQLDataStore {
 					.$this->escapeDataNameAlias( $columnName );
 			}
 		}
-		$sql = 'SELECT DISTINCT '.implode( ', ', $declarations ).' FROM '.$from;
-		if( count( $clauses ) > 0 ){ $sql.= ' WHERE '.implode( ' AND ', $clauses ); }
+		$fake_criteria = new CriteriaSet();
+		$order_by = '';
 		if( is_array( $orderBy ) && count( $orderBy ) > 0 ){
 			$orderClauses = array();
 			foreach( $orderBy as $sortSpec ){
 				list( $gridName, $columnName, $order ) = $sortSpec;
+				$fake_criteria->addCriteria(
+					new CriteriaNotEquals(
+						$gridName,
+						$columnName,
+						null
+					)
+				);
+
 				if( $order == GridSet::ORDER_RANDOM ){
 					$orderClauses[] = 'RAND()';
 				} else {
@@ -516,9 +524,11 @@ abstract class ANSISQLDataStore {
 						.' '.( $order == GridSet::ORDER_DESCENDING ? 'DESC' : 'ASC' );
 				}
 			}
-			$sql.= ' ORDER BY '.implode( ', ', $orderClauses );
+			$order_by.= ' ORDER BY '.implode( ', ', $orderClauses );
 		}
-		return( $sql );
+		$sql = 'SELECT DISTINCT '.implode( ', ', $declarations ).' FROM '.$this->CriteriaToJoinClause( $this->getTorpor()->containerKeyName( $grid ), $fake_criteria );
+		if( count( $clauses ) > 0 ){ $sql.= ' WHERE '.implode( ' AND ', $clauses ); }
+		return( $sql.$order_by );
 	}
 
 	protected function selectAndCount( $selectStatement, $limit = null, $offset = null ){
@@ -683,13 +693,23 @@ abstract class ANSISQLDataStore {
 				.' '.$this->asColumnOperator.' '
 				.$this->escapeDataNameAlias( $columnName );
 		}
-		$sql = 'SELECT DISTINCT '.implode( ', ', $declarations )
-			.' FROM '.$this->CriteriaToJoinClause( $sourceGridName, $criteria ).' '
-			.$this->CriteriaToConditions( $sourceGridName, $criteria );
+		$fake_criteria = clone $criteria;
+		// In order to ensure any remote (joined) table sort conditions are valid, they need to be part of the
+		// join clause.  Easiest way to do that is to make sure they show up in the criteria collection, even
+		// if artificially.
+		$order_by = '';
 		if( is_array( $orderBy ) && count( $orderBy ) > 0 ){
 			$orderClauses = array();
 			foreach( $orderBy as $sortSpec ){
 				list( $gridName, $columnName, $order ) = $sortSpec;
+				$fake_criteria->addCriteria(
+					new CriteriaNotEquals(
+						$gridName,
+						$columnName,
+						null
+					)
+				);
+					
 				if( $order == GridSet::ORDER_RANDOM ){
 					$orderClauses[] = 'RAND()';
 				} else {
@@ -698,9 +718,12 @@ abstract class ANSISQLDataStore {
 						.' '.( $order == GridSet::ORDER_DESCENDING ? 'DESC' : 'ASC' );
 				}
 			}
-			$sql.= ' ORDER BY '.implode( ', ', $orderClauses );
+			$order_by.= ' ORDER BY '.implode( ', ', $orderClauses );
 		}
-		return( $sql );
+		$sql = 'SELECT DISTINCT '.implode( ', ', $declarations )
+			.' FROM '.$this->CriteriaToJoinClause( $sourceGridName, $fake_criteria ).' '
+			.$this->CriteriaToConditions( $sourceGridName, $criteria );
+		return( $sql.$order_by );
 	}
 
 	public function CriteriaHandlerTYPE( $sourceGridName, Criteria $criteria, $column ){ /* return( $finishedSQLexpression ); */ }

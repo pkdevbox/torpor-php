@@ -419,6 +419,7 @@ class Grid extends PersistableContainer implements Iterator
 				// essentially shortcutting the process and inverting the mapping for the sake
 				// of convenience.  This is potentially dangerous, but has appropriate
 				// precedent in 3rd-normal databases.
+				// TODO: Where's the support for GridSets?
 				$gridType = $noun;
 				if(
 					!$this->Torpor()->supportedGrid( $noun )
@@ -432,6 +433,7 @@ class Grid extends PersistableContainer implements Iterator
 				$newCommand = Torpor::OPERATION_NEW.$gridType;
 				$targetGrid = $this->Torpor()->$newCommand();
 				$setCommand = Torpor::OPERATION_SET.$noun;
+				// TODO: Wait, shouldn't this be inverted?  If it's Them what's referencing Us, we should be doing $them->setUs( $this );
 				$this->$setCommand( $targetGrid );
 				return( $targetGrid );
 			}

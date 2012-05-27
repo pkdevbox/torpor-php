@@ -54,7 +54,7 @@ class Column extends PersistableContainer
 	private $_originalData = null;
 	private $_data = null;
 
-	public function Column( Torpor $torpor, $name = null, SimpleXMLElement $xmlDef = null, Grid $grid = null ){
+	public function __construct( Torpor $torpor, $name = null, SimpleXMLElement $xmlDef = null, Grid $grid = null ){
 		parent::__construct( $torpor, $name );
 		if( $grid instanceof Grid ){
 			$this->setGrid( $grid );
