@@ -8,7 +8,7 @@ class CriteriaSet extends CriteriaBase implements Iterator {
 	private $_criteria = array();
 	private $_type = self::TYPE_AND;
 
-	public function CriteriaSet( $type ){
+	public function CriteriaSet( $type = null ){
 		if( !empty( $type ) ){ $this->setType( $type ); }
 		$args = func_get_args();
 		foreach( array_slice( $args, 1 ) as $criterion ){
