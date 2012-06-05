@@ -140,7 +140,7 @@ class Column extends PersistableContainer
 			// WARNING: validating content from the dataStore; which can throw some
 			// strange warnings if the XML and the repository definitions don't agree.
 			$this->_defaultData = (string)$xmlDef->attributes()->default;
-			$this->_data = $this->validate( $this->_defaultData );
+			$this->_data = $this->validatePersistData( $this->_defaultData );
 			$this->setOriginalData( $this->_data );
 			$this->_setDirty();
 		}
@@ -313,7 +313,7 @@ class Column extends PersistableContainer
 					|| (
 						$this->isDirty()
 						&& $this->hasDefaultData()
-						&& $this->_data == $this->_defaultData
+						&& $this->_data == $this->validatePersistData( $this->_defaultData )
 					)
 				)
 				&& $this->Grid() instanceof Grid
