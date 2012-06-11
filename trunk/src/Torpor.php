@@ -1277,6 +1277,10 @@ class Torpor {
 			: $this->referenceKeysBetween( $record, $gridName, self::NON_ALIAS_KEYS )
 		);
 		foreach( $references as $sourceColumnName => $targetColumnName ){
+			if( !$record->Column( $sourceColumnName )->hasData() && $record->canLoad() )
+			{
+				$record->Load();
+			}
 			if( $record->Column( $sourceColumnName )->hasData() ){
 				$targetGrid->Column( $targetColumnName )->setData( $record->Column( $sourceColumnName )->getData() );
 			}
