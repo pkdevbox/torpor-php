@@ -85,7 +85,7 @@ class TorporConfigColumn {
 	public $generatedOnPublish = null;
 	public $length = null;
 	public $name = null;
-	public $nullable = null;
+	public $nullable = true;
 	public $precision = null;
 	public $readOnly = null;
 	public $type = '';
